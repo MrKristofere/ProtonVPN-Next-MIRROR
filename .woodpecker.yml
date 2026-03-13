@@ -24,6 +24,7 @@ steps:
       SENTRY_PROJECT:
         from_secret: SENTRY_PROJECT
     commands:
+      - apt-get update && apt-get install -y openjdk-17-jdk
       - echo $SIGNING_KEY_BASE64 | base64 -d > app/release.keystore
       - chmod +x gradlew
       - export SIGNING_KEY_FILE=release.keystore
