@@ -29,6 +29,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://maven.pkg.jetbrains.space/public/p/compose/dev") }
         maven { url = uri("https://jitpack.io") }
         maven { url = uri("https://clojars.org/repo/") }
     }
@@ -38,3 +39,9 @@ rootProject.name = "ProtonVpnNext"
 
 // Include main application module
 include(":app")
+
+// Shared Kotlin module (cross-platform)
+include(":shared")
+
+// Desktop target (Linux)
+include(":desktop")

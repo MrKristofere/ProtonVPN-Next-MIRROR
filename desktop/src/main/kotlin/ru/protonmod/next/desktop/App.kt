@@ -1,0 +1,392 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
+package ru.protonmod.next.desktop
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Logout
+import androidx.compose.material.icons.rounded.Map
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import ru.protonmod.next.desktop.ui.MainTarget
+import ru.protonmod.next.desktop.ui.components.DesktopConnectionCard
+import ru.protonmod.next.desktop.ui.components.LiquidGlassBottomBar
+import ru.protonmod.next.desktop.ui.screens.CountriesScreen
+import ru.protonmod.next.desktop.ui.screens.ProfilesScreen
+import ru.protonmod.next.desktop.ui.screens.SettingsScreen
+import ru.protonmod.next.ui.theme.ProtonNextTheme as Theme
+
+@Composable
+fun App() {
+    val authClient = remember { DesktopAuthClient() }
+    val vpnClient = remember { DesktopVpnClient() }
+    val viewModel = remember { DesktopLoginViewModel(authClient, vpnClient) }
+
+    val uiState by viewModel.uiState.collectAsState()
+    val servers by viewModel.servers.collectAsState()
+    val recentConnections by viewModel.recentConnections.collectAsState()
+
+    var showCaptcha by remember { mutableStateOf(false) }
+    var captchaState by remember { mutableStateOf<DesktopLoginUiState.RequiresCaptcha?>(null) }
+    var selectedTarget by remember { mutableStateOf(MainTarget.Home) }
+
+    var connectedServer by remember { mutableStateOf<ServerEntry?>(null) }
+    var isConnecting by remember { mutableStateOf(false) }
+
+    Theme {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            when (uiState) {
+                is DesktopLoginUiState.Idle, is DesktopLoginUiState.Loading, is DesktopLoginUiState.Error -> {
+                    WelcomeContent(
+                        uiState = uiState,
+                        onGuest = { viewModel.loginAnonymous() },
+                        onRetry = { viewModel.loginAnonymous() },
+                        onClearError = { viewModel.clearError() }
+                    )
+                }
+                is DesktopLoginUiState.RequiresCaptcha -> {
+                    val state = uiState as DesktopLoginUiState.RequiresCaptcha
+                    captchaState = state
+                    showCaptcha = true
+                }
+                is DesktopLoginUiState.Success -> {
+                    DashboardScreen(
+                        servers = servers,
+                        recentConnections = recentConnections,
+                        connectedServer = connectedServer,
+                        isConnecting = isConnecting,
+                        selectedTarget = selectedTarget,
+                        onTargetSelected = { selectedTarget = it },
+                        onLogout = { viewModel.clearError() },
+                        onConnect = { server ->
+                            viewModel.connectToServer(server)
+                            connectedServer = server
+                            // Mocking connection state for now
+                            // In real app, this would be handled by the ViewModel/Go library
+                        }
+                    )
+                }
+            }
+
+            if (showCaptcha && captchaState != null) {
+                CaptchaDialog(
+                    webUrl = captchaState!!.webUrl,
+                    onDismiss = {
+                        showCaptcha = false
+                        viewModel.clearError()
+                    },
+                    onCaptchaSolved = { token ->
+                        showCaptcha = false
+                        captchaState = null
+                        viewModel.retryWithCaptcha(token)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WelcomeContent(
+    uiState: DesktopLoginUiState,
+    onGuest: () -> Unit,
+    onRetry: () -> Unit,
+    onClearError: () -> Unit
+) {
+    val isLoading = uiState is DesktopLoginUiState.Loading
+    val errorMessage = (uiState as? DesktopLoginUiState.Error)?.message
+    val colors = Theme.colors
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0x6611D8CC), Color(0x006E4BFF))
+                )
+            )
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "ProtonVPN Next",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = colors.textInverted,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = "Secure VPN access on desktop. Guest login works without the mobile libraries.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = colors.textWeak,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = { onGuest() },
+            enabled = !isLoading,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = colors.brandNorm,
+                contentColor = colors.textInverted
+            )
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = colors.textInverted,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text(
+                    text = "Continue as Guest",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        errorMessage?.let {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = it,
+                color = colors.notificationError,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .clickable { onClearError() }
+                    .padding(8.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "If you see a captcha prompt, follow the instructions in the popup.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textWeak.copy(alpha = 0.7f),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Tip: If the captcha fails, try again.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textWeak.copy(alpha = 0.55f),
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun DashboardScreen(
+    servers: List<ServerEntry>,
+    recentConnections: List<ServerEntry>,
+    connectedServer: ServerEntry?,
+    isConnecting: Boolean,
+    selectedTarget: MainTarget,
+    onTargetSelected: (MainTarget) -> Unit,
+    onLogout: () -> Unit,
+    onConnect: (ServerEntry) -> Unit
+) {
+    val colors = Theme.colors
+    val scope = rememberCoroutineScope()
+
+    Box(modifier = Modifier.fillMaxSize().background(colors.backgroundNorm)) {
+        when (selectedTarget) {
+            MainTarget.Home -> {
+                HomeScreen(
+                    servers = servers,
+                    recentConnections = recentConnections,
+                    connectedServer = connectedServer,
+                    isConnecting = isConnecting,
+                    onLogout = onLogout,
+                    onConnect = onConnect
+                )
+            }
+            MainTarget.Countries -> {
+                CountriesScreen(
+                    servers = servers,
+                    connectedServer = connectedServer,
+                    onBack = { onTargetSelected(MainTarget.Home) },
+                    onConnect = onConnect
+                )
+            }
+            MainTarget.Settings -> {
+                SettingsScreen(
+                    onBack = { onTargetSelected(MainTarget.Home) }
+                )
+            }
+            MainTarget.Profiles -> {
+                ProfilesScreen(
+                    onBack = { onTargetSelected(MainTarget.Home) }
+                )
+            }
+        }
+
+        LiquidGlassBottomBar(
+            selectedTarget = selectedTarget,
+            navigateTo = onTargetSelected,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
+}
+
+@Composable
+private fun HomeScreen(
+    servers: List<ServerEntry>,
+    recentConnections: List<ServerEntry>,
+    connectedServer: ServerEntry?,
+    isConnecting: Boolean,
+    onLogout: () -> Unit,
+    onConnect: (ServerEntry) -> Unit
+) {
+    val colors = Theme.colors
+    
+    Box(modifier = Modifier.fillMaxSize()) {
+        TopAppBar(
+            title = { Text("Proton VPN", fontWeight = FontWeight.Bold, color = colors.textNorm) },
+            actions = {
+                IconButton(onClick = onLogout) {
+                    Icon(Icons.Rounded.Logout, "Logout", tint = colors.interactionNorm)
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+        )
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 80.dp, bottom = 120.dp)
+        ) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .padding(horizontal = 24.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(colors.backgroundSecondary.copy(alpha = 0.3f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Rounded.Map,
+                        null,
+                        modifier = Modifier.size(120.dp),
+                        tint = colors.brandNorm.copy(alpha = 0.2f)
+                    )
+                    Text(
+                        "Map View Placeholder",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = colors.textWeak.copy(alpha = 0.5f)
+                    )
+                }
+            }
+
+            item { Spacer(modifier = Modifier.height(24.dp)) }
+
+            item {
+                DesktopConnectionCard(
+                    isConnected = connectedServer != null,
+                    isConnecting = isConnecting,
+                    serverName = connectedServer?.name ?: "Quick Connect",
+                    countryName = connectedServer?.country ?: "Select Location",
+                    ipAddress = if (connectedServer != null) "1.2.3.4" else "0.0.0.0",
+                    onToggle = {
+                        if (connectedServer != null) {
+                            // TODO: Disconnect
+                        } else if (servers.isNotEmpty()) {
+                            onConnect(servers.first())
+                        }
+                    }
+                )
+            }
+
+            if (recentConnections.isNotEmpty()) {
+                item {
+                    Text(
+                        "Recent Connections",
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textNorm
+                    )
+                }
+                items(recentConnections) { server ->
+                    ServerCard(server, onClick = { onConnect(server) })
+                }
+            } else if (servers.isNotEmpty()) {
+                item {
+                    Text(
+                        "Recommended",
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textNorm
+                    )
+                }
+                items(servers.take(3)) { server ->
+                    ServerCard(server, onClick = { onConnect(server) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ServerCard(server: ServerEntry, onClick: () -> Unit) {
+    val colors = Theme.colors
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.backgroundSecondary.copy(alpha = 0.8f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.shade100.copy(alpha = 0.05f))
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(36.dp, 24.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(colors.backgroundNorm),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Rounded.Public, null, modifier = Modifier.size(20.dp), tint = colors.iconNorm)
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(server.country, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(server.name, style = MaterialTheme.typography.bodyMedium, color = colors.textWeak)
+            }
+        }
+    }
+}

@@ -149,6 +149,9 @@ sentry {
 }
 
 dependencies {
+    // Shared module
+    implementation(project(":shared"))
+
     // AndroidX & Core UI
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
