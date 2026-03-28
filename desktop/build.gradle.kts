@@ -33,6 +33,22 @@ application {
     mainClass.set("ru.protonmod.next.desktop.MainKt")
 }
 
+tasks.withType<Copy> {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.withType<Tar> {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.withType<Zip> {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.withType<JavaExec> {
+    systemProperty("jna.library.path", file("libs").absolutePath)
+}
+
 dependencies {
     // Use the Compose plugin extensions to add proper desktop dependencies
     implementation(compose.desktop.currentOs)
@@ -53,6 +69,9 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.kotlinx.serialization.converter)
     implementation(libs.kotlinx.serialization.json)
+
+    // Native access for Go bridge
+    implementation("net.java.dev.jna:jna:5.16.0")
 
 
     // Import shared module but EXCLUDE AndroidX Compose to prevent classpath clashes

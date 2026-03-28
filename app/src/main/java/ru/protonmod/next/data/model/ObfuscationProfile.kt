@@ -17,7 +17,7 @@
 
 package ru.protonmod.next.data.model
 
-import ru.protonmod.next.data.local.SettingsManager
+import ru.protonmod.next.vpn.VpnConstants
 
 data class ObfuscationProfile(
     val id: String,
@@ -49,7 +49,7 @@ data class ObfuscationProfile(
             jc = 3, jmin = 1, jmax = 3,
             s1 = 0, s2 = 0, s3 = 0, s4 = 0,
             h1 = "1", h2 = "2", h3 = "3", h4 = "4",
-            i1 = SettingsManager.DEFAULT_I1,
+            i1 = VpnConstants.DEFAULT_I1,
             junkLevel = 0 // Low
         )
 
@@ -60,7 +60,7 @@ data class ObfuscationProfile(
             jc = 3, jmin = 1, jmax = 3,
             s1 = 0, s2 = 0, s3 = 0, s4 = 0,
             h1 = "1", h2 = "2", h3 = "3", h4 = "4",
-            i1 = SettingsManager.DEFAULT_I1,
+            i1 = VpnConstants.DEFAULT_I1,
             junkLevel = 3 // Custom
         )
     }

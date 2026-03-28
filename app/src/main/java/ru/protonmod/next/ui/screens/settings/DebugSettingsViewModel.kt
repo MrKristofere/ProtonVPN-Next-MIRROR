@@ -42,6 +42,7 @@ import ru.protonmod.next.data.network.LogicalServer
 import ru.protonmod.next.utils.ProtonLogger
 import ru.protonmod.next.vpn.AmneziaConfigGenerator
 import ru.protonmod.next.vpn.AmneziaVpnManager
+import ru.protonmod.next.vpn.ObfuscationParams
 import io.sentry.Sentry
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -180,7 +181,7 @@ class DebugSettingsViewModel @Inject constructor(
                 // Get real settings for more accurate export
                 val isObfuscationEnabled = settingsManager.obfuscationEnabled.first()
                 val params = if (isObfuscationEnabled) {
-                    AmneziaVpnManager.ObfuscationParams(
+                    ObfuscationParams(
                         jc = settingsManager.awgJc.first(), jmin = settingsManager.awgJmin.first(), jmax = settingsManager.awgJmax.first(),
                         s1 = settingsManager.awgS1.first(), s2 = settingsManager.awgS2.first(),
                         s3 = settingsManager.awgS3.first(), s4 = settingsManager.awgS4.first(),
@@ -188,7 +189,7 @@ class DebugSettingsViewModel @Inject constructor(
                         i1 = settingsManager.awgI1.first(), i2 = settingsManager.awgI2.first(), i3 = settingsManager.awgI3.first(), i4 = settingsManager.awgI4.first(), i5 = settingsManager.awgI5.first()
                     )
                 } else {
-                    AmneziaVpnManager.ObfuscationParams(0, 0, 0, 0, 0, 0, 0, "", "", "", "", "", "", "", "", "")
+                    ObfuscationParams(0, 0, 0, 0, 0, 0, 0, "", "", "", "", "", "", "", "", "")
                 }
                 
                 val userDns = settingsManager.customDns.first().trim()

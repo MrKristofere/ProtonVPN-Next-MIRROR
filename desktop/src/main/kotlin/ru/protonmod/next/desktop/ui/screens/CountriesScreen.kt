@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.protonmod.next.desktop.ServerEntry
 import ru.protonmod.next.ui.theme.ProtonNextTheme
+import ru.protonmod.next.ui.utils.CommonCountryUtils
 
 sealed class CountriesNavigation {
     object CountriesList : CountriesNavigation()
@@ -56,7 +57,7 @@ fun CountriesScreen(
         servers.asSequence()
             .map { it.country }
             .distinct()
-            .map { code -> CountryDisplayItem(code = code, name = getCountryName(code)) }
+            .map { code -> CountryDisplayItem(code = code, name = CommonCountryUtils.getCountryName(code)) }
             .sortedBy { it.name }
             .toList()
     }
@@ -73,7 +74,7 @@ fun CountriesScreen(
                 title = { 
                     val titleText = when (val nav = currentNav) {
                         is CountriesNavigation.CountriesList -> "Countries"
-                        is CountriesNavigation.CityList -> getCountryName(nav.countryCode)
+                        is CountriesNavigation.CityList -> CommonCountryUtils.getCountryName(nav.countryCode)
                         is CountriesNavigation.ServerList -> nav.city
                     }
                     
@@ -317,21 +318,4 @@ fun LoadIndicator(load: Int) {
         color = color,
         fontWeight = FontWeight.Bold
     )
-}
-
-// Simple country name mapper for now
-fun getCountryName(code: String): String {
-    return when(code.uppercase()) {
-        "US" -> "United States"
-        "RU" -> "Russia"
-        "NL" -> "Netherlands"
-        "DE" -> "Germany"
-        "JP" -> "Japan"
-        "CH" -> "Switzerland"
-        "CA" -> "Canada"
-        "FR" -> "France"
-        "GB" -> "United Kingdom"
-        "AU" -> "Australia"
-        else -> code
-    }
 }

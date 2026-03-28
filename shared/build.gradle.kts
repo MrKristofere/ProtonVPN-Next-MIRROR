@@ -17,6 +17,7 @@
 
 plugins {
     kotlin("jvm")
+    kotlin("plugin.serialization")
     `java-library`
 }
 
@@ -28,4 +29,12 @@ java {
 
 dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation(libs.kotlinx.serialization.json)
+    
+    // Retrofit & OkHttp for shared API interfaces
+    api(libs.retrofit)
+    api(libs.okhttp.dnsoverhttps) // Using the one from catalog which includes okhttp
+
+    // javax.inject for @Inject and @Singleton in shared interfaces
+    implementation("javax.inject:javax.inject:1")
 }

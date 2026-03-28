@@ -90,7 +90,7 @@ class TokenAuthenticator @Inject constructor(
                     val newRefreshToken = refreshResponse.refreshToken ?: session.refreshToken
 
                     val updatedSession = session.copy(
-                        accessToken = newAccessToken,
+                        accessToken = newAccessToken!!,
                         refreshToken = newRefreshToken
                     )
 

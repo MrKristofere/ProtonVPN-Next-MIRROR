@@ -65,6 +65,8 @@ import java.security.cert.X509Certificate
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
+import ru.protonmod.next.vpn.ObfuscationParams
+import ru.protonmod.next.vpn.VpnConstants
 
 @Singleton
 class AmneziaVpnManager @Inject constructor(
@@ -81,8 +83,6 @@ class AmneziaVpnManager @Inject constructor(
 ) {
     companion object {
         private const val TAG = "AmneziaVpnManager"
-        private const val PROTON_CLIENT_IP = "10.2.0.2"
-        private const val PROTON_DNS_IP = "10.2.0.1" // Fallback default DNS
         private const val DNS_RETRY_COUNT = 5
         private const val DNS_RETRY_DELAY_MS = 1000L
         private const val STATE_CONNECTING = "CONNECTING"
@@ -103,12 +103,7 @@ class AmneziaVpnManager @Inject constructor(
     private val _certState = MutableStateFlow<CertificateState>(CertificateState.Valid)
     val certState: StateFlow<CertificateState> = _certState.asStateFlow()
 
-    data class ObfuscationParams(
-        val jc: Int, val jmin: Int, val jmax: Int,
-        val s1: Int, val s2: Int, val s3: Int = 0, val s4: Int = 0,
-        val h1: String, val h2: String, val h3: String, val h4: String,
-        val i1: String, val i2: String = "", val i3: String = "", val i4: String = "", val i5: String = ""
-    )
+
 
     private val _isConnecting = MutableStateFlow(false)
     val isConnecting: StateFlow<Boolean> = _isConnecting
@@ -452,13 +447,13 @@ class AmneziaVpnManager @Inject constructor(
 
             // Retrieve Custom DNS IP or fallback to Proton Default
             val userDns = settingsManager.customDns.first().trim()
-            val activeDns = if (userDns.isNotEmpty()) userDns else PROTON_DNS_IP
+            val activeDns = if (userDns.isNotEmpty()) userDns else VpnConstants.PROTON_DNS_IP
             ProtonLogger.i(TAG, "Using DNS Server: $activeDns")
 
             val configStr = amneziaConfigGenerator.buildConfig(
                 serverPublicKey = serverPubKey,
                 privateKey = wgPrivateKeyB64,
-                localIp = PROTON_CLIENT_IP,
+                localIp = VpnConstants.PROTON_CLIENT_IP,
                 dnsServer = activeDns,
                 targetIp = targetIp,
                 isIncludeMode = isIncludeMode,

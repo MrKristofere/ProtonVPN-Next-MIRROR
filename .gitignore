@@ -17,3 +17,16 @@ local.properties
 # Sentry Config File
 sentry.properties
 /desktop/build/
+
+# Go artifacts
+/go-bridge/bridge
+/desktop/libs/vpn-helper
+/desktop/libs/libgovpn.so
+/desktop/libs/libgovpn.h
+bin/
+pkg/
+vendor/
+
+# Editors
+.vscode/
+*.code-workspace

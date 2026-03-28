@@ -2,16 +2,7 @@ package ru.protonmod.next.desktop
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-
-@Serializable
-data class LoginResponse(
-    @SerialName("Code") val code: Int,
-    @SerialName("AccessToken") val accessToken: String? = null,
-    @SerialName("RefreshToken") val refreshToken: String? = null,
-    @SerialName("UID") val sessionId: String? = null,
-    @SerialName("UserID") val userId: String? = null,
-    @SerialName("Scopes") val scopes: List<String> = emptyList()
-)
+import ru.protonmod.next.data.network.PhysicalServer
 
 @Serializable
 data class ProtonErrorResponse(
@@ -35,5 +26,6 @@ data class ServerEntry(
     val name: String,
     val city: String,
     val country: String,
-    val tier: Int
+    val tier: Int,
+    val physicalServer: PhysicalServer? = null
 )

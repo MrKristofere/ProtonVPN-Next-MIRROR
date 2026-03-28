@@ -20,10 +20,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import ru.protonmod.next.desktop.ui.MainTarget
 import ru.protonmod.next.desktop.ui.components.DesktopConnectionCard
 import ru.protonmod.next.desktop.ui.components.LiquidGlassBottomBar
@@ -41,13 +40,12 @@ fun App() {
     val uiState by viewModel.uiState.collectAsState()
     val servers by viewModel.servers.collectAsState()
     val recentConnections by viewModel.recentConnections.collectAsState()
+    val connectedServer by viewModel.connectedServer.collectAsState()
+    val isConnecting by viewModel.isConnecting.collectAsState()
 
     var showCaptcha by remember { mutableStateOf(false) }
     var captchaState by remember { mutableStateOf<DesktopLoginUiState.RequiresCaptcha?>(null) }
     var selectedTarget by remember { mutableStateOf(MainTarget.Home) }
-
-    var connectedServer by remember { mutableStateOf<ServerEntry?>(null) }
-    var isConnecting by remember { mutableStateOf(false) }
 
     Theme {
         Surface(modifier = Modifier.fillMaxSize()) {
@@ -55,6 +53,7 @@ fun App() {
                 is DesktopLoginUiState.Idle, is DesktopLoginUiState.Loading, is DesktopLoginUiState.Error -> {
                     WelcomeContent(
                         uiState = uiState,
+                        onLogin = { u, p -> viewModel.login(u, p) },
                         onGuest = { viewModel.loginAnonymous() },
                         onRetry = { viewModel.loginAnonymous() },
                         onClearError = { viewModel.clearError() }
@@ -76,9 +75,9 @@ fun App() {
                         onLogout = { viewModel.clearError() },
                         onConnect = { server ->
                             viewModel.connectToServer(server)
-                            connectedServer = server
-                            // Mocking connection state for now
-                            // In real app, this would be handled by the ViewModel/Go library
+                        },
+                        onDisconnect = {
+                            viewModel.disconnect()
                         }
                     )
                 }
@@ -105,6 +104,7 @@ fun App() {
 @Composable
 private fun WelcomeContent(
     uiState: DesktopLoginUiState,
+    onLogin: (String, String) -> Unit,
     onGuest: () -> Unit,
     onRetry: () -> Unit,
     onClearError: () -> Unit
@@ -112,6 +112,9 @@ private fun WelcomeContent(
     val isLoading = uiState is DesktopLoginUiState.Loading
     val errorMessage = (uiState as? DesktopLoginUiState.Error)?.message
     val colors = Theme.colors
+
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -136,7 +139,7 @@ private fun WelcomeContent(
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "Secure VPN access on desktop. Guest login works without the mobile libraries.",
+            text = "Secure VPN access on desktop. Powered by AmneziaWG Go.",
             style = MaterialTheme.typography.bodyLarge,
             color = colors.textWeak,
             textAlign = TextAlign.Center
@@ -144,17 +147,52 @@ private fun WelcomeContent(
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        OutlinedTextField(
+            value = username,
+            onValueChange = { username = it },
+            label = { Text("Username") },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            singleLine = true,
+            enabled = !isLoading
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            visualTransformation = PasswordVisualTransformation(),
+            singleLine = true,
+            enabled = !isLoading
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         Button(
-            onClick = { onGuest() },
-            enabled = !isLoading,
+            onClick = { onLogin(username, password) },
+            enabled = !isLoading && username.isNotBlank() && password.isNotBlank(),
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 16.dp)
                 .height(56.dp),
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = colors.brandNorm,
                 contentColor = colors.textInverted
             )
+        ) {
+            Text("Login")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        TextButton(
+            onClick = { onGuest() },
+            enabled = !isLoading,
+            modifier = Modifier.padding(horizontal = 16.dp),
+            colors = ButtonDefaults.textButtonColors(contentColor = colors.textInverted)
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
@@ -192,15 +230,6 @@ private fun WelcomeContent(
             color = colors.textWeak.copy(alpha = 0.7f),
             textAlign = TextAlign.Center
         )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Tip: If the captcha fails, try again.",
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.textWeak.copy(alpha = 0.55f),
-            textAlign = TextAlign.Center
-        )
     }
 }
 
@@ -213,10 +242,10 @@ private fun DashboardScreen(
     selectedTarget: MainTarget,
     onTargetSelected: (MainTarget) -> Unit,
     onLogout: () -> Unit,
-    onConnect: (ServerEntry) -> Unit
+    onConnect: (ServerEntry) -> Unit,
+    onDisconnect: () -> Unit
 ) {
     val colors = Theme.colors
-    val scope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize().background(colors.backgroundNorm)) {
         when (selectedTarget) {
@@ -227,7 +256,8 @@ private fun DashboardScreen(
                     connectedServer = connectedServer,
                     isConnecting = isConnecting,
                     onLogout = onLogout,
-                    onConnect = onConnect
+                    onConnect = onConnect,
+                    onDisconnect = onDisconnect
                 )
             }
             MainTarget.Countries -> {
@@ -265,7 +295,8 @@ private fun HomeScreen(
     connectedServer: ServerEntry?,
     isConnecting: Boolean,
     onLogout: () -> Unit,
-    onConnect: (ServerEntry) -> Unit
+    onConnect: (ServerEntry) -> Unit,
+    onDisconnect: () -> Unit
 ) {
     val colors = Theme.colors
     
@@ -316,10 +347,10 @@ private fun HomeScreen(
                     isConnecting = isConnecting,
                     serverName = connectedServer?.name ?: "Quick Connect",
                     countryName = connectedServer?.country ?: "Select Location",
-                    ipAddress = if (connectedServer != null) "1.2.3.4" else "0.0.0.0",
+                    ipAddress = if (connectedServer != null) "10.2.0.2" else "0.0.0.0",
                     onToggle = {
                         if (connectedServer != null) {
-                            // TODO: Disconnect
+                            onDisconnect()
                         } else if (servers.isNotEmpty()) {
                             onConnect(servers.first())
                         }

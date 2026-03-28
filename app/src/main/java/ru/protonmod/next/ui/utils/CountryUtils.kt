@@ -20,7 +20,6 @@ package ru.protonmod.next.ui.utils
 import android.content.Context
 import androidx.compose.ui.graphics.Color
 import ru.protonmod.next.ui.theme.ProtonPalette
-import java.util.Locale
 
 object CountryUtils {
 
@@ -29,8 +28,6 @@ object CountryUtils {
      */
     fun getFlagResource(context: Context, countryCode: String?): Int {
         if (countryCode == null) return 0
-        // Standard mapping: UK -> GB for resource matching if necessary, 
-        // but typically resources follow ISO 3166-1 alpha-2.
         val normalizedCode = when (val code = countryCode.lowercase()) {
             "uk" -> "gb"
             else -> code
@@ -43,13 +40,7 @@ object CountryUtils {
      * Generates an Emoji flag from an ISO country code (e.g., "US" -> 🇺🇸)
      */
     fun getFlagForCountry(countryCode: String?): String {
-        if (countryCode == null || countryCode.length != 2) return "🌍"
-        
-        val code = countryCode.uppercase()
-        val firstChar = Character.codePointAt(code, 0) - 0x41 + 0x1F1E6
-        val secondChar = Character.codePointAt(code, 1) - 0x41 + 0x1F1E6
-        
-        return String(Character.toChars(firstChar)) + String(Character.toChars(secondChar))
+        return CommonCountryUtils.getFlagForCountry(countryCode)
     }
 
     /**
@@ -58,8 +49,7 @@ object CountryUtils {
     fun getCountryName(context: Context, countryCode: String?): String {
         if (countryCode == null || countryCode.equals("null", ignoreCase = true) || countryCode.isBlank()) return ""
 
-        val locale = Locale.Builder().setRegion(countryCode.uppercase()).build()
-        val displayName = locale.getDisplayCountry(Locale.getDefault())
+        val displayName = CommonCountryUtils.getCountryName(countryCode)
         
         return if (displayName.isNotEmpty() && !displayName.equals(countryCode, ignoreCase = true)) {
             displayName

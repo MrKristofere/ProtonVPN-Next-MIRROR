@@ -47,6 +47,7 @@ import ru.protonmod.next.data.state.ConnectedServerState
 import ru.protonmod.next.ui.screens.countries.CityDisplayItem
 import ru.protonmod.next.ui.screens.countries.CountryDisplayItem
 import ru.protonmod.next.vpn.AmneziaVpnManager
+import ru.protonmod.next.vpn.ObfuscationParams
 import javax.inject.Inject
 
 @HiltViewModel
@@ -186,7 +187,7 @@ class ProfilesViewModel @Inject constructor(
                 return@launch
             }
 
-            var obfuscationParams: AmneziaVpnManager.ObfuscationParams? = null
+            var obfuscationParams: ObfuscationParams? = null
             if (profile.isObfuscationEnabled && profile.obfuscationProfileId != null) {
                 val customProfiles = settingsManager.customProfiles.first()
                 val standardProfileName = context.getString(R.string.obfuscation_config_standard)
@@ -194,7 +195,7 @@ class ProfilesViewModel @Inject constructor(
                     ?: if (profile.obfuscationProfileId == "standard_1") ObfuscationProfile.getStandardProfile(standardProfileName) else null
 
                 selectedConfig?.let {
-                    obfuscationParams = AmneziaVpnManager.ObfuscationParams(
+                    obfuscationParams = ObfuscationParams(
                         jc = it.jc, jmin = it.jmin, jmax = it.jmax,
                         s1 = it.s1, s2 = it.s2,
                         h1 = it.h1, h2 = it.h2, h3 = it.h3, h4 = it.h4,

@@ -1,28 +1,23 @@
 package ru.protonmod.next.desktop
 
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import kotlinx.serialization.json.*
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import retrofit2.HttpException
 import retrofit2.Retrofit
-import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.Header
 import retrofit2.http.POST
+import ru.protonmod.next.data.network.*
+import ru.protonmod.next.desktop.native.VpnNative
 import java.util.*
 import kotlin.math.abs
 
 private const val BASE_URL = "https://vpn-api.proton.me/"
 private const val SPOOFED_APP_VERSION = "5.16.31.0"
-
-// Match Android client parameters to avoid "platform desktop is not valid" rejection.
 private const val SPOOFED_OS = "Android 14"
 private const val SPOOFED_DEVICE = "Google Pixel 7"
 private const val SPOOFED_DEVICE_HASH = 53319294142L
@@ -31,6 +26,24 @@ interface DesktopAuthApi {
     @POST("auth/v4/sessions")
     suspend fun createAnonymousSession(
         @Body payload: JsonObject,
+        @Header("x-pm-human-verification-token") captchaToken: String? = null,
+        @Header("x-pm-human-verification-token-type") captchaTokenType: String? = null
+    ): LoginResponse
+
+    @POST("auth/v4/info")
+    suspend fun getAuthInfo(
+        @Header("Authorization") authorization: String,
+        @Header("x-pm-uid") sessionId: String,
+        @Body request: AuthInfoRequest,
+        @Header("x-pm-human-verification-token") captchaToken: String? = null,
+        @Header("x-pm-human-verification-token-type") captchaTokenType: String? = null
+    ): AuthInfoResponse
+
+    @POST("auth/v4")
+    suspend fun performLogin(
+        @Header("Authorization") authorization: String,
+        @Header("x-pm-uid") sessionId: String,
+        @Body request: LoginRequest,
         @Header("x-pm-human-verification-token") captchaToken: String? = null,
         @Header("x-pm-human-verification-token-type") captchaTokenType: String? = null
     ): LoginResponse
@@ -45,11 +58,6 @@ interface DesktopAuthApi {
     ): LoginResponse
 }
 
-/**
- * Lightweight Proton auth client for desktop.
- *
- * Implements the same guest login flow as the Android app but without any Go libraries.
- */
 class DesktopAuthClient {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -71,10 +79,58 @@ class DesktopAuthClient {
     private var pendingAnonUid: String? = null
     private var pendingChallengePayload: JsonObject? = null
 
-    /**
-     * Perform a guest (anonymous) login.
-     * If Proton requires a captcha, a [CaptchaRequiredException] is returned.
-     */
+    suspend fun login(username: String, password: String, captchaToken: String? = null): Result<LoginResponse> {
+        try {
+            val tokenType = if (captchaToken != null) "captcha" else null
+            
+            // 1. Ensure anonymous session for initial requests
+            if (pendingAnonToken == null || pendingAnonUid == null) {
+                val challengePayload = pendingChallengePayload ?: buildChallengePayload().also { pendingChallengePayload = it }
+                val anonSession = authApi.createAnonymousSession(challengePayload, captchaToken, tokenType)
+                pendingAnonToken = anonSession.accessToken
+                pendingAnonUid = anonSession.sessionId
+            }
+            
+            val anonToken = pendingAnonToken ?: throw Exception("Failed to obtain anonymous session token")
+            val anonUid = pendingAnonUid ?: throw Exception("Failed to obtain anonymous session uid")
+            val bearer = "Bearer $anonToken"
+            
+            // 2. Get Auth Info
+            val info = authApi.getAuthInfo(bearer, anonUid, AuthInfoRequest(username), captchaToken, tokenType)
+            if (info.code != 1000) return Result.failure(Exception("Auth info failed: ${info.code}"))
+            
+            // 3. Compute SRP proofs using native bridge
+            val proofsStr = VpnNative.INSTANCE.SRPCompute(
+                username, password,
+                info.salt ?: "",
+                info.modulus ?: "",
+                info.serverEphemeral ?: "",
+                4 // Standard Proton SRP version
+            )
+            
+            if (proofsStr.startsWith("ERROR:")) return Result.failure(Exception(proofsStr))
+            val parts = proofsStr.split(" ")
+            
+            // 4. Perform real login
+            val loginRequest = LoginRequest(
+                username = username,
+                clientEphemeral = parts[0],
+                clientProof = parts[1],
+                srpSession = info.srpSession ?: "",
+                payload = buildChallengePayload()
+            )
+            
+            val response = authApi.performLogin(bearer, anonUid, loginRequest, captchaToken, tokenType)
+            if (response.code == 1000) {
+                return Result.success(response)
+            }
+            return Result.failure(Exception("Login failed: Code ${response.code}"))
+            
+        } catch (e: Exception) {
+            return handleHttpError(e)
+        }
+    }
+
     suspend fun loginAnonymous(captchaToken: String? = null): Result<LoginResponse> {
         try {
             val tokenType = if (captchaToken != null) "captcha" else null
@@ -93,7 +149,6 @@ class DesktopAuthClient {
             val response = authApi.performLoginLess(bearer, anonUid, challengePayload, captchaToken, tokenType)
 
             if (response.code == 1000) {
-                // Clear the cached payload so subsequent logins use a fresh challenge (but keep the session)
                 pendingChallengePayload = null
                 return Result.success(response)
             }
@@ -106,10 +161,6 @@ class DesktopAuthClient {
     private fun buildChallengePayload(): JsonObject {
         val locale = Locale.getDefault()
         val timezone = TimeZone.getDefault()
-
-        val deviceName = "${locale.displayCountry} Desktop".takeIf { it.isNotBlank() } ?: "Linux Desktop"
-        val deviceHash = abs("${System.getProperty("os.name")}-${System.getProperty("os.arch")}".hashCode().toLong())
-
         return buildJsonObject {
             put("Payload", buildJsonObject {
                 put("vpn-android-v4-challenge-0", buildJsonObject {
@@ -117,7 +168,6 @@ class DesktopAuthClient {
                     put("v", JsonPrimitive(SPOOFED_APP_VERSION))
                     put("appLang", JsonPrimitive(locale.language))
                     put("timezone", JsonPrimitive(timezone.id))
-                    // Use Android-like device parameters to avoid backend platform restrictions.
                     put("deviceName", JsonPrimitive(SPOOFED_DEVICE_HASH))
                     put("regionCode", JsonPrimitive(locale.country.ifEmpty { "US" }))
                     put("timezoneOffset", JsonPrimitive(-(timezone.rawOffset / (1000 * 60))))
@@ -146,9 +196,7 @@ class DesktopAuthClient {
                         clearPendingAuth()
                         return Result.failure(Exception("Verification failed. Please try again."))
                     }
-                } catch (_: Exception) {
-                    // ignore parse errors
-                }
+                } catch (_: Exception) {}
             }
             return Result.failure(Exception("HTTP ${e.code()}: ${errorBody ?: e.message()}"))
         }
@@ -160,7 +208,6 @@ class DesktopAuthClient {
         pendingAnonUid = null
         pendingChallengePayload = null
     }
-
 }
 
 internal class HeadersInterceptor : Interceptor {
