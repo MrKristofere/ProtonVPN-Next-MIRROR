@@ -28,11 +28,18 @@ data class ObfuscationProfile(
     val jmax: Int,
     val s1: Int,
     val s2: Int,
+    val s3: Int = 0, // cookieReplyPacketJunkSize
+    val s4: Int = 0, // transportPacketJunkSize
     val h1: String,
     val h2: String,
     val h3: String,
     val h4: String,
-    val i1: String
+    val i1: String,
+    val i2: String = "",
+    val i3: String = "",
+    val i4: String = "",
+    val i5: String = "",
+    val junkLevel: Int = 3 // 0: Low, 1: Medium, 2: High, 3: Custom
 ) {
     companion object {
         fun getStandardProfile(name: String = "Standard") = ObfuscationProfile(
@@ -40,9 +47,10 @@ data class ObfuscationProfile(
             name = name,
             isReadOnly = true,
             jc = 3, jmin = 1, jmax = 3,
-            s1 = 0, s2 = 0,
+            s1 = 0, s2 = 0, s3 = 0, s4 = 0,
             h1 = "1", h2 = "2", h3 = "3", h4 = "4",
-            i1 = SettingsManager.DEFAULT_I1
+            i1 = SettingsManager.DEFAULT_I1,
+            junkLevel = 0 // Low
         )
 
         fun createDefaultCustomProfile(id: String, name: String) = ObfuscationProfile(
@@ -50,9 +58,10 @@ data class ObfuscationProfile(
             name = name,
             isReadOnly = false,
             jc = 3, jmin = 1, jmax = 3,
-            s1 = 0, s2 = 0,
+            s1 = 0, s2 = 0, s3 = 0, s4 = 0,
             h1 = "1", h2 = "2", h3 = "3", h4 = "4",
-            i1 = SettingsManager.DEFAULT_I1
+            i1 = SettingsManager.DEFAULT_I1,
+            junkLevel = 3 // Custom
         )
     }
 }

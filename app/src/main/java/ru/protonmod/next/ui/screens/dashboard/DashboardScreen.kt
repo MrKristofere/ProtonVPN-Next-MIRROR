@@ -20,7 +20,7 @@ package ru.protonmod.next.ui.screens.dashboard
 import android.app.Activity
 import android.net.VpnService
 import android.text.BidiFormatter
-import android.util.Log
+import ru.protonmod.next.utils.ProtonLogger
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -36,7 +36,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Place
 import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -66,11 +70,11 @@ import kotlinx.coroutines.delay
 import ru.protonmod.next.R
 import ru.protonmod.next.data.network.LogicalServer
 import ru.protonmod.next.ui.components.FlagIcon
-import ru.protonmod.next.ui.components.LiquidGlassBottomBar
-import ru.protonmod.next.ui.nav.MainTarget
 import ru.protonmod.next.ui.theme.ProtonColors
 import ru.protonmod.next.ui.theme.ProtonNextTheme
+import ru.protonmod.next.ui.theme.liquidGlass
 import ru.protonmod.next.ui.utils.CountryUtils
+import ru.protonmod.next.ui.utils.isTablet
 import ru.protonmod.next.vpn.AmneziaVpnManager
 
 // --- Extensions for UI Effects matching Original Proton ---
@@ -161,11 +165,15 @@ private fun annotatedCountryHighlight(
     append(displayText)
     val startIndex = text.indexOf(highlight)
     if (startIndex >= 0) {
-        addStyle(
-            style = SpanStyle(color = ProtonNextTheme.colors.textNorm, fontWeight = FontWeight.SemiBold),
-            start = startIndex,
-            end = startIndex + highlight.length
-        )
+        val styleStart = startIndex.coerceAtMost(displayText.length)
+        val styleEnd = (startIndex + highlight.length).coerceAtMost(displayText.length)
+        if (styleStart < styleEnd) {
+            addStyle(
+                style = SpanStyle(color = ProtonNextTheme.colors.textNorm, fontWeight = FontWeight.SemiBold),
+                start = styleStart,
+                end = styleEnd
+            )
+        }
     }
 }
 
@@ -179,18 +187,15 @@ private fun ObscurableText(
     targetText: String,
     highlightText: String,
     isObscured: Boolean,
-    duration: Int = 30, // animation speed per character
+    duration: Int = 30, // Animation speed per character
     targetCharacter: Char = '*',
     preserveCharacters: CharArray = charArrayOf('.', ' ', '-', ':')
 ) {
-    val obscureStartIndex = 0
-
-    // Remove targetText from remember keys so we don't instantly throw away the animation state
     var displayText by remember {
         mutableStateOf(
             if (isObscured) {
                 val chars = targetText.toCharArray()
-                for (i in obscureStartIndex until chars.size) {
+                for (i in chars.indices) {
                     if (!preserveCharacters.contains(chars[i])) chars[i] = targetCharacter
                 }
                 String(chars)
@@ -199,41 +204,37 @@ private fun ObscurableText(
             }
         )
     }
+
     var fixedWidth by remember { mutableStateOf<Int?>(null) }
+    // Track the previous target string to rebuild the base perfectly when the IP changes
+    var previousTargetText by remember { mutableStateOf(targetText) }
 
     LaunchedEffect(isObscured, targetText) {
         val targetChars = targetText.toCharArray()
         var currentChars = displayText.toCharArray()
 
-        val currentObscureStart = 0
-
-        // Check if the base string structure changed (length difference or country name change)
-        var baseChanged = currentChars.size != targetChars.size
-        if (!baseChanged) {
-            for (i in 0 until currentObscureStart) {
-                if (currentChars[i] != targetChars[i]) {
-                    baseChanged = true
-                    break
-                }
-            }
-        }
+        // Check if the underlying string itself has changed (e.g., completely new IP loaded)
+        // This is critical because if lengths match but dot positions differ, the old
+        // asterisks will remain stuck since the animation filter preserves the new dots.
+        val baseChanged = previousTargetText != targetText || currentChars.size != targetChars.size
 
         if (baseChanged) {
             // Reset fixed width to allow the layout to remeasure for the new string
             fixedWidth = null
+            previousTargetText = targetText
 
             val baseChars = targetChars.clone()
             if (isObscured) {
-                // If the new string is obscured, jump to its obscured form immediately
-                for (i in currentObscureStart until baseChars.size) {
+                // Instantly obscure the new text, applying the new dot/dash placement
+                for (i in baseChars.indices) {
                     if (!preserveCharacters.contains(baseChars[i])) baseChars[i] = targetCharacter
                 }
                 displayText = String(baseChars)
                 return@LaunchedEffect
             } else {
                 // If we are unobscuring to a NEW target, start from its obscured version
-                // and let the animation below reveal the new characters.
-                for (i in currentObscureStart until baseChars.size) {
+                // and let the animation below reveal the new characters gracefully.
+                for (i in baseChars.indices) {
                     if (!preserveCharacters.contains(baseChars[i])) baseChars[i] = targetCharacter
                 }
                 currentChars = baseChars
@@ -242,7 +243,7 @@ private fun ObscurableText(
         }
 
         // Animate the differences character by character
-        val indicesToAnimate = (currentObscureStart until targetText.length)
+        val indicesToAnimate = targetText.indices
             .filter { !preserveCharacters.contains(targetText[it]) }
             .filter {
                 if (isObscured) currentChars[it] != targetCharacter
@@ -309,12 +310,17 @@ private fun LocationTextElement(
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick) // Makes the entire IP block clickable to toggle privacy mode
     ) {
-        // Safe fallbacks to absolutely guarantee no null strings
-        val safeCountry = if (locationText.country.isBlank() || locationText.country == "null") "Unknown" else locationText.country
-        val safeIp = if (locationText.ip.isBlank() || locationText.ip == "null") "000.000.000.000" else locationText.ip
+        // Data is now sanitized at the Mapper level, so we only need simple fallbacks
+        val safeCountry = locationText.country.ifBlank {
+            stringResource(R.string.status_not_connected)
+        }
+        
+        val safeIp = locationText.ip.ifBlank {
+            stringResource(R.string.ip_placeholder)
+        }
 
         val country = BidiFormatter.getInstance().unicodeWrap(safeCountry)
-        val fullText = "$country • $safeIp"
+        val fullText = stringResource(R.string.location_format, country, safeIp)
 
         ObscurableText(
             targetText = fullText,
@@ -329,9 +335,6 @@ private fun LocationTextElement(
 
 @Composable
 fun DashboardScreen(
-    onNavigateToCountries: (() -> Unit)? = null,
-    onNavigateToSettings: (() -> Unit)? = null,
-    onNavigateToProfiles: (() -> Unit)? = null,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val colors = ProtonNextTheme.colors
@@ -339,12 +342,15 @@ fun DashboardScreen(
     val context = LocalContext.current
     var pendingServer by remember { mutableStateOf<LogicalServer?>(null) }
     var isQuickConnectPending by remember { mutableStateOf(false) }
+    val isTablet = isTablet()
+
+    var showQuickConnectConfig by remember { mutableStateOf(false) }
 
     val vpnPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            Log.d("DashboardScreen", "VPN permission granted")
+            ProtonLogger.d("DashboardScreen", "VPN permission granted")
             if (isQuickConnectPending) {
                 viewModel.quickConnect()
                 isQuickConnectPending = false
@@ -392,41 +398,75 @@ fun DashboardScreen(
         }
     }
 
-    val currentTarget = MainTarget.Home
-
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        containerColor = colors.backgroundNorm,
         bottomBar = {}
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(colors.backgroundNorm)
         ) {
             val successState = uiState as? DashboardUiState.Success
             val isConnected = successState?.isConnected == true
             val isConnecting = successState?.isConnecting == true
 
-            HomeMap(
+            // Background gradient decoration (immersive)
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.6f),
-                allServers = successState?.servers ?: emptyList(),
-                connectedServer = successState?.connectedServer,
-                userCountryCode = successState?.originalLocationText?.countryCode, // Focus on user's real location initially
-                isConnecting = isConnecting,
-                isInteractive = false
+                    .fillMaxSize()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                colors.brandNorm.copy(alpha = 0.25f),
+                                colors.backgroundNorm.copy(alpha = 0.1f),
+                                colors.backgroundNorm
+                            )
+                        )
+                    )
             )
 
-            Spacer(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(250.dp) // Proton uses ~200-250dp for the top gradient
-                    .align(Alignment.TopCenter)
-                    .vpnStatusOverlayBackground(isConnected, isConnecting, colors)
-            )
+                    .fillMaxHeight(if (isTablet) 1f else 0.6f)
+            ) {
+                HomeMap(
+                    modifier = Modifier.fillMaxSize(),
+                    allServers = successState?.servers ?: emptyList(),
+                    connectedServer = successState?.connectedServer,
+                    userCountryCode = successState?.originalLocationText?.countryCode,
+                    isConnecting = isConnecting,
+                    isInteractive = isTablet
+                )
+
+                // Fade out map at the bottom to blend with background
+                if (!isTablet) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(100.dp)
+                            .align(Alignment.BottomCenter)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, colors.backgroundNorm)
+                                )
+                            )
+                    )
+                }
+            }
+
+            if (!isTablet) {
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(250.dp)
+                        .align(Alignment.TopCenter)
+                        .vpnStatusOverlayBackground(isConnected, isConnecting, colors)
+                )
+            }
 
             VpnStatusTop(
                 isConnected = isConnected,
@@ -474,38 +514,31 @@ fun DashboardScreen(
                         if (state != null) {
                             DashboardContent(
                                 state = state,
-                                onServerClick = { server ->
-                                    checkVpnAndConnect(server)
-                                },
-                                onQuickConnect = {
-                                    checkVpnAndQuickConnect()
-                                },
+                                isTablet = isTablet,
+                                onServerClick = { server -> checkVpnAndConnect(server) },
+                                onQuickConnect = { checkVpnAndQuickConnect() },
                                 onDisconnect = { viewModel.disconnect() },
                                 onRefreshCert = { viewModel.refreshCertificate() },
-                                onToggleIpVisibility = { viewModel.toggleIpVisibility() }
+                                onToggleIpVisibility = { viewModel.toggleIpVisibility() },
+                                onChangeQuickConnect = { showQuickConnectConfig = true }
                             )
+
+                            if (showQuickConnectConfig) {
+                                QuickConnectBottomSheet(
+                                    onDismiss = { showQuickConnectConfig = false },
+                                    currentStrategy = state.quickConnectStrategy,
+                                    currentTargetId = state.quickConnectTargetId,
+                                    profiles = state.profiles,
+                                    recentServers = state.recentConnections,
+                                    onStrategySelect = { strategy, targetId ->
+                                        viewModel.setQuickConnectStrategy(strategy, targetId)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
             }
-
-            // Bottom Navigation
-            LiquidGlassBottomBar(
-                selectedTarget = currentTarget,
-                showCountries = true,
-                showGateways = false,
-                navigateTo = { target ->
-                    when (target) {
-                        MainTarget.Countries -> onNavigateToCountries?.invoke()
-                        MainTarget.Settings -> onNavigateToSettings?.invoke()
-                        MainTarget.Profiles -> onNavigateToProfiles?.invoke()
-                        else -> {}
-                    }
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-            )
         }
     }
 }
@@ -513,92 +546,170 @@ fun DashboardScreen(
 @Composable
 fun DashboardContent(
     state: DashboardUiState.Success,
+    isTablet: Boolean = false,
     onServerClick: (LogicalServer) -> Unit,
     onQuickConnect: () -> Unit,
     onDisconnect: () -> Unit,
     onRefreshCert: () -> Unit,
-    onToggleIpVisibility: () -> Unit
+    onToggleIpVisibility: () -> Unit,
+    onChangeQuickConnect: () -> Unit
 ) {
     val colors = ProtonNextTheme.colors
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
     
-    // Dynamically calculate the top spacer to push the card lower on larger screens
-    // This addresses the issue where the card was too high when no recent connections existed.
-    val topSpacerHeight = (screenHeight * 0.55f).coerceAtLeast(400.dp)
+    if (isTablet) {
+        // Tablet Layout: Split connection (Left) and recent connections (Right)
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 32.dp)
+                .padding(bottom = 140.dp), // Increased for the centered bottom bar
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(32.dp)
+        ) {
+            // Left Side: Connection Status
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.Center
+            ) {
+                CertificateBanner(
+                    state = state.certificateState,
+                    onRefresh = onRefreshCert,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            bottom = 140.dp // Increased padding for better scroll feel with the floating bottom bar
-        )
-    ) {
-        item {
-            // This spacer pushes the cards down so the Map and Lock icon are visible
-            Spacer(modifier = Modifier.height(topSpacerHeight))
-        }
+                ConnectionStatusCard(
+                    isConnected = state.isConnected,
+                    isConnecting = state.isConnecting,
+                    connectedServer = state.connectedServer,
+                    allServers = state.servers,
+                    originalLocationText = state.originalLocationText,
+                    vpnLocationText = state.vpnLocationText,
+                    isIpHidden = state.isIpHidden,
+                    quickConnectStrategy = state.quickConnectStrategy,
+                    quickConnectTargetId = state.quickConnectTargetId,
+                    profiles = state.profiles,
+                    onToggleIpVisibility = onToggleIpVisibility,
+                    onToggleConnection = {
+                        if (state.isConnected) onDisconnect() else onQuickConnect()
+                    },
+                    onChangeQuickConnect = onChangeQuickConnect
+                )
+            }
 
-        item {
-            CertificateBanner(
-                state = state.certificateState,
-                onRefresh = onRefreshCert,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-        }
-
-        item {
-            ConnectionStatusCard(
-                isConnected = state.isConnected,
-                isConnecting = state.isConnecting,
-                connectedServer = state.connectedServer,
-                originalLocationText = state.originalLocationText,
-                vpnLocationText = state.vpnLocationText,
-                isIpHidden = state.isIpHidden,
-                onToggleIpVisibility = onToggleIpVisibility,
-                onToggleConnection = {
-                    if (state.isConnected) {
-                        onDisconnect()
-                    } else {
-                        onQuickConnect()
-                    }
-                }
-            )
-        }
-
-        if (state.recentConnections.isNotEmpty()) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    colors.backgroundNorm
-                                )
-                            )
-                        )
-                        .padding(top = 24.dp)
-                ) {
+            // Right Side: Recent Connections
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.Center
+            ) {
+                if (state.recentConnections.isNotEmpty()) {
                     Text(
                         text = stringResource(R.string.title_recent_connections),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = colors.textNorm,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                        modifier = Modifier.padding(bottom = 16.dp)
                     )
+
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(colors.backgroundNorm.copy(alpha = 0.5f)),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                                items(state.recentConnections, key = { it.id }) { server ->
+                            ServerCard(
+                                server = server,
+                                isConnected = state.connectedServer?.id == server.id,
+                                isConnecting = state.isConnecting && state.connectedServer?.id == server.id,
+                                displayMode = state.serverLoadDisplayMode,
+                                onClick = { onServerClick(server) }
+                            )
+                        }
+                    }
                 }
             }
+        }
+    } else {
+        // Phone Layout (original LazyColumn)
+        val topSpacerHeight = (screenHeight * 0.55f).coerceAtLeast(400.dp)
 
-            items(state.recentConnections) { server ->
-                Box(modifier = Modifier.background(colors.backgroundNorm)) {
-                    ServerCard(
-                        server = server,
-                        isConnected = state.connectedServer?.id == server.id,
-                        isConnecting = state.isConnecting && state.connectedServer?.id == server.id,
-                        onClick = { onServerClick(server) },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                    )
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 140.dp)
+        ) {
+            item {
+                Spacer(modifier = Modifier.height(topSpacerHeight))
+            }
+
+            item {
+                CertificateBanner(
+                    state = state.certificateState,
+                    onRefresh = onRefreshCert,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
+            item {
+                ConnectionStatusCard(
+                    isConnected = state.isConnected,
+                    isConnecting = state.isConnecting,
+                    connectedServer = state.connectedServer,
+                    allServers = state.servers,
+                    originalLocationText = state.originalLocationText,
+                    vpnLocationText = state.vpnLocationText,
+                    isIpHidden = state.isIpHidden,
+                    quickConnectStrategy = state.quickConnectStrategy,
+                    quickConnectTargetId = state.quickConnectTargetId,
+                    profiles = state.profiles,
+                    onToggleIpVisibility = onToggleIpVisibility,
+                    onToggleConnection = {
+                        if (state.isConnected) onDisconnect() else onQuickConnect()
+                    },
+                    onChangeQuickConnect = onChangeQuickConnect
+                )
+            }
+
+            if (state.recentConnections.isNotEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, colors.backgroundNorm)
+                                )
+                            )
+                            .padding(top = 24.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.title_recent_connections),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textNorm,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+
+                items(state.recentConnections, key = { it.id }) { server ->
+                    Box(modifier = Modifier.background(colors.backgroundNorm)) {
+                        ServerCard(
+                            server = server,
+                            isConnected = state.connectedServer?.id == server.id,
+                            isConnecting = state.isConnecting && state.connectedServer?.id == server.id,
+                            displayMode = state.serverLoadDisplayMode,
+                            onClick = { onServerClick(server) },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        )
+                    }
                 }
             }
         }
@@ -718,33 +829,31 @@ fun ConnectionStatusCard(
     isConnected: Boolean,
     isConnecting: Boolean,
     connectedServer: LogicalServer?,
+    allServers: List<LogicalServer> = emptyList(),
     originalLocationText: LocationText?,
     vpnLocationText: LocationText?,
     isIpHidden: Boolean,
+    quickConnectStrategy: String,
+    quickConnectTargetId: String?,
+    profiles: List<ru.protonmod.next.data.local.VpnProfileEntity>,
     onToggleIpVisibility: () -> Unit,
-    onToggleConnection: () -> Unit
+    onToggleConnection: () -> Unit,
+    onChangeQuickConnect: () -> Unit
 ) {
     val colors = ProtonNextTheme.colors
     val context = LocalContext.current
-    val cardContainerColor = when {
-        isConnected -> colors.notificationSuccess.copy(alpha = 0.18f)
-        isConnecting -> colors.backgroundSecondary
-        else -> colors.backgroundSecondary.copy(alpha = 0.92f)
-    }
 
     val contentColor = colors.textNorm
 
-    Card(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(32.dp),
-        colors = CardDefaults.cardColors(containerColor = cardContainerColor),
-        border = BorderStroke(
-            1.dp,
-            if (isConnected) colors.notificationSuccess.copy(alpha = 0.25f)
-            else colors.shade100.copy(alpha = 0.08f)
-        )
+            .padding(horizontal = 16.dp)
+            .liquidGlass(
+                shape = RoundedCornerShape(32.dp),
+                alpha = if (isConnected) 0.2f else 0.4f,
+                shadowElevation = 0.dp
+            )
     ) {
         Column(
             modifier = Modifier
@@ -771,10 +880,10 @@ fun ConnectionStatusCard(
                     isConnected && vpnLocationText == null -> {
                         // Provide a dummy IP string while waiting for the real one.
                         val rawCountry = connectedServer?.exitCountry?.let { CountryUtils.getCountryName(context, it) }
-                        val safeCountry = rawCountry?.takeIf { it.isNotBlank() && it != "null" } ?: "VPN"
-                        LocationText(country = safeCountry, countryCode = connectedServer?.exitCountry, ip = "000.000.000.000")
+                        val safeCountry = rawCountry?.ifBlank { null } ?: stringResource(R.string.status_vpn)
+                        LocationText(country = safeCountry, countryCode = connectedServer?.exitCountry, ip = stringResource(R.string.ip_placeholder))
                     }
-                    else -> originalLocationText ?: LocationText(country = stringResource(R.string.status_connecting), ip = "000.000.000.000")
+                    else -> originalLocationText ?: LocationText(country = stringResource(R.string.status_connecting), ip = stringResource(R.string.ip_placeholder))
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -792,7 +901,7 @@ fun ConnectionStatusCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .clickable(enabled = !isConnecting) { /* TODO: Open Change Server Bottom Sheet */ }
+                    .clickable(enabled = !isConnecting) { onChangeQuickConnect() }
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -821,23 +930,71 @@ fun ConnectionStatusCard(
                         }
                     }
                 } else {
-                    FlagIcon(
-                        countryFlag = R.drawable.flag_fastest,
-                        size = DpSize(48.dp, 32.dp)
-                    )
+                    val targetServer = if (quickConnectStrategy == "server") {
+                        allServers.find { it.id == quickConnectTargetId }
+                    } else null
+
+                    val flagRes = when {
+                        targetServer != null -> CountryUtils.getFlagResource(context, targetServer.exitCountry)
+                        quickConnectStrategy == "fastest" || quickConnectStrategy == "recent" -> R.drawable.flag_fastest
+                        else -> 0
+                    }
+
+                    if (flagRes != 0) {
+                        FlagIcon(
+                            countryFlag = flagRes,
+                            size = DpSize(48.dp, 32.dp)
+                        )
+                    } else {
+                        val iconVector = when (quickConnectStrategy) {
+                            "profile" -> Icons.Rounded.Star
+                            else -> Icons.Rounded.Speed
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp, 32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(colors.backgroundNorm),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = iconVector,
+                                contentDescription = null,
+                                tint = colors.brandNorm,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     val rawCountry = connectedServer?.let { CountryUtils.getCountryName(context, it.exitCountry) }
-                    val safeCountryName = rawCountry?.takeIf { it.isNotBlank() && it != "null" } ?: "VPN"
-                    val safeCityName = connectedServer?.city?.takeIf { it.isNotBlank() && it != "null" } ?: ""
+                    val safeCountryName = rawCountry?.ifBlank { null } ?: stringResource(R.string.status_vpn)
+                    val safeCityName = connectedServer?.city ?: ""
+
+                    val targetServer = if (quickConnectStrategy == "server") {
+                        allServers.find { it.id == quickConnectTargetId }
+                    } else null
 
                     val locationTitleText = if (isConnected || isConnecting) {
-                        if (safeCityName.isNotEmpty()) "$safeCountryName, $safeCityName" else safeCountryName
+                        if (safeCityName.isNotEmpty()) {
+                            stringResource(R.string.location_city_format, safeCountryName, safeCityName)
+                        } else {
+                            safeCountryName
+                        }
                     } else {
-                        stringResource(R.string.label_fastest_server)
+                        when (quickConnectStrategy) {
+                            "fastest" -> stringResource(R.string.qc_strategy_fastest)
+                            "recent" -> stringResource(R.string.qc_strategy_recent)
+                            "profile" -> profiles.find { it.id == quickConnectTargetId }?.name ?: stringResource(R.string.label_fastest_server)
+                            "server" -> targetServer?.let {
+                                val cName = CountryUtils.getCountryName(context, it.exitCountry)
+                                if (it.city.isNotBlank()) "$cName, ${it.city}" else cName
+                            } ?: stringResource(R.string.label_fastest_server)
+                            else -> stringResource(R.string.label_fastest_server)
+                        }
                     }
 
                     Text(
@@ -851,7 +1008,10 @@ fun ConnectionStatusCard(
                     Text(
                         text = if (isConnected || isConnecting) {
                             connectedServer?.name ?: ""
-                        } else stringResource(R.string.label_select_location),
+                        } else {
+                            if (quickConnectStrategy == "server") targetServer?.name ?: ""
+                            else stringResource(R.string.label_select_location)
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.textWeak
                     )
@@ -905,86 +1065,109 @@ fun ServerCard(
     server: LogicalServer,
     isConnected: Boolean,
     isConnecting: Boolean,
-    onClick: () -> Unit,
+    displayMode: ru.protonmod.next.data.local.ServerLoadDisplayMode = ru.protonmod.next.data.local.ServerLoadDisplayMode.ALL,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val colors = ProtonNextTheme.colors
     val context = LocalContext.current
-    Card(
+    
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(enabled = !isConnecting) { onClick() },
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isConnected) colors.brandNorm.copy(alpha = 0.12f) else colors.backgroundSecondary.copy(alpha = 0.8f)
-        ),
-        border = BorderStroke(
-            1.dp,
-            if (isConnected) colors.brandNorm.copy(alpha = 0.2f) else colors.shade100.copy(alpha = 0.05f)
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier.size(36.dp, 24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isConnecting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = colors.brandNorm
-                    )
+            .liquidGlass(
+                shape = RoundedCornerShape(24.dp),
+                alpha = if (isConnected) 0.3f else 0.4f,
+                shadowElevation = 0.dp
+            )
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(enabled = !isConnecting) { onClick() }
                 } else {
-                    val flagResId = CountryUtils.getFlagResource(context, server.exitCountry)
-                    if (flagResId != 0) {
-                        FlagIcon(
-                            countryFlag = flagResId,
-                            size = DpSize(36.dp, 24.dp)
+                    Modifier
+                }
+            )
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier.size(36.dp, 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isConnecting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = colors.brandNorm
                         )
                     } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(colors.backgroundNorm),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Public,
-                                contentDescription = stringResource(R.string.desc_country),
-                                tint = colors.iconNorm,
-                                modifier = Modifier.size(20.dp)
+                        val flagResId = CountryUtils.getFlagResource(context, server.exitCountry)
+                        if (flagResId != 0) {
+                            FlagIcon(
+                                countryFlag = flagResId,
+                                size = DpSize(36.dp, 24.dp)
                             )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(colors.backgroundNorm),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Public,
+                                    contentDescription = stringResource(R.string.desc_country),
+                                    tint = colors.iconNorm,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    val rawCountry = CountryUtils.getCountryName(context, server.exitCountry)
+                    val safeCountry = rawCountry.ifBlank { stringResource(R.string.status_vpn) }
+                    val safeCity = server.city
+                    val locationTitle = if (safeCity.isNotEmpty()) {
+                        stringResource(R.string.location_city_format, safeCountry, safeCity)
+                    } else {
+                        safeCountry
+                    }
+
+                    Text(
+                        text = locationTitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textNorm
+                    )
+                    Text(
+                        text = server.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textWeak
+                    )
+                }
+
+                if (!isConnecting) {
+                    ru.protonmod.next.ui.components.LoadIndicator(
+                        load = server.averageLoad,
+                        displayMode = displayMode
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                val rawCountry = CountryUtils.getCountryName(context, server.exitCountry)
-                val safeCountry = rawCountry.takeIf { it.isNotBlank() && it != "null" } ?: "VPN"
-                val safeCity = server.city.takeIf { it.isNotBlank() && it != "null" } ?: ""
-                val locationTitle = if (safeCity.isNotEmpty()) "$safeCountry, $safeCity" else safeCountry
-
-                Text(
-                    text = locationTitle,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textNorm
-                )
-                Text(
-                    text = server.name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.textWeak
-                )
-            }
+            ru.protonmod.next.ui.components.LoadProgressBar(
+                load = server.averageLoad,
+                displayMode = displayMode
+            )
         }
     }
 }

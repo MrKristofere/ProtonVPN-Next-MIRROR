@@ -21,7 +21,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.util.Log
+import android.net.Uri
+import ru.protonmod.next.utils.ProtonLogger
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +33,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -42,14 +46,20 @@ import org.amnezia.awg.backend.Tunnel
 import org.amnezia.awg.config.Config
 import org.amnezia.awg.config.Interface
 import org.amnezia.awg.config.Peer
+import java.net.InetAddress
 import ru.protonmod.next.data.local.SettingsManager
 import ru.protonmod.next.data.local.SessionEntity
 import ru.protonmod.next.data.local.SessionDao
+import ru.protonmod.next.data.network.LogicalServer
 import ru.protonmod.next.data.network.PhysicalServer
 import ru.protonmod.next.data.repository.VpnRepository
+import ru.protonmod.next.data.state.ConnectedServerState
 import ru.protonmod.next.di.ApplicationScope
+import ru.protonmod.next.utils.coroutines.DispatcherProvider
+import ru.protonmod.next.utils.crypto.CryptoWrapper
+import ru.protonmod.next.utils.system.SystemContextWrapper
+import io.sentry.Sentry
 import java.io.ByteArrayInputStream
-import java.net.InetAddress
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import javax.inject.Inject
@@ -62,6 +72,11 @@ class AmneziaVpnManager @Inject constructor(
     private val settingsManager: SettingsManager,
     private val vpnRepositoryProvider: Provider<VpnRepository>,
     private val sessionDao: SessionDao,
+    private val connectedServerState: ConnectedServerState,
+    private val systemContextWrapper: SystemContextWrapper,
+    private val cryptoWrapper: CryptoWrapper,
+    private val amneziaConfigGenerator: AmneziaConfigGenerator,
+    private val dispatcherProvider: DispatcherProvider,
     @ApplicationScope private val applicationScope: CoroutineScope
 ) {
     companion object {
@@ -90,9 +105,9 @@ class AmneziaVpnManager @Inject constructor(
 
     data class ObfuscationParams(
         val jc: Int, val jmin: Int, val jmax: Int,
-        val s1: Int, val s2: Int,
+        val s1: Int, val s2: Int, val s3: Int = 0, val s4: Int = 0,
         val h1: String, val h2: String, val h3: String, val h4: String,
-        val i1: String
+        val i1: String, val i2: String = "", val i3: String = "", val i4: String = "", val i5: String = ""
     )
 
     private val _isConnecting = MutableStateFlow(false)
@@ -103,6 +118,7 @@ class AmneziaVpnManager @Inject constructor(
 
     private val _rawTunnelState = MutableStateFlow(Tunnel.State.DOWN)
     private var isReconnecting = false
+    private var currentServerId: String? = null
     private var connectionJob: Job? = null
     private var refreshJob: Job? = null
     private val refreshMutex = Mutex()
@@ -119,21 +135,37 @@ class AmneziaVpnManager @Inject constructor(
                         val newState = Tunnel.State.valueOf(it)
                         _rawTunnelState.value = newState
                         _isConnecting.value = false
-                        if (!(isReconnecting && newState == Tunnel.State.DOWN)) {
-                            _tunnelState.value = newState
-                            if (newState == Tunnel.State.UP) {
-                                checkAndRefreshCertificateProactively()
-                            }
+                        
+                        _tunnelState.value = newState
+                        if (newState == Tunnel.State.UP) {
+                            checkAndRefreshCertificateProactively()
+                        } else if (newState == Tunnel.State.DOWN && !isReconnecting) {
+                            currentServerId = null
+                            connectedServerState.setConnectedServer(null)
                         }
                     }
                 }
             }
         }, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
 
-        applicationScope.launch { settingsManager.notificationsEnabled.collect { updateServiceSettings() } }
-        applicationScope.launch { settingsManager.killSwitchEnabled.collect { updateServiceSettings() } }
+        // Monitor settings changes and update the service accordingly.
+        // We use a single coroutine with a small initial delay to avoid competing 
+        // with the main thread during critical app boot/injection window.
+        applicationScope.launch {
+            delay(1000) 
+            combine(
+                settingsManager.notificationsEnabled,
+                settingsManager.killSwitchEnabled,
+                settingsManager.sentryNonFatalEnabled,
+                settingsManager.analyticsEnabled
+            ) { _, _, _, _ -> }
+                .collectLatest {
+                    updateServiceSettings()
+                }
+        }
 
         applicationScope.launch {
+            delay(1500) // Staggered initialization
             val session = sessionDao.getSession()
             if (session != null) {
                 updateCertificateState(session.wgCertificate)
@@ -168,35 +200,56 @@ class AmneziaVpnManager @Inject constructor(
         }
     }
 
-    private suspend fun performCertificateRefresh(): Result<String> = refreshMutex.withLock {
-        val currentSession = sessionDao.getSession() ?: return Result.failure(Exception("No session"))
+    private suspend fun performCertificateRefresh(force: Boolean = false): Result<String> = refreshMutex.withLock {
+        val currentSession = sessionDao.getSession() ?: return Result.failure<String>(Exception("No session")).also {
+            ProtonLogger.e(TAG, "Certificate refresh failed: No active session found in database")
+        }
         updateCertificateState(currentSession.wgCertificate)
 
-        if (_certState.value is CertificateState.Valid) {
+        if (!force && _certState.value is CertificateState.Valid) {
+            ProtonLogger.d(TAG, "Certificate is still valid, skipping refresh")
             return Result.success(currentSession.wgCertificate ?: "")
         }
 
         val previousState = _certState.value
         _certState.value = CertificateState.Refreshing
-        Log.d(TAG, "Refreshing certificate (previous state: $previousState)")
+        ProtonLogger.i(TAG, "Starting certificate refresh (force=$force, previous state: $previousState)")
+
+        val keyPair = cryptoWrapper.generateVpnKeyPair()
+        ProtonLogger.v(TAG, "Generated new VPN keypair for registration")
 
         val result = vpnRepositoryProvider.get().registerWireGuardKey(
             accessToken = currentSession.accessToken,
             sessionId = currentSession.sessionId,
-            publicKeyPem = currentSession.wgPublicKeyPem ?: ""
+            publicKeyPem = keyPair.publicKeyPem
         )
         return if (result.isSuccess) {
             val newCert = result.getOrNull()?.certificate
             if (newCert != null) {
-                sessionDao.updateCertificate(newCert)
+                ProtonLogger.i(TAG, "Successfully registered new WireGuard key and received certificate")
+                
+                // Metrics
+                Sentry.metrics().count("cert_refresh_success", 1.0)
+                
+                sessionDao.updateVpnKeys(
+                    privateKey = keyPair.privateKeyX25519,
+                    publicKeyPem = keyPair.publicKeyPem,
+                    certificate = newCert
+                )
                 updateCertificateState(newCert)
                 Result.success(newCert)
             } else {
+                ProtonLogger.e(TAG, "Server returned success but certificate is null or empty")
                 _certState.value = previousState
                 Result.failure(Exception("Empty certificate in response"))
             }
         } else {
             val error = result.exceptionOrNull()?.message ?: "Unknown error"
+            ProtonLogger.e(TAG, "Failed to register WireGuard key with Proton API: $error", result.exceptionOrNull())
+            
+            // Metrics
+            Sentry.metrics().count("cert_refresh_error", 1.0)
+
             val isFullyExpired = previousState is CertificateState.Expired ||
                     (previousState is CertificateState.RefreshFailed && previousState.isFullyExpired)
             _certState.value = CertificateState.RefreshFailed(error, isFullyExpired)
@@ -219,8 +272,8 @@ class AmneziaVpnManager @Inject constructor(
                     continue
                 }
 
-                Log.d(TAG, "Proactive refresh starting (cert state: ${_certState.value})")
-                val result = performCertificateRefresh()
+                ProtonLogger.d(TAG, "Proactive refresh starting (cert state: ${_certState.value})")
+                val result = performCertificateRefresh(force = false)
                 
                 if (result.isSuccess) {
                     currentRetryDelay = 5000L
@@ -228,7 +281,7 @@ class AmneziaVpnManager @Inject constructor(
                 } else {
                     // API access is expected to be preserved, so we retry with backoff.
                     // This covers cases where internet is temporarily down.
-                    Log.w(TAG, "Proactive refresh failed, retrying in ${currentRetryDelay}ms")
+                    ProtonLogger.w(TAG, "Proactive refresh failed, retrying in ${currentRetryDelay}ms")
                     delay(currentRetryDelay)
                     currentRetryDelay = (currentRetryDelay * 2).coerceAtMost(RETRY_DELAY_MS)
                 }
@@ -236,18 +289,22 @@ class AmneziaVpnManager @Inject constructor(
         }
     }
 
-    private fun isEffectivelyExpired(): Boolean {
+    fun isEffectivelyExpired(): Boolean {
         val state = _certState.value
         return state is CertificateState.Expired || (state is CertificateState.RefreshFailed && state.isFullyExpired)
     }
 
+    suspend fun forceRefreshCertificate(): Result<String> {
+        return performCertificateRefresh(force = true)
+    }
+
     private suspend fun updateServiceSettings() {
-        val intent = Intent(ProtonVpnService.ACTION_UPDATE_SETTINGS).apply {
-            setPackage(context.packageName)
-            putExtra(ProtonVpnService.EXTRA_NOTIFICATIONS_ENABLED, settingsManager.notificationsEnabled.first())
-            putExtra(ProtonVpnService.EXTRA_KILL_SWITCH_ENABLED, settingsManager.killSwitchEnabled.first())
-        }
-        context.sendBroadcast(intent)
+        systemContextWrapper.updateVpnSettings(
+            notificationsEnabled = settingsManager.notificationsEnabled.first(),
+            killSwitchEnabled = settingsManager.killSwitchEnabled.first(),
+            nonFatalEnabled = settingsManager.sentryNonFatalEnabled.first(),
+            analyticsEnabled = settingsManager.analyticsEnabled.first()
+        )
     }
 
     fun connect(
@@ -256,11 +313,30 @@ class AmneziaVpnManager @Inject constructor(
         session: SessionEntity,
         overridePort: Int? = null,
         overrideObfuscation: Boolean? = null,
-        obfuscationParams: ObfuscationParams? = null
+        obfuscationParams: ObfuscationParams? = null,
+        logicalServer: LogicalServer? = null
     ) {
+        if (currentServerId == logicalServerId && _tunnelState.value == Tunnel.State.UP) {
+            ProtonLogger.d(TAG, "Already connected to $logicalServerId")
+            return
+        }
+        
         connectionJob?.cancel()
-        connectionJob = applicationScope.launch {
+        connectionJob = applicationScope.launch(dispatcherProvider.io()) {
+            currentServerId = logicalServerId
+            
+            // Resolve logical server if not provided to ensure UI can show location info
+            if (logicalServer != null) {
+                connectedServerState.setConnectedServer(logicalServer)
+            } else if (connectedServerState.connectedServer.value?.id != logicalServerId) {
+                val resolved = vpnRepositoryProvider.get().getCachedServers().find { it.id == logicalServerId }
+                connectedServerState.setConnectedServer(resolved)
+            }
+
             connectInternal(logicalServerId, server, session, overridePort, overrideObfuscation, obfuscationParams)
+            
+            // Track connection attempt via Sentry Metrics
+            Sentry.metrics().count("vpn_connection_attempt", 1.0)
         }
     }
 
@@ -271,89 +347,150 @@ class AmneziaVpnManager @Inject constructor(
         overridePort: Int? = null,
         overrideObfuscation: Boolean? = null,
         obfuscationParams: ObfuscationParams? = null
-    ): Result<Unit> = withContext(Dispatchers.IO) {
+    ): Result<Unit> = withContext(dispatcherProvider.io()) {
         try {
+            ProtonLogger.i(TAG, "Initiating connection to server: ${server.id} (Domain: ${server.domain}, LogicalID: $logicalServerId)")
             _isConnecting.value = true
             var currentSession = session
 
             // Proactively refresh certificate if it's not valid (Expired or ExpiringSoon)
             updateCertificateState(currentSession.wgCertificate)
             if (_certState.value !is CertificateState.Valid) {
-                Log.d(TAG, "Certificate state is ${_certState.value}, attempting refresh before connection.")
+                ProtonLogger.i(TAG, "Certificate state is ${_certState.value}, attempting refresh before connection.")
                 performCertificateRefresh()
 
                 if (isEffectivelyExpired()) {
-                    // Even if expired, we try to connect because Proton API might be reachable 
-                    // and some servers might still accept the old key for a short grace period.
-                    // But we keep the UI warning.
-                    Log.w(TAG, "Certificate is expired. Proceeding with connection anyway as Proton API is accessible.")
+                    ProtonLogger.w(TAG, "Certificate is still effectively expired after refresh attempt. Proceeding anyway as Proton API might allow grace period.")
                 }
                 
                 // Refresh session from DB to get the new certificate and any other potential updates
                 currentSession = sessionDao.getSession() ?: currentSession
             }
 
-            val wgPrivateKeyB64 = currentSession.wgPrivateKey ?: throw Exception("Offline VPN private key missing!")
+            val wgPrivateKeyB64 = currentSession.wgPrivateKey ?: throw Exception("Offline VPN private key missing!").also {
+                ProtonLogger.e(TAG, "Critical: VPN Private Key is null in session data")
+            }
             var targetIp: String? = null
+            
+            // DNS resolution with improved retry and logging
+            ProtonLogger.d(TAG, "Resolving domain ${server.domain} (Max retries: $DNS_RETRY_COUNT)")
             for (i in 1..DNS_RETRY_COUNT) {
                 try {
                     targetIp = InetAddress.getByName(server.domain).hostAddress
-                    if (targetIp != null) break
+                    if (targetIp != null) {
+                        ProtonLogger.i(TAG, "DNS resolved ${server.domain} to $targetIp on attempt $i")
+                        break
+                    }
                 } catch (e: Exception) {
-                    if (i < DNS_RETRY_COUNT) delay(DNS_RETRY_DELAY_MS)
+                    ProtonLogger.w(TAG, "DNS retry $i failed for ${server.domain}: ${e.message}")
+                    if (i < DNS_RETRY_COUNT) delay(DNS_RETRY_DELAY_MS * i) // Exponential-ish backoff
                 }
             }
 
             if (targetIp == null) {
                 _isConnecting.value = false
                 _tunnelState.value = Tunnel.State.DOWN
-                throw Exception("DNS resolution failed for ${server.domain}")
+                throw Exception("DNS resolution failed for ${server.domain} after $DNS_RETRY_COUNT attempts").also {
+                    ProtonLogger.e(TAG, it.message!!)
+                }
             }
 
-            val serverPubKey = server.wgPublicKey ?: throw Exception("Missing WG Public Key for Server")
+            val serverPubKey = server.wgPublicKey ?: throw Exception("Missing WG Public Key for Server").also {
+                ProtonLogger.e(TAG, "Critical: Server ${server.id} has no WireGuard Public Key")
+            }
+            
             val splitTunnelingEnabled = settingsManager.splitTunnelingEnabled.first()
-            val excludedApps = if (splitTunnelingEnabled) settingsManager.excludedApps.first() else emptySet()
-            val excludedIps = if (splitTunnelingEnabled) settingsManager.excludedIps.first() else emptySet()
+            val stMode = settingsManager.splitTunnelingMode.first()
+            val isIncludeMode = stMode == "include"
+            val selectedApps = if (splitTunnelingEnabled) settingsManager.excludedApps.first() else emptySet()
+            val selectedIps = if (splitTunnelingEnabled) settingsManager.excludedIps.first().toMutableSet() else mutableSetOf()
+            val selectedDomains = if (splitTunnelingEnabled) settingsManager.excludedDomains.first() else emptySet()
+
+            ProtonLogger.d(TAG, "Split Tunneling: enabled=$splitTunnelingEnabled, mode=$stMode, apps=${selectedApps.size}, IPs=${selectedIps.size}, domains=${selectedDomains.size}")
+
+            // Resolve split tunneling domains
+            if (splitTunnelingEnabled && selectedDomains.isNotEmpty()) {
+                ProtonLogger.i(TAG, "Resolving ${selectedDomains.size} split-tunneling domains...")
+                selectedDomains.forEach { domain ->
+                    try {
+                        val addresses = InetAddress.getAllByName(domain)
+                        addresses.forEach { addr ->
+                            val ip = addr.hostAddress
+                            if (ip != null) {
+                                selectedIps.add(if (ip.contains(":")) "$ip/128" else "$ip/32")
+                                ProtonLogger.v(TAG, "Split-tunnel domain $domain resolved to $ip")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        ProtonLogger.w(TAG, "Failed to resolve split-tunneling domain $domain: ${e.message}")
+                    }
+                }
+            }
+
             val selectedPort = overridePort?.takeIf { it != 0 } ?: settingsManager.vpnPort.first().let { port ->
-                if (port == 0) listOf(443, 123, 1194, 51820).random() else port
+                if (port == 0) {
+                    val p = listOf(443, 123, 1194, 51820).random()
+                    ProtonLogger.d(TAG, "Auto-port selected: $p")
+                    p
+                } else port
             }
             val isObfuscationEnabled = overrideObfuscation ?: settingsManager.obfuscationEnabled.first()
+
+            ProtonLogger.i(TAG, "Connection parameters: Port=$selectedPort, Obfuscation=$isObfuscationEnabled")
 
             val params = if (isObfuscationEnabled) {
                 obfuscationParams ?: ObfuscationParams(
                     jc = settingsManager.awgJc.first(), jmin = settingsManager.awgJmin.first(), jmax = settingsManager.awgJmax.first(),
                     s1 = settingsManager.awgS1.first(), s2 = settingsManager.awgS2.first(),
+                    s3 = settingsManager.awgS3.first(), s4 = settingsManager.awgS4.first(),
                     h1 = settingsManager.awgH1.first(), h2 = settingsManager.awgH2.first(), h3 = settingsManager.awgH3.first(), h4 = settingsManager.awgH4.first(),
-                    i1 = settingsManager.awgI1.first()
+                    i1 = settingsManager.awgI1.first(), i2 = settingsManager.awgI2.first(), i3 = settingsManager.awgI3.first(), i4 = settingsManager.awgI4.first(), i5 = settingsManager.awgI5.first()
                 )
             } else {
-                ObfuscationParams(0, 0, 0, 0, 0, "", "", "", "", "")
+                ObfuscationParams(0, 0, 0, 0, 0, 0, 0, "", "", "", "", "", "", "", "", "")
             }
 
             // Retrieve Custom DNS IP or fallback to Proton Default
             val userDns = settingsManager.customDns.first().trim()
             val activeDns = if (userDns.isNotEmpty()) userDns else PROTON_DNS_IP
-            Log.d(TAG, "Using DNS Server: $activeDns")
+            ProtonLogger.i(TAG, "Using DNS Server: $activeDns")
 
-            val config = buildAwgConfig(
-                serverPublicKey = serverPubKey, privateKey = wgPrivateKeyB64, localIp = PROTON_CLIENT_IP, dnsServer = activeDns,
-                targetIp = targetIp, excludedApps = excludedApps, excludedIps = excludedIps, port = selectedPort,
-                jc = params.jc, jmin = params.jmin, jmax = params.jmax, s1 = params.s1, s2 = params.s2,
-                h1 = params.h1, h2 = params.h2, h3 = params.h3, h4 = params.h4, i1 = params.i1
+            val configStr = amneziaConfigGenerator.buildConfig(
+                serverPublicKey = serverPubKey,
+                privateKey = wgPrivateKeyB64,
+                localIp = PROTON_CLIENT_IP,
+                dnsServer = activeDns,
+                targetIp = targetIp,
+                isIncludeMode = isIncludeMode,
+                selectedApps = selectedApps,
+                selectedIps = selectedIps,
+                port = selectedPort,
+                certificate = currentSession.wgCertificate,
+                obfuscationParams = params
+            )
+            
+            ProtonLogger.v(TAG, "Generated AWG Config Length: ${configStr.length}")
+
+            systemContextWrapper.startVpnService(
+                configStr = configStr,
+                notificationsEnabled = settingsManager.notificationsEnabled.first(),
+                killSwitchEnabled = settingsManager.killSwitchEnabled.first(),
+                excludedApps = selectedApps,
+                excludedIps = selectedIps
             )
 
-            val intent = Intent(context, ProtonVpnService::class.java).apply {
-                action = ProtonVpnService.ACTION_CONNECT
-                putExtra(ProtonVpnService.EXTRA_CONFIG, config.toAwgQuickString(false, false))
-                putExtra(ProtonVpnService.EXTRA_NOTIFICATIONS_ENABLED, settingsManager.notificationsEnabled.first())
-                putExtra(ProtonVpnService.EXTRA_KILL_SWITCH_ENABLED, settingsManager.killSwitchEnabled.first())
-                putStringArrayListExtra(ProtonVpnService.EXTRA_EXCLUDED_APPS, ArrayList(excludedApps))
-                putStringArrayListExtra(ProtonVpnService.EXTRA_EXCLUDED_IPS, ArrayList(excludedIps))
-            }
-            context.startService(intent)
-
+            ProtonLogger.i(TAG, "VPN start command issued successfully")
+            
+            // Track connection success
+            Sentry.metrics().count("vpn_connection_success", 1.0)
+            
             Result.success(Unit)
         } catch (e: Exception) {
+            ProtonLogger.e(TAG, "Failed to connect to VPN", e)
+            
+            // Track connection failure
+            Sentry.metrics().count("vpn_connection_failure", 1.0)
+
             _isConnecting.value = false
             _tunnelState.value = Tunnel.State.DOWN
             Result.failure(e)
@@ -366,17 +503,42 @@ class AmneziaVpnManager @Inject constructor(
         session: SessionEntity,
         overridePort: Int? = null,
         overrideObfuscation: Boolean? = null,
-        obfuscationParams: ObfuscationParams? = null
+        obfuscationParams: ObfuscationParams? = null,
+        logicalServer: LogicalServer? = null
     ) {
+        // Only skip if we're already connecting (to avoid multiple rapid clicks)
+        if (_isConnecting.value) {
+            ProtonLogger.d(TAG, "Reconnect skipped: Already in a connecting state.")
+            return
+        }
+
         connectionJob?.cancel()
         connectionJob = applicationScope.launch {
-            isReconnecting = true
-            _isConnecting.value = true
-            disconnectInternal()
-            try { withTimeout(5000) { _rawTunnelState.first { it == Tunnel.State.DOWN } } } catch (_: Exception) {}
-            delay(500)
-            isReconnecting = false
-            connectInternal(logicalServerId, server, session, overridePort, overrideObfuscation, obfuscationParams)
+            try {
+                isReconnecting = true
+                _isConnecting.value = true
+                currentServerId = logicalServerId
+
+                // Resolve logical server if not provided
+                if (logicalServer != null) {
+                    connectedServerState.setConnectedServer(logicalServer)
+                } else if (connectedServerState.connectedServer.value?.id != logicalServerId) {
+                    val resolved = vpnRepositoryProvider.get().getCachedServers().find { it.id == logicalServerId }
+                    connectedServerState.setConnectedServer(resolved)
+                }
+
+                disconnectInternal()
+                try {
+                    withTimeout(5000) {
+                        _rawTunnelState.first { it == Tunnel.State.DOWN }
+                    }
+                } catch (_: Exception) {
+                }
+                delay(500)
+                connectInternal(logicalServerId, server, session, overridePort, overrideObfuscation, obfuscationParams)
+            } finally {
+                isReconnecting = false
+            }
         }
     }
 
@@ -384,62 +546,67 @@ class AmneziaVpnManager @Inject constructor(
         connectionJob?.cancel()
         applicationScope.launch {
             isReconnecting = false
+            currentServerId = null
             disconnectInternal()
         }
     }
 
-    private suspend fun disconnectInternal() = withContext(Dispatchers.IO) {
-        val intent = Intent(context, ProtonVpnService::class.java).apply {
-            action = ProtonVpnService.ACTION_DISCONNECT
-        }
-        context.startService(intent)
+    private suspend fun disconnectInternal() = withContext(dispatcherProvider.io()) {
+        systemContextWrapper.stopVpnService()
     }
 
-    private fun buildAwgConfig(
-        serverPublicKey: String,
-        privateKey: String,
-        localIp: String,
-        dnsServer: String,
-        targetIp: String,
-        excludedApps: Set<String> = emptySet(),
-        excludedIps: Set<String> = emptySet(),
-        port: Int = 1194,
-        jc: Int = 3, jmin: Int = 1, jmax: Int = 3,
-        s1: Int = 0, s2: Int = 0,
-        h1: String = "1", h2: String = "2", h3: String = "3", h4: String = "4",
-        i1: String = ""
-    ): Config {
-        val allowedIpsList = if (excludedIps.isEmpty()) listOf("0.0.0.0/0") else IpSubnetCalculator.complementOfExcluded(excludedIps)
-        val peer = Peer.Builder()
-            .parsePublicKey(serverPublicKey)
-            .parseEndpoint("$targetIp:$port")
-            .apply {
-                if (allowedIpsList.isEmpty()) parseAllowedIPs("0.0.0.0/0") else allowedIpsList.forEach { parseAllowedIPs(it) }
+    /**
+     * Connect & Go: Centralized logic to wait for the VPN tunnel to be ready
+     * and then open the specified URL in the system browser.
+     */
+    fun awaitTunnelAndOpenUrl(url: String) {
+        if (url.isEmpty()) return
+
+        var finalUrl = url.trim()
+        if (finalUrl.isNotEmpty() && !finalUrl.contains("://")) {
+            finalUrl = "https://$finalUrl"
+        }
+
+        val targetUrl = finalUrl
+
+        applicationScope.launch(dispatcherProvider.main()) {
+            ProtonLogger.d(TAG, "Connect & Go: Waiting for tunnel UP to open URL: $targetUrl")
+            try {
+                // Initial delay to allow the connection attempt to start and set isConnecting=true
+                delay(1500)
+
+                withTimeout(40000) {
+                    // 1. If we are currently in the middle of connecting, wait for it to finish
+                    if (_isConnecting.value) {
+                        ProtonLogger.d(TAG, "Connect & Go: VPN is connecting, waiting...")
+                        _isConnecting.first { !it }
+                    }
+                    
+                    // 2. Then wait for the tunnel state to be UP
+                    ProtonLogger.d(TAG, "Connect & Go: VPN attempt finished, waiting for UP state...")
+                    _tunnelState.first { it == Tunnel.State.UP }
+                }
+
+                // 3. Extra delay to ensure routing and DNS are fully established and browser can reach the site
+                ProtonLogger.d(TAG, "Connect & Go: Tunnel is UP, waiting for routing stabilization...")
+                delay(3000)
+
+                if (_tunnelState.value == Tunnel.State.UP) {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                    ProtonLogger.d(TAG, "Connect & Go: URL opened successfully: $targetUrl")
+                } else {
+                    ProtonLogger.w(TAG, "Connect & Go: Tunnel is not UP anymore, skipping URL open.")
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.TimeoutCancellationException) {
+                    ProtonLogger.e(TAG, "Connect & Go: Timed out waiting for VPN to connect for URL: $targetUrl")
+                } else {
+                    ProtonLogger.e(TAG, "Connect & Go: Failed to handle URL: $targetUrl", e)
+                }
             }
-            .setPersistentKeepalive(60)
-            .build()
-
-        val ifaceBuilder = Interface.Builder()
-            .parsePrivateKey(privateKey)
-            .parseAddresses("$localIp/32")
-            // WireGuard accepts the custom DNS directly here
-            .parseDnsServers(dnsServer)
-            .setMtu(1280)
-            .setJunkPacketCount(jc)
-            .setJunkPacketMinSize(jmin)
-            .setJunkPacketMaxSize(jmax)
-            .setInitPacketJunkSize(s1)
-            .setResponsePacketJunkSize(s2)
-            .apply {
-                if (h1.isNotEmpty()) setInitPacketMagicHeader(h1)
-                if (h2.isNotEmpty()) setResponsePacketMagicHeader(h2)
-                if (h3.isNotEmpty()) setUnderloadPacketMagicHeader(h3)
-                if (h4.isNotEmpty()) setTransportPacketMagicHeader(h4)
-            }
-
-        if (i1.isNotEmpty()) ifaceBuilder.parseSpecialJunkI1(i1)
-        if (excludedApps.isNotEmpty()) ifaceBuilder.parseExcludedApplications(excludedApps.joinToString(","))
-
-        return Config.Builder().setInterface(ifaceBuilder.build()).addPeer(peer).build()
+        }
     }
 }

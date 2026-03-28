@@ -30,7 +30,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Public
@@ -50,7 +49,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.protonmod.next.R
+import ru.protonmod.next.ui.components.NavigationHeader
 import ru.protonmod.next.ui.theme.ProtonNextTheme
+import ru.protonmod.next.ui.theme.liquidGlass
+import ru.protonmod.next.ui.utils.isTablet
 
 /**
  * Screen for configuring API Block Bypass strategies.
@@ -64,6 +66,7 @@ fun ApiBypassScreen(
 ) {
     val colors = ProtonNextTheme.colors
     val uiState by viewModel.uiState.collectAsState()
+    val isTablet = isTablet()
 
     // Assuming the ViewModel exposes whether ANY VPN (ours or third-party) is active
     // via ConnectivityManager NetworkCapabilities.TRANSPORT_VPN
@@ -74,41 +77,19 @@ fun ApiBypassScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(R.string.settings_api_bypass), // e.g., "API Block Bypass"
-                        fontWeight = FontWeight.Bold,
-                        color = colors.textNorm
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.desc_back_button),
-                            tint = colors.textNorm
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
-            )
-        },
-        containerColor = colors.backgroundNorm
+        containerColor = colors.backgroundNorm,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             // Background gradient matching the unified design language
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.4f)
+                    .fillMaxSize()
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                colors.brandNorm.copy(alpha = 0.2f),
+                                colors.brandNorm.copy(alpha = 0.25f),
+                                colors.backgroundNorm.copy(alpha = 0.1f),
                                 colors.backgroundNorm
                             )
                         )
@@ -118,14 +99,20 @@ fun ApiBypassScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp),
+                horizontalAlignment = if (isTablet) Alignment.CenterHorizontally else Alignment.Start
             ) {
+                NavigationHeader(
+                    title = stringResource(R.string.settings_api_bypass),
+                    onBack = onBack
+                )
+
+                val contentModifier = if (isTablet) Modifier.widthIn(max = 600.dp) else Modifier.fillMaxWidth()
+
                 // Header Image/Icon
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
+                    modifier = contentModifier
                         .padding(vertical = 32.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -151,7 +138,7 @@ fun ApiBypassScreen(
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     color = colors.textNorm,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = contentModifier.padding(horizontal = 16.dp)
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -162,9 +149,8 @@ fun ApiBypassScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.textWeak,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
+                    modifier = contentModifier
+                        .padding(horizontal = 32.dp)
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -173,7 +159,8 @@ fun ApiBypassScreen(
                 AnimatedVisibility(
                     visible = isAnyVpnActive,
                     enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
+                    exit = fadeOut() + shrinkVertically(),
+                    modifier = contentModifier.padding(horizontal = 16.dp)
                 ) {
                     Surface(
                         modifier = Modifier
@@ -195,7 +182,7 @@ fun ApiBypassScreen(
                             )
                             Spacer(modifier = Modifier.width(16.dp))
                             Text(
-                                text = stringResource(R.string.api_bypass_vpn_detected), // "VPN detected. API bypass is disabled as it's not needed."
+                                text = stringResource(R.string.api_bypass_vpn_detected),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = colors.notificationWarning,
                                 fontWeight = FontWeight.Medium
@@ -205,12 +192,10 @@ fun ApiBypassScreen(
                 }
 
                 // Main Settings Card
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = colors.backgroundSecondary.copy(alpha = 0.8f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                Box(
+                    modifier = contentModifier
+                        .padding(horizontal = 16.dp)
+                        .liquidGlass(shape = RoundedCornerShape(16.dp), alpha = 0.4f, shadowElevation = 0.dp)
                 ) {
                     Column(modifier = Modifier.padding(vertical = 4.dp)) {
 

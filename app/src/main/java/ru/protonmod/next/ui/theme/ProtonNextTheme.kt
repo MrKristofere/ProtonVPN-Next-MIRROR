@@ -18,8 +18,8 @@
 package ru.protonmod.next.ui.theme
 
 import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
@@ -70,6 +70,36 @@ object ProtonPalette {
     val TexasRose = Color(0xFFFFB84D)
     val Apple = Color(0xFF007B58)
     val PuertoRico = Color(0xFF4AB89A)
+
+    val Gold = Color(0xFFD4AF37)
+    val GoldDarken20 = Color(0xFFAA8C2C)
+    val GoldDarken40 = Color(0xFF7F6921)
+    val GoldLighten20 = Color(0xFFDDBF5F)
+    val GoldLighten40 = Color(0xFFE6CF87)
+
+    // Surfshark
+    val SurfsharkBlue = Color(0xFF00D1FF)
+    val SurfsharkDeep = Color(0xFF001F2D)
+
+    // Nord
+    val NordBlue = Color(0xFF4687FF)
+    val NordDeep = Color(0xFF0B122B)
+
+    // IPVanish
+    val IPVanishGreen = Color(0xFF8CC63F)
+    val IPVanishDeep = Color(0xFF121212)
+
+    // PureVPN
+    val PureVPNCyan = Color(0xFF00EBC7)
+    val PureVPNDeep = Color(0xFF1A0033)
+
+    // Mullvad
+    val MullvadOrange = Color(0xFFFFBD44)
+    val MullvadDeep = Color(0xFF222222)
+
+    // Windscribe
+    val WindscribeBlue = Color(0xFF009FE3)
+    val WindscribeDeep = Color(0xFF001A33)
 }
 
 @Stable
@@ -283,6 +313,132 @@ class ProtonColors(
         val Light = baseLight().copy(sidebarColors = sidebarLight())
         val Dark = baseDark().copy(sidebarColors = sidebarDark())
 
+        val Amoled = baseDark().copy(
+            shade0 = Color.Black,
+            backgroundNorm = Color.Black,
+            backgroundSecondary = ProtonPalette.BalticSea.copy(alpha = 0.4f), // More transparent for glass
+            backgroundDeep = Color.Black,
+            sidebarColors = sidebarDark().copy(backgroundNorm = Color.Black)
+        )
+
+        val GoldLight = baseLight(
+            brandDarken40 = ProtonPalette.GoldDarken40,
+            brandDarken20 = ProtonPalette.GoldDarken20,
+            brandNorm = ProtonPalette.Gold,
+            brandLighten20 = ProtonPalette.GoldLighten20,
+            brandLighten40 = ProtonPalette.GoldLighten40,
+        ).let { it.copy(
+            backgroundSecondary = it.shade10.copy(alpha = 0.4f),
+            sidebarColors = sidebarLight(
+            brandDarken40 = it.brandDarken40,
+            brandDarken20 = it.brandDarken20,
+            brandNorm = it.brandNorm,
+            brandLighten20 = it.brandLighten20,
+            brandLighten40 = it.brandLighten40,
+        )) }
+
+        val GoldDark = baseDark(
+            brandDarken40 = ProtonPalette.GoldDarken40,
+            brandDarken20 = ProtonPalette.GoldDarken20,
+            brandNorm = ProtonPalette.Gold,
+            brandLighten20 = ProtonPalette.GoldLighten20,
+            brandLighten40 = ProtonPalette.GoldLighten40,
+        ).let { it.copy(
+            backgroundSecondary = it.shade20.copy(alpha = 0.4f),
+            sidebarColors = sidebarDark(
+            brandDarken40 = it.brandDarken40,
+            brandDarken20 = it.brandDarken20,
+            brandNorm = it.brandNorm,
+            brandLighten20 = it.brandLighten20,
+            brandLighten40 = it.brandLighten40,
+        )) }
+
+        val GoldAmoled = baseDark(
+            brandDarken40 = ProtonPalette.GoldDarken40,
+            brandDarken20 = ProtonPalette.GoldDarken20,
+            brandNorm = ProtonPalette.Gold,
+            brandLighten20 = ProtonPalette.GoldLighten20,
+            brandLighten40 = ProtonPalette.GoldLighten40,
+        ).let {
+            it.copy(
+                shade0 = Color.Black,
+                backgroundNorm = Color.Black,
+                backgroundSecondary = ProtonPalette.BalticSea.copy(alpha = 0.4f), // More transparent for glass
+                backgroundDeep = Color.Black,
+                sidebarColors = sidebarDark(
+                    brandDarken40 = it.brandDarken40,
+                    brandDarken20 = it.brandDarken20,
+                    brandNorm = it.brandNorm,
+                    brandLighten20 = it.brandLighten20,
+                    brandLighten40 = it.brandLighten40,
+                ).copy(backgroundNorm = Color.Black)
+            )
+        }
+
+        val Surfshark = baseLight(
+            brandNorm = ProtonPalette.SurfsharkBlue,
+            brandDarken20 = Color(0xFF00A3CC),
+            brandDarken40 = Color(0xFF007599),
+        ).copy(
+            notificationError = ProtonPalette.Pomegranate, // Surfshark sometimes uses red accents
+            backgroundSecondary = Color(0xFFF0F8FF).copy(alpha = 0.4f)
+        )
+
+        val Nord = baseLight(
+            brandNorm = ProtonPalette.NordBlue,
+            brandDarken20 = Color(0xFF0055D4),
+            brandDarken40 = Color(0xFF003380),
+        ).copy(
+            backgroundSecondary = Color(0xFFE5E9F0).copy(alpha = 0.4f)
+        )
+
+        val IPVanish = baseDark(
+            brandNorm = ProtonPalette.IPVanishGreen,
+            brandDarken20 = ProtonPalette.IPVanishGreen.copy(alpha = 0.8f),
+            brandDarken40 = ProtonPalette.IPVanishGreen.copy(alpha = 0.6f),
+        ).copy(
+            shade0 = Color.Black,
+            backgroundNorm = ProtonPalette.IPVanishDeep,
+            backgroundSecondary = Color(0xFF222222).copy(alpha = 0.4f),
+            backgroundDeep = Color.Black,
+        )
+
+        val PureVPN = baseDark(
+            brandNorm = ProtonPalette.PureVPNCyan,
+            brandDarken20 = ProtonPalette.PureVPNCyan.copy(alpha = 0.8f),
+            brandDarken40 = ProtonPalette.PureVPNCyan.copy(alpha = 0.6f),
+        ).copy(
+            shade0 = ProtonPalette.PureVPNDeep,
+            backgroundNorm = ProtonPalette.PureVPNDeep,
+            backgroundSecondary = Color(0xFF2A0043).copy(alpha = 0.4f),
+            backgroundDeep = ProtonPalette.PureVPNDeep,
+        )
+
+        val Mullvad = baseDark(
+            brandNorm = ProtonPalette.MullvadOrange,
+            brandDarken20 = ProtonPalette.MullvadOrange.copy(alpha = 0.8f),
+            brandDarken40 = ProtonPalette.MullvadOrange.copy(alpha = 0.6f),
+        ).copy(
+            shade0 = Color.Black,
+            backgroundNorm = ProtonPalette.MullvadDeep,
+            backgroundSecondary = Color(0xFF333333).copy(alpha = 0.4f),
+            backgroundDeep = Color.Black,
+        )
+
+        val Windscribe = baseDark(
+            brandNorm = ProtonPalette.CadetBlue, // Grayish accent
+            brandDarken20 = ProtonPalette.CadetBlue.copy(alpha = 0.8f),
+            brandDarken40 = ProtonPalette.CadetBlue.copy(alpha = 0.6f),
+        ).copy(
+            shade0 = Color.Black,
+            backgroundNorm = Color.Black,
+            backgroundSecondary = Color(0xFF1A1A1A).copy(alpha = 0.4f),
+            backgroundDeep = Color.Black,
+            shade100 = Color.White,
+            shade80 = Color.Gray,
+            textAccent = Color.White
+        )
+
         private fun baseLight(
             brandDarken40: Color = ProtonPalette.Chambray,
             brandDarken20: Color = ProtonPalette.SanMarino,
@@ -306,7 +462,7 @@ class ProtonColors(
             shade40 = ProtonPalette.Cloud,
             shade20 = ProtonPalette.Ebb,
             shade15 = ProtonPalette.Pampas,
-            shade10 = ProtonPalette.Carrara,
+            shade10 = Color(0xFFF0F0F0), // Explicit secondary
             shade0 = Color.White,
             shadowNorm = Color.Black.copy(alpha = 0.1f),
             shadowRaised = Color.Black.copy(alpha = 0.1f),
@@ -314,7 +470,11 @@ class ProtonColors(
             blenderNorm = ProtonPalette.Woodsmoke.copy(alpha = 0.48f),
             textAccent = brandNorm,
             iconAccent = brandNorm,
-        )
+        ).let {
+            it.copy(
+                backgroundSecondary = it.shade10.copy(alpha = 0.4f) // More transparent for better glass effect
+            )
+        }
 
         private fun baseDark(
             brandDarken40: Color = ProtonPalette.Chambray,
@@ -354,7 +514,7 @@ class ProtonColors(
                 interactionWeakDisabled = it.shade15,
                 interactionDisabled = it.brandDarken40,
                 backgroundNorm = it.shade10,
-                backgroundSecondary = it.shade15,
+                backgroundSecondary = it.shade20.copy(alpha = 0.4f), // More transparent for better glass effect
                 backgroundDeep = it.shade0,
             )
         }
@@ -468,26 +628,44 @@ val LocalColors = staticCompositionLocalOf { ProtonColors.Light }
 
 @Composable
 fun ProtonNextTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    appTheme: AppTheme = AppTheme.DARK,
     content: @Composable () -> Unit
 ) {
-    val protonColors = if (darkTheme) ProtonColors.Dark else ProtonColors.Light
+    val protonColors = when (appTheme) {
+        AppTheme.LIGHT -> ProtonColors.Light
+        AppTheme.DARK -> ProtonColors.Dark
+        AppTheme.AMOLED -> ProtonColors.Amoled
+        AppTheme.GOLD_LIGHT -> ProtonColors.GoldLight
+        AppTheme.GOLD_DARK -> ProtonColors.GoldDark
+        AppTheme.GOLD_AMOLED -> ProtonColors.GoldAmoled
+        AppTheme.SURFSHARK -> ProtonColors.Surfshark
+        AppTheme.NORD -> ProtonColors.Nord
+        AppTheme.IPVANISH -> ProtonColors.IPVanish
+        AppTheme.PUREVPN -> ProtonColors.PureVPN
+        AppTheme.MULLVAD -> ProtonColors.Mullvad
+        AppTheme.WINDSCRIBE -> ProtonColors.Windscribe
+    }
+
+    val isDark = protonColors.isDark
 
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
             val controller = WindowCompat.getInsetsController(window, view)
-            controller.isAppearanceLightStatusBars = !darkTheme
-            WindowCompat.setDecorFitsSystemWindows(window, false)
+            controller.isAppearanceLightStatusBars = !isDark
         }
     }
 
     CompositionLocalProvider(LocalColors provides protonColors) {
         MaterialTheme(
             colorScheme = protonColors.toMaterial3ThemeColors(),
-            content = content
-        )
+        ) {
+            Surface(
+                color = protonColors.backgroundNorm,
+                content = content
+            )
+        }
     }
 }
 

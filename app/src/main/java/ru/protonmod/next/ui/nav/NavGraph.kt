@@ -43,12 +43,28 @@ sealed class Screen(val route: String) {
     data object SplitTunnelingMain : Screen("split_tunneling_main")
     data object SplitTunnelingApps : Screen("split_tunneling_apps")
     data object SplitTunnelingIps : Screen("split_tunneling_ips")
+    data object SplitTunnelingDomains : Screen("split_tunneling_domains")
 
     // Connection Screens
     data object Protocol : Screen("protocol")
     data object ObfuscationSettings : Screen("obfuscation_settings")
     data object KillSwitch : Screen("kill_switch")
     data object ErrorReporting : Screen("error_reporting")
+
+    data object ThemeSelection : Screen("theme_selection")
+    data object LoadDisplayModeSelection : Screen("load_display_mode_selection")
+    data object DebugSettings : Screen("debug_settings")
+
+    data object CustomDns : Screen("custom_dns")
+    data object PortSelection : Screen("port_selection?currentPort={currentPort}&isGlobal={isGlobal}") {
+        fun createRoute(currentPort: Int, isGlobal: Boolean) = "port_selection?currentPort=$currentPort&isGlobal=$isGlobal"
+    }
+    data object ProtocolSelection : Screen("protocol_selection?currentProtocol={currentProtocol}") {
+        fun createRoute(currentProtocol: String) = "protocol_selection?currentProtocol=$currentProtocol"
+    }
+    data object AutoOpenUrl : Screen("auto_open_url?currentUrl={currentUrl}") {
+        fun createRoute(currentUrl: String) = "auto_open_url?currentUrl=$currentUrl"
+    }
 
     data object AboutApp : Screen("about_app")
     data object Licenses : Screen("licenses")
@@ -63,37 +79,12 @@ fun NavGraphBuilder.appNavGraph(
     navController: NavHostController,
 ) {
     composable(Screen.Home.route) {
-        DashboardScreen(
-            onNavigateToCountries = { navController.navigate(Screen.Countries.route) },
-            onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-            onNavigateToProfiles = { navController.navigate(Screen.Profiles.route) }
-        )
+        DashboardScreen()
     }
 
     composable(Screen.Settings.route) {
         SettingsScreen(
             onBack = { navController.popBackStack() },
-            onNavigateToHome = {
-                navController.navigate(Screen.Home.route) {
-                    popUpTo(Screen.Home.route) { inclusive = false }
-                    launchSingleTop = true
-                }
-            },
-            onNavigateToApiBypass = {
-                navController.navigate(Screen.ApiBypass.route)
-            },
-            onNavigateToCountries = {
-                navController.navigate(Screen.Countries.route) {
-                    popUpTo(Screen.Home.route)
-                    launchSingleTop = true
-                }
-            },
-            onNavigateToProfiles = {
-                navController.navigate(Screen.Profiles.route) {
-                    popUpTo(Screen.Home.route)
-                    launchSingleTop = true
-                }
-            },
             onNavigateToSplitTunnelingMain = {
                 navController.navigate(Screen.SplitTunnelingMain.route)
             },
@@ -108,6 +99,24 @@ fun NavGraphBuilder.appNavGraph(
             },
             onNavigateToErrorReporting = {
                 navController.navigate(Screen.ErrorReporting.route)
+            },
+            onNavigateToApiBypass = {
+                navController.navigate(Screen.ApiBypass.route)
+            },
+            onNavigateToThemeSelection = {
+                navController.navigate(Screen.ThemeSelection.route)
+            },
+            onNavigateToLoadDisplayMode = {
+                navController.navigate(Screen.LoadDisplayModeSelection.route)
+            },
+            onNavigateToDebug = {
+                navController.navigate(Screen.DebugSettings.route)
+            },
+            onNavigateToCustomDns = {
+                navController.navigate(Screen.CustomDns.route)
+            },
+            onNavigateToPortSelection = { currentPort ->
+                navController.navigate(Screen.PortSelection.createRoute(currentPort, true))
             }
         )
     }
@@ -143,6 +152,24 @@ fun NavGraphBuilder.appNavGraph(
         )
     }
 
+    composable(Screen.ThemeSelection.route) {
+        ThemeSelectionScreen(
+            onBack = { navController.popBackStack() }
+        )
+    }
+
+    composable(Screen.LoadDisplayModeSelection.route) {
+        ServerLoadDisplayModeScreen(
+            onBack = { navController.popBackStack() }
+        )
+    }
+
+    composable(Screen.DebugSettings.route) {
+        DebugSettingsScreen(
+            onBack = { navController.popBackStack() }
+        )
+    }
+
     composable(Screen.AboutApp.route) {
         AboutAppScreen(
             onBack = { navController.popBackStack() },
@@ -157,12 +184,77 @@ fun NavGraphBuilder.appNavGraph(
         )
     }
 
+    composable(Screen.CustomDns.route) {
+        DnsSettingsScreen(
+            onBack = { navController.popBackStack() }
+        )
+    }
+
+    composable(
+        route = Screen.PortSelection.route,
+        arguments = listOf(
+            navArgument("currentPort") { type = NavType.IntType },
+            navArgument("isGlobal") { type = NavType.BoolType }
+        )
+    ) { backStackEntry ->
+        val currentPort = backStackEntry.arguments?.getInt("currentPort") ?: 0
+        val isGlobal = backStackEntry.arguments?.getBoolean("isGlobal") ?: false
+        val viewModel: SettingsViewModel = hiltViewModel()
+
+        PortSelectionScreen(
+            currentPort = currentPort,
+            onBack = { navController.popBackStack() },
+            onPortSelected = { port ->
+                if (isGlobal) {
+                    viewModel.setVpnPort(port)
+                } else {
+                    // For profile editing, we send the result back
+                    navController.previousBackStackEntry?.savedStateHandle?.set("selectedPort", port)
+                }
+                navController.popBackStack()
+            }
+        )
+    }
+
+    composable(
+        route = Screen.ProtocolSelection.route,
+        arguments = listOf(navArgument("currentProtocol") { type = NavType.StringType })
+    ) { backStackEntry ->
+        val currentProtocol = backStackEntry.arguments?.getString("currentProtocol") ?: "AmneziaWG"
+        
+        ProtocolSelectionScreen(
+            currentProtocol = currentProtocol,
+            onBack = { navController.popBackStack() },
+            onProtocolSelected = { protocol ->
+                navController.previousBackStackEntry?.savedStateHandle?.set("selectedProtocol", protocol)
+                navController.popBackStack()
+            }
+        )
+    }
+
+    composable(
+        route = Screen.AutoOpenUrl.route,
+        arguments = listOf(navArgument("currentUrl") { type = NavType.StringType })
+    ) { backStackEntry ->
+        val currentUrl = backStackEntry.arguments?.getString("currentUrl") ?: ""
+        
+        AutoOpenUrlScreen(
+            currentUrl = currentUrl,
+            onBack = { navController.popBackStack() },
+            onUrlSaved = { url ->
+                navController.previousBackStackEntry?.savedStateHandle?.set("selectedUrl", url)
+                navController.popBackStack()
+            }
+        )
+    }
+
     // Main Split Tunneling Hub
     composable(Screen.SplitTunnelingMain.route) {
         SplitTunnelingMainScreen(
             onBack = { navController.popBackStack() },
             onNavigateToApps = { navController.navigate(Screen.SplitTunnelingApps.route) },
-            onNavigateToIps = { navController.navigate(Screen.SplitTunnelingIps.route) }
+            onNavigateToIps = { navController.navigate(Screen.SplitTunnelingIps.route) },
+            onNavigateToDomains = { navController.navigate(Screen.SplitTunnelingDomains.route) }
         )
     }
 
@@ -179,23 +271,17 @@ fun NavGraphBuilder.appNavGraph(
         )
     }
 
+    composable(Screen.SplitTunnelingDomains.route) {
+        SplitTunnelingDomainsScreen(
+            onBack = { navController.popBackStack() }
+        )
+    }
+
     composable(Screen.Countries.route) {
         CountriesScreen(
             onNavigateToHome = {
                 navController.navigate(Screen.Home.route) {
                     popUpTo(Screen.Home.route) { inclusive = false }
-                    launchSingleTop = true
-                }
-            },
-            onNavigateToSettings = {
-                navController.navigate(Screen.Settings.route) {
-                    popUpTo(Screen.Home.route)
-                    launchSingleTop = true
-                }
-            },
-            onNavigateToProfiles = {
-                navController.navigate(Screen.Profiles.route) {
-                    popUpTo(Screen.Home.route)
                     launchSingleTop = true
                 }
             },
@@ -208,18 +294,6 @@ fun NavGraphBuilder.appNavGraph(
             onNavigateToHome = {
                 navController.navigate(Screen.Home.route) {
                     popUpTo(Screen.Home.route) { inclusive = false }
-                    launchSingleTop = true
-                }
-            },
-            onNavigateToCountries = {
-                navController.navigate(Screen.Countries.route) {
-                    popUpTo(Screen.Home.route)
-                    launchSingleTop = true
-                }
-            },
-            onNavigateToSettings = {
-                navController.navigate(Screen.Settings.route) {
-                    popUpTo(Screen.Home.route)
                     launchSingleTop = true
                 }
             },
@@ -244,6 +318,16 @@ fun NavGraphBuilder.appNavGraph(
         EditProfileScreen(
             profileId = profileId,
             viewModel = hiltViewModel(),
+            onNavigateToPortSelection = { port ->
+                navController.navigate(Screen.PortSelection.createRoute(port, false))
+            },
+            onNavigateToProtocolSelection = { protocol ->
+                navController.navigate(Screen.ProtocolSelection.createRoute(protocol))
+            },
+            onNavigateToUrlSelection = { url ->
+                navController.navigate(Screen.AutoOpenUrl.createRoute(url))
+            },
+            navController = navController,
             onNavigateBack = { navController.popBackStack() }
         )
     }

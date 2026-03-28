@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,7 +35,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.protonmod.next.R
+import ru.protonmod.next.ui.components.NavigationHeader
 import ru.protonmod.next.ui.theme.ProtonNextTheme
+import ru.protonmod.next.ui.theme.liquidGlass
 
 /**
  * Screen for selecting the VPN Protocol.
@@ -76,58 +77,38 @@ fun ProtocolScreen(
                     )
             )
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.statusBars)
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                CenterAlignedTopAppBar(
-                    title = {
-                        Text(
-                            stringResource(R.string.protocol_title),
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            color = colors.textNorm
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = stringResource(R.string.desc_back_button),
-                                tint = colors.textNorm
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = Color.Transparent,
-                        navigationIconContentColor = colors.textNorm,
-                        titleContentColor = colors.textNorm,
-                        actionIconContentColor = Color.Unspecified
+                item {
+                    NavigationHeader(
+                        title = stringResource(R.string.protocol_title),
+                        onBack = onBack
                     )
-                )
+                }
 
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    item {
-                        Card(
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = colors.backgroundSecondary.copy(alpha = 0.5f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column {
-                                // Protocol Item: AmneziaWG
-                                ProtocolItemRow(
-                                    title = stringResource(R.string.protocol_amneziawg),
-                                    description = stringResource(R.string.protocol_amneziawg_desc),
-                                    isSelected = true, // Hardcoded as selected for now
-                                    onSelect = { /* TODO: Update selected protocol in VM */ },
-                                    onSettingsClick = onNavigateToObfuscation
-                                )
-                            }
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .liquidGlass(
+                                shape = RoundedCornerShape(20.dp),
+                                alpha = 0.4f,
+                                shadowElevation = 0.dp
+                            )
+                    ) {
+                        Column {
+                            // Protocol Item: AmneziaWG
+                            ProtocolItemRow(
+                                title = stringResource(R.string.protocol_amneziawg),
+                                description = stringResource(R.string.protocol_amneziawg_desc),
+                                isSelected = true, // Hardcoded as selected for now
+                                onSelect = { /* TODO: Update selected protocol in VM */ },
+                                onSettingsClick = onNavigateToObfuscation
+                            )
                         }
                     }
                 }

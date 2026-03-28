@@ -18,7 +18,7 @@
 package ru.protonmod.next.data.cache
 
 import android.content.Context
-import android.util.Log
+import ru.protonmod.next.utils.ProtonLogger
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -26,19 +26,13 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import ru.protonmod.next.data.local.ServerDao
-import ru.protonmod.next.data.local.ServersCacheDao
-import ru.protonmod.next.data.local.ServersCacheEntity
-import ru.protonmod.next.data.local.ServerMapper
 import ru.protonmod.next.data.repository.VpnRepository
 
 @HiltWorker
 class ServersCacheUpdateWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
-    private val vpnRepository: VpnRepository,
-    private val serverDao: ServerDao,
-    private val serversCacheDao: ServersCacheDao
+    private val vpnRepository: VpnRepository
 ) : CoroutineWorker(appContext, workerParams) {
 
     companion object {
@@ -51,26 +45,23 @@ class ServersCacheUpdateWorker @AssistedInject constructor(
             val sessionId = inputData.getString("session_id") ?: return@withContext Result.failure()
             val userTier = inputData.getInt("user_tier", 0)
 
-            Log.d(TAG, "Background update worker started for tier $userTier")
+            ProtonLogger.d(TAG, "Background update worker started for tier $userTier")
 
             val result = vpnRepository.getServers(accessToken, sessionId, userTier = userTier)
 
-            result.onSuccess { servers ->
-                Log.d(TAG, "Background update success: ${servers.size} servers")
-                serverDao.insertServers(servers.map { ServerMapper.toEntity(it) })
-                val now = System.currentTimeMillis()
-                serversCacheDao.saveCacheInfo(ServersCacheEntity(cachedAt = now, expiresAt = now + 3600000L))
+            result.onSuccess {
+                ProtonLogger.d(TAG, "Background update success: ${it.size} servers")
                 return@withContext Result.success()
             }
 
             result.onFailure {
-                Log.e(TAG, "Background update failed: ${it.message}")
+                ProtonLogger.e(TAG, "Background update failed: ${it.message}")
                 return@withContext Result.retry()
             }
 
             Result.success()
         } catch (e: Exception) {
-            Log.e(TAG, "Exception: ${e.message}")
+            ProtonLogger.e(TAG, "Exception: ${e.message}")
             Result.retry()
         }
     }

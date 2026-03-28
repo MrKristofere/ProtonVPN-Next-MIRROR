@@ -17,9 +17,7 @@
 
 package ru.protonmod.next.data.repository
 
-import android.util.Base64
-import android.util.Log
-import com.proton.gopenpgp.srp.Srp
+import ru.protonmod.next.utils.ProtonLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
@@ -30,6 +28,8 @@ import ru.protonmod.next.data.network.*
 import ru.protonmod.next.ui.screens.CaptchaRequiredException
 import ru.protonmod.next.ui.screens.ProtonErrorResponse
 import ru.protonmod.next.utils.DeviceInfoProvider
+import ru.protonmod.next.utils.coroutines.DispatcherProvider
+import ru.protonmod.next.utils.crypto.CryptoWrapper
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -38,7 +38,9 @@ class AuthRepository @Inject constructor(
     private val authApi: ProtonAuthApi,
     private val vpnRepository: VpnRepository,
     private val sessionDao: SessionDao,
-    private val deviceInfoProvider: DeviceInfoProvider
+    private val deviceInfoProvider: DeviceInfoProvider,
+    private val cryptoWrapper: CryptoWrapper,
+    private val dispatcherProvider: DispatcherProvider
 ) {
     companion object {
         private const val TAG = "AuthRepository"
@@ -67,10 +69,20 @@ class AuthRepository @Inject constructor(
     fun getPendingUid(): String? = pendingAnonUid
 
     /**
+     * Clears local session and stops background tasks.
+     */
+    suspend fun logout() = withContext(dispatcherProvider.io()) {
+        ProtonLogger.d(TAG, "Logging out user...")
+        vpnRepository.stopAutoUpdate()
+        sessionDao.clearSession()
+        clearPendingAuth()
+    }
+
+    /**
      * Main login flow using SRP (Secure Remote Password) protocol.
      * Handles Captcha verification by refreshing sessions if a token is provided.
      */
-    suspend fun login(username: String, passwordRaw: String, captchaToken: String? = null): Result<LoginResponse> = withContext(Dispatchers.IO) {
+    suspend fun login(username: String, passwordRaw: String, captchaToken: String? = null): Result<LoginResponse> = withContext(dispatcherProvider.io()) {
         try {
             if (pendingUsername != username) {
                 clearPendingAuth()
@@ -86,7 +98,7 @@ class AuthRepository @Inject constructor(
             // If we are retrying after a CAPTCHA, we MUST reuse the existing session ID
             // because the captcha token is cryptographically bound to it.
             if (pendingAnonToken == null || pendingAnonUid == null) {
-                Log.d(TAG, "[Login] Phase 0: Creating Anonymous Session")
+                ProtonLogger.d(TAG, "[Login] Phase 0: Creating Anonymous Session")
                 val anonSession = authApi.createAnonymousSession(challengePayload, captchaToken, tokenType)
                 pendingAnonToken = anonSession.accessToken
                 pendingAnonUid = anonSession.sessionId
@@ -97,25 +109,37 @@ class AuthRepository @Inject constructor(
             val bearer = "Bearer $anonToken"
 
             if (pendingAuthInfo == null) {
-                Log.d(TAG, "[Login] Phase 1: Requesting Auth Info")
+                ProtonLogger.d(TAG, "[Login] Phase 1: Requesting Auth Info")
                 val authInfo = authApi.getAuthInfo(bearer, anonUid, AuthInfoRequest(username), captchaToken, tokenType)
                 if (authInfo.code != 1000) return@withContext Result.failure(Exception("Auth info failed: ${authInfo.code}"))
                 pendingAuthInfo = authInfo
             }
 
             val authInfo = pendingAuthInfo!!
-            val auth = Srp.newAuth(4L, username, passwordRaw.toByteArray(), authInfo.salt ?: "", authInfo.modulus ?: "", authInfo.serverEphemeral ?: "")
-            val proofs = auth.generateProofs(2048L)
+            
+            // Validate SRP parameters before proceeding
+            if (authInfo.salt.isNullOrEmpty() || authInfo.modulus.isNullOrEmpty() || authInfo.serverEphemeral.isNullOrEmpty()) {
+                ProtonLogger.e(TAG, "[Login] Invalid SRP parameters from server")
+                return@withContext Result.failure(Exception("Invalid security parameters from server"))
+            }
+
+            val proofs = cryptoWrapper.generateSrpProofs(
+                username = username,
+                passwordRaw = passwordRaw.toByteArray(),
+                salt = authInfo.salt,
+                modulus = authInfo.modulus,
+                serverEphemeral = authInfo.serverEphemeral
+            )
 
             val loginRequest = LoginRequest(
                 username = username,
-                clientEphemeral = Base64.encodeToString(proofs.clientEphemeral, Base64.NO_WRAP),
-                clientProof = Base64.encodeToString(proofs.clientProof, Base64.NO_WRAP),
+                clientEphemeral = proofs.clientEphemeral,
+                clientProof = proofs.clientProof,
                 srpSession = authInfo.srpSession ?: "",
                 payload = challengePayload["Payload"]?.jsonObject
             )
 
-            Log.d(TAG, "[Login] Phase 2: Performing Login SRP")
+            ProtonLogger.d(TAG, "[Login] Phase 2: Performing Login SRP")
             val loginResponse = authApi.performLogin(bearer, anonUid, loginRequest, captchaToken, tokenType)
 
             clearPendingAuth()
@@ -126,7 +150,7 @@ class AuthRepository @Inject constructor(
 
             // If 2FA is not required, proceed to complete setup
             if (!loginResponse.scopes.contains("twofactor")) {
-                Log.d(TAG, "[Login] Completing authentication. Registering VPN cert...")
+                ProtonLogger.d(TAG, "[Login] Completing authentication. Registering VPN cert...")
                 val keys = registerAndGetVpnKeys(finalAccessToken, finalUid)
 
                 val vpnInfoResult = vpnRepository.getVpnInfo(finalAccessToken, finalUid)
@@ -142,16 +166,18 @@ class AuthRepository @Inject constructor(
                     wgPublicKeyPem = keys?.second,
                     wgCertificate = keys?.third
                 )
+                
+                vpnRepository.refreshServersBackground(finalAccessToken, finalUid, userTier)
             }
 
-            Log.d(TAG, "[Login] Success. Scopes: ${loginResponse.scopes}")
+            ProtonLogger.d(TAG, "[Login] Success. Scopes: ${loginResponse.scopes}")
             Result.success(loginResponse.copy(
                 accessToken = finalAccessToken,
                 refreshToken = finalRefreshToken,
                 sessionId = finalUid
             ))
         } catch (e: Exception) {
-            if (e !is HttpException) Log.e(TAG, "[Login] Exception thrown", e)
+            if (e !is HttpException) ProtonLogger.e(TAG, "[Login] Exception thrown", e)
             handleHttpError(e)
         }
     }
@@ -159,18 +185,18 @@ class AuthRepository @Inject constructor(
     /**
      * Anonymous login flow (Guest login).
      */
-    suspend fun loginAnonymous(captchaToken: String? = null): Result<LoginResponse> = withContext(Dispatchers.IO) {
+    suspend fun loginAnonymous(captchaToken: String? = null): Result<LoginResponse> = withContext(dispatcherProvider.io()) {
         try {
             val tokenType = if (captchaToken != null) "captcha" else null
 
             // Use cached payload if available to guarantee consistent hash for CAPTCHA validation
             val challengePayload = pendingChallengePayload ?: buildChallengePayload().also { pendingChallengePayload = it }
 
-            Log.d(TAG, "[AnonymousLogin] Starting flow. Have Captcha: ${captchaToken != null}")
+            ProtonLogger.d(TAG, "[AnonymousLogin] Starting flow. Have Captcha: ${captchaToken != null}")
 
             // Reusing existing session if available to avoid 12087 error.
             if (pendingAnonToken == null || pendingAnonUid == null) {
-                Log.d(TAG, "[AnonymousLogin] Requesting initial anonymous session")
+                ProtonLogger.d(TAG, "[AnonymousLogin] Requesting initial anonymous session")
                 val anonSession = authApi.createAnonymousSession(challengePayload, captchaToken, tokenType)
                 pendingAnonToken = anonSession.accessToken
                 pendingAnonUid = anonSession.sessionId
@@ -180,11 +206,11 @@ class AuthRepository @Inject constructor(
             val anonUid = pendingAnonUid ?: throw Exception("Failed to get anonymous UID")
             val bearer = "Bearer $anonToken"
 
-            Log.d(TAG, "[AnonymousLogin] Upgrading to credentialless session using UID: $anonUid")
+            ProtonLogger.d(TAG, "[AnonymousLogin] Upgrading to credentialless session using UID: $anonUid")
             val response = authApi.performLoginLess(bearer, anonUid, challengePayload, captchaToken, tokenType)
 
             if (response.code == 1000) {
-                Log.d(TAG, "[AnonymousLogin] Success. Registering VPN cert...")
+                ProtonLogger.d(TAG, "[AnonymousLogin] Success. Registering VPN cert...")
 
                 clearPendingAuth()
 
@@ -202,12 +228,14 @@ class AuthRepository @Inject constructor(
                     wgPublicKeyPem = keys?.second,
                     wgCertificate = keys?.third
                 )
+
+                vpnRepository.refreshServersBackground(finalAccessToken, finalUid, 0)
                 Result.success(response.copy(accessToken = finalAccessToken, sessionId = finalUid))
             } else {
                 Result.failure(Exception("Guest login failed: Code ${response.code}"))
             }
         } catch (e: Exception) {
-            if (e !is HttpException) Log.e(TAG, "[AnonymousLogin] Exception thrown", e)
+            if (e !is HttpException) ProtonLogger.e(TAG, "[AnonymousLogin] Exception thrown", e)
             handleHttpError(e)
         }
     }
@@ -220,7 +248,7 @@ class AuthRepository @Inject constructor(
         tempAccessToken: String,
         refreshToken: String,
         totpCode: String
-    ): Result<LoginResponse> = withContext(Dispatchers.IO) {
+    ): Result<LoginResponse> = withContext(dispatcherProvider.io()) {
         try {
             val bearer = "Bearer $tempAccessToken"
             val response2fa = authApi.performSecondFactor(bearer, sessionId, SecondFactorRequest(totpCode))
@@ -250,9 +278,10 @@ class AuthRepository @Inject constructor(
                 wgCertificate = keys?.third
             )
 
+            vpnRepository.refreshServersBackground(fullToken, sessionId, userTier)
             Result.success(response2fa.copy(userId = finalUserId))
         } catch (e: Exception) {
-            if (e !is HttpException) Log.e(TAG, "[verify2FA] Exception thrown", e)
+            if (e !is HttpException) ProtonLogger.e(TAG, "[verify2FA] Exception thrown", e)
             handleHttpError(e)
         }
     }
@@ -283,9 +312,9 @@ class AuthRepository @Inject constructor(
 
     private suspend fun registerAndGetVpnKeys(accessToken: String, sessionId: String): Triple<String, String, String>? {
         return try {
-            val keyPair = com.proton.gopenpgp.ed25519.KeyPair()
-            val publicKeyPem = keyPair.publicKeyPKIXPem()
-            val wgPrivateKeyB64 = keyPair.toX25519Base64()
+            val vpnKeyPair = cryptoWrapper.generateVpnKeyPair()
+            val publicKeyPem = vpnKeyPair.publicKeyPem
+            val wgPrivateKeyB64 = vpnKeyPair.privateKeyX25519
 
             val regResult = vpnRepository.registerWireGuardKey(accessToken, sessionId, publicKeyPem)
 
@@ -323,17 +352,17 @@ class AuthRepository @Inject constructor(
                     if (parsedError.code == 9001) {
                         val url = parsedError.details?.webUrl ?: ""
                         val token = parsedError.details?.humanVerificationToken ?: ""
-                        Log.w(TAG, "CAPTCHA Verification Required. Token extracted.")
+                        ProtonLogger.w(TAG, "CAPTCHA Verification Required. Token extracted.")
                         return Result.failure(CaptchaRequiredException(url, token, getPendingUid()))
                     }
                     // 12087 = Captcha validation failed due to payload mismatch or session reset
                     if (parsedError.code == 12087) {
-                        Log.e(TAG, "Captcha validation failed (12087) on server side.")
+                        ProtonLogger.e(TAG, "Captcha validation failed (12087) on server side.")
                         clearPendingAuth()
                         return Result.failure(Exception("Verification failed. Please try again."))
                     }
                 } catch (ex: Exception) {
-                    Log.w(TAG, "Failed to parse 422 error body: ${ex.message}")
+                    ProtonLogger.w(TAG, "Failed to parse 422 error body: ${ex.message}")
                 }
                 return Result.failure(Exception("HTTP 422: $errorBody"))
             }

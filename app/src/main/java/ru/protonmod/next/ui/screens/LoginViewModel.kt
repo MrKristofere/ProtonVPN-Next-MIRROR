@@ -26,6 +26,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
+import io.sentry.Sentry
+import ru.protonmod.next.data.local.SettingsManager
 import ru.protonmod.next.data.repository.AuthRepository
 import javax.inject.Inject
 
@@ -83,19 +87,29 @@ sealed class LoginUiState {
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val settingsManager: SettingsManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
+    val isApiBypassEnabled = settingsManager.apiBypassEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     fun login(username: String, passwordRaw: String, captchaToken: String? = null) {
         if (username.isBlank() || passwordRaw.isBlank()) return
 
+        val startTime = System.currentTimeMillis()
         _uiState.value = LoginUiState.Loading
         viewModelScope.launch {
             authRepository.login(username, passwordRaw, captchaToken)
                 .onSuccess { response ->
+                    // Metrics
+                    val duration = System.currentTimeMillis() - startTime
+                    Sentry.metrics().distribution("login_latency", duration.toDouble())
+                    Sentry.metrics().count("login_success", 1.0)
+
                     val scopes = response.scopes
                     if (scopes.contains("twofactor")) {
                         _uiState.value = LoginUiState.Requires2FA(
@@ -111,6 +125,9 @@ class LoginViewModel @Inject constructor(
                     }
                 }
                 .onFailure { exception ->
+                    // Metrics
+                    Sentry.metrics().count("login_error", 1.0)
+
                     if (exception is CaptchaRequiredException) {
                         _uiState.value = LoginUiState.RequiresCaptcha(
                             webUrl = exception.webUrl,

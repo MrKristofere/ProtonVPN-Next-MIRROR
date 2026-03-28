@@ -1,0 +1,186 @@
+/*
+ * Copyright (C) 2026 SMH01
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package ru.protonmod.next.utils
+
+import android.util.Log
+import io.sentry.Sentry
+import io.sentry.Breadcrumb
+import io.sentry.SentryLevel
+import ru.protonmod.next.BuildConfig
+
+/**
+ * A professional logging wrapper for Proton VPN-Next.
+ * 
+ * Automatically handles debug/release logic, tag generation from stack trace,
+ * and integrates with Sentry for remote diagnostics.
+ */
+object ProtonLogger {
+
+    private const val DEFAULT_TAG = "ProtonVPN"
+    private const val CALL_STACK_INDEX = 4
+
+    /** Controlled by SettingsManager at runtime/startup */
+    var isNonFatalEnabled: Boolean = true
+    /** Controlled by SettingsManager at runtime/startup */
+    var isAnalyticsEnabled: Boolean = true
+
+    /** Log at VERBOSE level */
+    fun v(tag: String? = null, message: String, throwable: Throwable? = null) {
+        val finalTag = tag ?: getAutoTag()
+        if (BuildConfig.DEBUG) {
+            Log.v(finalTag, message, throwable)
+        }
+        addSentryBreadcrumb(finalTag, message, SentryLevel.DEBUG)
+    }
+
+    /** Log at VERBOSE level with a lazy message lambda for better performance */
+    inline fun v(tag: String? = null, throwable: Throwable? = null, crossinline message: () -> String) {
+        val finalTag = tag ?: getAutoTag()
+        if (BuildConfig.DEBUG) {
+            Log.v(finalTag, message(), throwable)
+        }
+        addSentryBreadcrumb(finalTag, message(), SentryLevel.DEBUG)
+    }
+
+    /** Log at DEBUG level */
+    fun d(tag: String? = null, message: String, throwable: Throwable? = null) {
+        val finalTag = tag ?: getAutoTag()
+        if (BuildConfig.DEBUG) {
+            Log.d(finalTag, message, throwable)
+        }
+        addSentryBreadcrumb(finalTag, message, SentryLevel.DEBUG)
+    }
+
+    /** Log at DEBUG level with a lazy message lambda for better performance */
+    inline fun d(tag: String? = null, throwable: Throwable? = null, crossinline message: () -> String) {
+        val finalTag = tag ?: getAutoTag()
+        if (BuildConfig.DEBUG) {
+            Log.d(finalTag, message(), throwable)
+        }
+        addSentryBreadcrumb(finalTag, message(), SentryLevel.DEBUG)
+    }
+
+    /** Log at INFO level */
+    fun i(tag: String? = null, message: String, throwable: Throwable? = null) {
+        val finalTag = tag ?: getAutoTag()
+        if (BuildConfig.DEBUG) {
+            Log.i(finalTag, message, throwable)
+        }
+        addSentryBreadcrumb(finalTag, message, SentryLevel.INFO)
+    }
+
+    /** Log at INFO level with a lazy message lambda for better performance */
+    inline fun i(tag: String? = null, throwable: Throwable? = null, crossinline message: () -> String) {
+        val finalTag = tag ?: getAutoTag()
+        if (BuildConfig.DEBUG) {
+            Log.i(finalTag, message(), throwable)
+        }
+        addSentryBreadcrumb(finalTag, message(), SentryLevel.INFO)
+    }
+
+    /** Log at WARN level */
+    fun w(tag: String? = null, message: String, throwable: Throwable? = null) {
+        val finalTag = tag ?: getAutoTag()
+        if (BuildConfig.DEBUG) {
+            Log.w(finalTag, message, throwable)
+        }
+        addSentryBreadcrumb(finalTag, message, SentryLevel.WARNING)
+        if (throwable != null && isNonFatalEnabled) {
+            Sentry.captureException(throwable)
+        }
+    }
+
+    /** Log at WARN level with a lazy message lambda for better performance */
+    inline fun w(tag: String? = null, throwable: Throwable? = null, crossinline message: () -> String) {
+        val finalTag = tag ?: getAutoTag()
+        if (BuildConfig.DEBUG) {
+            Log.w(finalTag, message(), throwable)
+        }
+        addSentryBreadcrumb(finalTag, message(), SentryLevel.WARNING)
+        if (throwable != null && isNonFatalEnabled) {
+            Sentry.captureException(throwable)
+        }
+    }
+
+    /** Log at ERROR level */
+    fun e(tag: String? = null, message: String, throwable: Throwable? = null) {
+        val finalTag = tag ?: getAutoTag()
+        if (BuildConfig.DEBUG) {
+            Log.e(finalTag, message, throwable)
+        }
+        addSentryBreadcrumb(finalTag, message, SentryLevel.ERROR)
+        if (isNonFatalEnabled) {
+            if (throwable != null) {
+                Sentry.captureException(throwable)
+            } else {
+                Sentry.captureMessage(message, SentryLevel.ERROR)
+            }
+        }
+    }
+
+    /** Log at ERROR level with a lazy message lambda for better performance */
+    inline fun e(tag: String? = null, throwable: Throwable? = null, crossinline message: () -> String) {
+        val finalTag = tag ?: getAutoTag()
+        val msg = message()
+        if (BuildConfig.DEBUG) {
+            Log.e(finalTag, msg, throwable)
+        }
+        addSentryBreadcrumb(finalTag, msg, SentryLevel.ERROR)
+        if (isNonFatalEnabled) {
+            if (throwable != null) {
+                Sentry.captureException(throwable)
+            } else {
+                Sentry.captureMessage(msg, SentryLevel.ERROR)
+            }
+        }
+    }
+
+    /**
+     * Professional error logging that accepts a message and an optional throwable.
+     */
+    fun error(tag: String? = null, message: String, throwable: Throwable? = null) {
+        e(tag, message, throwable)
+    }
+
+    @PublishedApi
+    internal fun addSentryBreadcrumb(tag: String, message: String, level: SentryLevel) {
+        if (!isAnalyticsEnabled) return
+        val breadcrumb = Breadcrumb().apply {
+            this.category = tag
+            this.message = message
+            this.level = level
+        }
+        Sentry.addBreadcrumb(breadcrumb)
+    }
+
+    /**
+     * Automatically extracts the class name from the stack trace to use as a tag.
+     */
+    @PublishedApi
+    internal fun getAutoTag(): String {
+        val stackTrace = Thread.currentThread().stackTrace
+        return if (stackTrace.size > CALL_STACK_INDEX) {
+            val element = stackTrace[CALL_STACK_INDEX]
+            val className = element.className.substringAfterLast('.')
+            // If the caller is an anonymous class or lambda, cleanup the name
+            className.substringBefore('$')
+        } else {
+            DEFAULT_TAG
+        }
+    }
+}

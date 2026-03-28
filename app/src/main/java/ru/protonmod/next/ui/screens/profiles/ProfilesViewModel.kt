@@ -18,9 +18,7 @@
 package ru.protonmod.next.ui.screens.profiles
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.util.Log
+import ru.protonmod.next.utils.ProtonLogger
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -41,6 +39,7 @@ import ru.protonmod.next.data.repository.VpnRepository
 import ru.protonmod.next.data.local.ProfileDao
 import ru.protonmod.next.data.local.SessionDao
 import ru.protonmod.next.data.local.SettingsManager
+import ru.protonmod.next.data.local.ServerLoadDisplayMode
 import ru.protonmod.next.data.local.VpnProfileEntity
 import ru.protonmod.next.data.model.ObfuscationProfile
 import ru.protonmod.next.data.network.LogicalServer
@@ -70,7 +69,6 @@ class ProfilesViewModel @Inject constructor(
         vpnRepository.getServersFlow()
     ) { entities, servers ->
         entities.map { entity ->
-            // Resolve the human-readable name from the cached servers list
             val serverName = servers.find { it.id == entity.targetServerId }?.name
             VpnProfileUiModel(
                 id = entity.id,
@@ -92,17 +90,26 @@ class ProfilesViewModel @Inject constructor(
         initialValue = emptyList()
     )
 
-    // Changed from List<String> to List<CountryDisplayItem> to support load indicators
     private val _countries = MutableStateFlow<List<CountryDisplayItem>>(emptyList())
     val countries: StateFlow<List<CountryDisplayItem>> = _countries.asStateFlow()
 
     init {
-        loadCountries()
+        observeServersForCountries()
     }
 
-    private fun loadCountries() {
+    private fun observeServersForCountries() {
         viewModelScope.launch {
-            _countries.value = getAvailableCountries()
+            vpnRepository.getServersFlow().collect { servers ->
+                if (servers.isNotEmpty()) {
+                    _countries.value = servers
+                        .groupBy { it.exitCountry }
+                        .map { (countryCode, countryServers) ->
+                            val avgLoad = if (countryServers.isEmpty()) 0 else countryServers.map { it.averageLoad }.average().toInt()
+                            CountryDisplayItem(code = countryCode, averageLoad = avgLoad)
+                        }
+                        .sortedBy { it.code }
+                }
+            }
         }
     }
 
@@ -154,25 +161,28 @@ class ProfilesViewModel @Inject constructor(
         viewModelScope.launch {
             val session = sessionDao.getSession()
             if (session == null) {
-                Log.e(TAG, "Cannot connect: No session found")
+                ProtonLogger.e(TAG, "Cannot connect: No session found")
                 return@launch
             }
 
             val servers = vpnRepository.getCachedServers()
             if (servers.isEmpty()) {
-                Log.e(TAG, "Cannot connect: Server list is empty")
+                ProtonLogger.e(TAG, "Cannot connect: Server list is empty")
                 return@launch
             }
 
             val targetServer = findBestServerForProfile(profile, servers)
             if (targetServer == null) {
-                Log.e(TAG, "Cannot connect: No suitable server found for profile")
+                ProtonLogger.e(TAG, "Cannot connect: No suitable server found for profile")
                 return@launch
             }
 
-            val physicalServer = targetServer.servers.firstOrNull { it.status == 1 }
+            // Reliable server selection: Fallback to any server with min load if status == 1 is absent.
+            val physicalServer = targetServer.servers.filter { it.status == 1 }.minByOrNull { it.load }
+                ?: targetServer.servers.minByOrNull { it.load }
+
             if (physicalServer == null) {
-                Log.e(TAG, "Cannot connect: Selected server is currently unavailable.")
+                ProtonLogger.e(TAG, "Cannot connect: Selected server is currently unavailable.")
                 return@launch
             }
 
@@ -218,7 +228,7 @@ class ProfilesViewModel @Inject constructor(
             }
 
             if (!profile.autoOpenUrl.isNullOrEmpty()) {
-                handleAutoOpenUrl(profile.autoOpenUrl)
+                amneziaVpnManager.awaitTunnelAndOpenUrl(profile.autoOpenUrl)
             }
         }
     }
@@ -248,58 +258,12 @@ class ProfilesViewModel @Inject constructor(
         return allServers.minByOrNull { it.averageLoad }
     }
 
-    private fun handleAutoOpenUrl(url: String?) {
-        if (url.isNullOrEmpty()) return
-
-        viewModelScope.launch {
-            Log.d(TAG, "Waiting for VPN to be UP before opening URL: $url")
-            try {
-                // Wait for the tunnel to reach UP state with a 20s timeout
-                withTimeout(20000) {
-                    amneziaVpnManager.tunnelState.first { it == Tunnel.State.UP }
-                }
-
-                // Extra small delay to ensure routing is established
-                delay(800)
-
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(intent)
-                Log.d(TAG, "Connect & Go: URL opened successfully")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to handle Connect & Go", e)
-                // Fallback: try opening anyway if it took too long but we are still attempting
-                if (amneziaVpnManager.tunnelState.value == Tunnel.State.UP) {
-                    try {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(intent)
-                    } catch (_: Exception) {}
-                }
-            }
-        }
-    }
-
-    // Now computes average load for countries to be displayed in the UI
-    suspend fun getAvailableCountries(): List<CountryDisplayItem> {
-        return vpnRepository.getCachedServers()
-            .groupBy { it.exitCountry }
-            .map { (countryCode, servers) ->
-                val avgLoad = if (servers.isEmpty()) 0 else servers.map { it.averageLoad }.average().toInt()
-                CountryDisplayItem(code = countryCode, averageLoad = avgLoad)
-            }
-            .sortedBy { it.code }
-    }
-
-    // Now computes average load for cities to be displayed in the UI
     suspend fun getCitiesForCountry(countryCode: String): List<CityDisplayItem> {
         return vpnRepository.getCachedServers()
             .filter { it.exitCountry == countryCode }
             .groupBy { it.city }
-            .map { (cityName, servers) ->
-                val avgLoad = if (servers.isEmpty()) 0 else servers.map { it.averageLoad }.average().toInt()
+            .map { (cityName, cityServers) ->
+                val avgLoad = if (cityServers.isEmpty()) 0 else cityServers.map { it.averageLoad }.average().toInt()
                 CityDisplayItem(name = cityName, averageLoad = avgLoad)
             }
             .sortedBy { it.name }
@@ -316,6 +280,13 @@ class ProfilesViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
+        )
+
+    val serverLoadDisplayMode: StateFlow<ServerLoadDisplayMode> = settingsManager.serverLoadDisplayMode
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ServerLoadDisplayMode.ALL
         )
 
     fun saveObfuscationProfile(profile: ObfuscationProfile) {

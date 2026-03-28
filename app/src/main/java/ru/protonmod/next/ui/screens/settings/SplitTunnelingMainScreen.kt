@@ -23,16 +23,17 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.AltRoute
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -49,7 +50,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.protonmod.next.R
+import ru.protonmod.next.ui.components.NavigationHeader
 import ru.protonmod.next.ui.theme.ProtonNextTheme
+import ru.protonmod.next.ui.theme.liquidGlass
 
 /**
  * Main Hub for Split Tunneling settings.
@@ -61,6 +64,7 @@ fun SplitTunnelingMainScreen(
     onBack: () -> Unit = {},
     onNavigateToApps: () -> Unit,
     onNavigateToIps: () -> Unit,
+    onNavigateToDomains: () -> Unit,
     // We reuse SettingsViewModel because it already holds the splitTunneling state perfectly
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -69,41 +73,19 @@ fun SplitTunnelingMainScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(R.string.settings_split_tunneling), // e.g. "Split Tunneling"
-                        fontWeight = FontWeight.Bold,
-                        color = colors.textNorm
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.desc_back_button),
-                            tint = colors.textNorm
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
-            )
-        },
-        containerColor = colors.backgroundNorm
+        containerColor = colors.backgroundNorm,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             // Background gradient
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.4f)
+                    .fillMaxSize()
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                colors.brandNorm.copy(alpha = 0.2f),
+                                colors.brandNorm.copy(alpha = 0.25f),
+                                colors.backgroundNorm.copy(alpha = 0.1f),
                                 colors.backgroundNorm
                             )
                         )
@@ -113,10 +95,14 @@ fun SplitTunnelingMainScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp)
             ) {
+                NavigationHeader(
+                    title = stringResource(R.string.settings_split_tunneling),
+                    onBack = onBack
+                )
+
                 // Header Image (Replaced with a large beautiful vector icon)
                 Box(
                     modifier = Modifier
@@ -146,7 +132,7 @@ fun SplitTunnelingMainScreen(
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     color = colors.textNorm,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -159,18 +145,17 @@ fun SplitTunnelingMainScreen(
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
+                        .padding(horizontal = 32.dp)
                 )
 
                 Spacer(modifier = Modifier.height(32.dp))
 
                 // Settings Card
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = colors.backgroundSecondary.copy(alpha = 0.8f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .liquidGlass(shape = RoundedCornerShape(16.dp), alpha = 0.4f, shadowElevation = 0.dp)
                 ) {
                     Column(modifier = Modifier.padding(vertical = 4.dp)) {
                         // Master Toggle
@@ -198,9 +183,41 @@ fun SplitTunnelingMainScreen(
                                     color = colors.separatorNorm.copy(alpha = 0.5f)
                                 )
 
+                                // Mode Selection Section
+                                Text(
+                                    text = stringResource(R.string.settings_st_mode).uppercase(),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = colors.textWeak,
+                                    modifier = Modifier.padding(start = 24.dp, top = 16.dp, bottom = 8.dp)
+                                )
+
+                                SplitTunnelingModeRow(
+                                    title = stringResource(R.string.st_mode_exclude),
+                                    description = stringResource(R.string.st_mode_exclude_desc),
+                                    isSelected = uiState.splitTunnelingMode == "exclude",
+                                    onClick = { viewModel.setSplitTunnelingMode("exclude") }
+                                )
+
+                                SplitTunnelingModeRow(
+                                    title = stringResource(R.string.st_mode_include),
+                                    description = stringResource(R.string.st_mode_include_desc),
+                                    isSelected = uiState.splitTunnelingMode == "include",
+                                    onClick = { viewModel.setSplitTunnelingMode("include") }
+                                )
+
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    color = colors.separatorNorm.copy(alpha = 0.5f)
+                                )
+
+                                val isExcludeMode = uiState.splitTunnelingMode == "exclude"
+
                                 SettingRowWithIcon(
                                     icon = Icons.Rounded.Apps,
-                                    title = stringResource(R.string.settings_excluded_apps),
+                                    title = stringResource(
+                                        if (isExcludeMode) R.string.settings_excluded_apps 
+                                        else R.string.settings_included_apps
+                                    ),
                                     subtitle = pluralStringResource(
                                         R.plurals.st_apps_selected,
                                         uiState.excludedApps.size,
@@ -216,13 +233,35 @@ fun SplitTunnelingMainScreen(
 
                                 SettingRowWithIcon(
                                     icon = Icons.Rounded.Dns,
-                                    title = stringResource(R.string.settings_excluded_ips),
+                                    title = stringResource(
+                                        if (isExcludeMode) R.string.settings_excluded_ips
+                                        else R.string.settings_included_ips
+                                    ),
                                     subtitle = pluralStringResource(
                                         R.plurals.st_ips_selected,
                                         uiState.excludedIps.size,
                                         uiState.excludedIps.size
                                     ),
                                     onClick = onNavigateToIps
+                                )
+
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    color = colors.separatorNorm.copy(alpha = 0.5f)
+                                )
+
+                                SettingRowWithIcon(
+                                    icon = Icons.Rounded.Public,
+                                    title = stringResource(
+                                        if (isExcludeMode) R.string.settings_excluded_domains
+                                        else R.string.settings_included_domains
+                                    ),
+                                    subtitle = pluralStringResource(
+                                        R.plurals.st_domains_selected,
+                                        uiState.excludedDomains.size,
+                                        uiState.excludedDomains.size
+                                    ),
+                                    onClick = onNavigateToDomains
                                 )
                             }
                         }
@@ -232,5 +271,46 @@ fun SplitTunnelingMainScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun SplitTunnelingModeRow(
+    title: String,
+    description: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val colors = ProtonNextTheme.colors
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = colors.textNorm
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textWeak
+            )
+        }
+
+        RadioButton(
+            selected = isSelected,
+            onClick = null,
+            colors = RadioButtonDefaults.colors(
+                selectedColor = colors.brandNorm,
+                unselectedColor = colors.iconWeak
+            )
+        )
     }
 }

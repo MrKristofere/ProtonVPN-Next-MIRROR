@@ -19,12 +19,17 @@ package ru.protonmod.next.ui.screens.profiles
 
 import android.app.Activity
 import android.net.VpnService
-import android.util.Log
+import ru.protonmod.next.utils.ProtonLogger
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,24 +52,25 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import ru.protonmod.next.R
 import ru.protonmod.next.ui.components.FlagIcon
-import ru.protonmod.next.ui.components.LiquidGlassBottomBar
+import ru.protonmod.next.ui.components.MainHeader
+import ru.protonmod.next.ui.components.NavigationHeader
 import ru.protonmod.next.ui.nav.MainTarget
 import ru.protonmod.next.ui.theme.ProtonNextTheme
+import ru.protonmod.next.ui.theme.liquidGlass
 import ru.protonmod.next.ui.utils.CountryUtils
+import ru.protonmod.next.ui.utils.isTablet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfilesScreen(
     onNavigateToHome: () -> Unit,
-    onNavigateToCountries: () -> Unit,
-    onNavigateToSettings: () -> Unit,
     onCreateNewProfile: () -> Unit,
     onEditProfile: (String) -> Unit,
     viewModel: ProfilesViewModel = hiltViewModel()
 ) {
     val colors = ProtonNextTheme.colors
-    val currentTarget = MainTarget.Profiles
     val context = LocalContext.current
+    val isTablet = isTablet()
 
     // Collect profiles from ViewModel
     val profiles by viewModel.profiles.collectAsState()
@@ -75,7 +81,7 @@ fun ProfilesScreen(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            Log.d("ProfilesScreen", "VPN permission granted")
+            ProtonLogger.d("ProfilesScreen", "VPN permission granted")
             pendingAction?.invoke()
             pendingAction = null
         } else {
@@ -103,17 +109,18 @@ fun ProfilesScreen(
         containerColor = colors.backgroundNorm,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onCreateNewProfile,
-                containerColor = colors.brandNorm,
-                contentColor = Color.White,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    // Added more padding to lift the FAB well above the BottomBar
-                    .padding(bottom = 130.dp)
-            ) {
-                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.desc_create_profile))
+            if (!isTablet) {
+                FloatingActionButton(
+                    onClick = onCreateNewProfile,
+                    containerColor = colors.brandNorm,
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(bottom = 130.dp)
+                ) {
+                    Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.desc_create_profile))
+                }
             }
         },
         bottomBar = {}
@@ -126,87 +133,129 @@ fun ProfilesScreen(
             // Background gradient decoration (immersive)
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.4f)
+                    .fillMaxSize()
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                colors.brandNorm.copy(alpha = 0.2f),
+                                colors.brandNorm.copy(alpha = 0.25f),
+                                colors.backgroundNorm.copy(alpha = 0.1f),
                                 colors.backgroundNorm
                             )
                         )
                     )
             )
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.statusBars),
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 16.dp,
-                    // Increased bottom padding so the last item scrolls above the higher FAB
-                    bottom = 140.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            Column(
+                modifier = Modifier.fillMaxSize()
             ) {
-                item {
-                    Text(
-                        text = stringResource(R.string.profiles_title),
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                        color = colors.textNorm,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 24.dp)
-                    )
-                }
-
                 if (profiles.isEmpty()) {
-                    item {
-                        // Fixed centering: fillMaxWidth ensures it's horizontally centered,
-                        // fillParentMaxHeight(0.75f) takes 75% of height to account for the title above
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .fillParentMaxHeight(0.75f),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            EmptyProfilesState()
+                    // Header for empty state
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        ProfilesHeader(
+                            isTablet = isTablet,
+                            onCreateNewProfile = onCreateNewProfile
+                        )
+                    }
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        EmptyProfilesState()
+                    }
+                } else if (isTablet) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 340.dp),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 120.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            ProfilesHeader(
+                                isTablet = true,
+                                onCreateNewProfile = onCreateNewProfile
+                            )
+                        }
+
+                        items(profiles, key = { it.id }) { profile ->
+                            ProfileCardItem(
+                                profile = profile,
+                                onConnect = {
+                                    checkVpnAndConnect {
+                                        viewModel.connectWithProfile(profile)
+                                        onNavigateToHome()
+                                    }
+                                },
+                                onEdit = { onEditProfile(profile.id) }
+                            )
                         }
                     }
                 } else {
-                    items(profiles, key = { it.id }) { profile ->
-                        ProfileCardItem(
-                            profile = profile,
-                            onConnect = {
-                                checkVpnAndConnect {
-                                    viewModel.connectWithProfile(profile)
-                                    onNavigateToHome()
-                                }
-                            },
-                            onEdit = { onEditProfile(profile.id) }
-                        )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            end = 16.dp,
+                            bottom = 140.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        item {
+                            ProfilesHeader(
+                                isTablet = false,
+                                onCreateNewProfile = onCreateNewProfile
+                            )
+                        }
+
+                        items(profiles, key = { it.id }) { profile ->
+                            ProfileCardItem(
+                                profile = profile,
+                                onConnect = {
+                                    checkVpnAndConnect {
+                                        viewModel.connectWithProfile(profile)
+                                        onNavigateToHome()
+                                    }
+                                },
+                                onEdit = { onEditProfile(profile.id) }
+                            )
+                        }
                     }
                 }
             }
+        }
+    }
+}
 
-            // Bottom Navigation
-            LiquidGlassBottomBar(
-                selectedTarget = currentTarget,
-                showCountries = true,
-                showGateways = false,
-                navigateTo = { target ->
-                    when (target) {
-                        MainTarget.Home -> onNavigateToHome()
-                        MainTarget.Countries -> onNavigateToCountries()
-                        MainTarget.Profiles -> { /* Already here */ }
-                        MainTarget.Settings -> onNavigateToSettings()
-                    }
-                },
+@Composable
+private fun ProfilesHeader(
+    isTablet: Boolean,
+    onCreateNewProfile: () -> Unit
+) {
+    val colors = ProtonNextTheme.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        MainHeader(
+            title = stringResource(R.string.profiles_title),
+            modifier = Modifier.weight(1f)
+        )
+
+        if (isTablet) {
+            Button(
+                onClick = onCreateNewProfile,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = colors.brandNorm),
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-            )
+                    .statusBarsPadding()
+                    .padding(end = 16.dp)
+            ) {
+                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.desc_create_profile))
+            }
         }
     }
 }
@@ -222,14 +271,11 @@ fun ProfileCardItem(
     val colors = ProtonNextTheme.colors
     val context = LocalContext.current
 
-    Card(
-        onClick = onConnect,
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = colors.backgroundSecondary.copy(alpha = 0.8f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = modifier.fillMaxWidth()
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .liquidGlass(shape = RoundedCornerShape(24.dp), alpha = 0.4f, shadowElevation = 0.dp)
+            .clickable(onClick = onConnect)
     ) {
         Row(
             modifier = Modifier
@@ -296,7 +342,7 @@ fun ProfileCardItem(
                 }
 
                 Text(
-                    text = "${profile.protocol} • $portStr • $targetName",
+                    text = stringResource(R.string.profile_info_format, profile.protocol, portStr, targetName),
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.textWeak
                 )

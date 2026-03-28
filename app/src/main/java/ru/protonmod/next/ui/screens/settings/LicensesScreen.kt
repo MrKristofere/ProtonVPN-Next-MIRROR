@@ -22,8 +22,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -33,7 +31,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.protonmod.next.R
+import ru.protonmod.next.ui.components.NavigationHeader
 import ru.protonmod.next.ui.theme.ProtonNextTheme
+import ru.protonmod.next.ui.theme.liquidGlass
 
 data class LicenseItem(
     val titleRes: Int,
@@ -54,38 +54,20 @@ fun LicensesScreen(
         LicenseItem(R.string.license_kotlin_title, R.string.license_apache_2, "https://www.apache.org/licenses/LICENSE-2.0"),
         LicenseItem(R.string.license_hilt_title, R.string.license_apache_2, "https://www.apache.org/licenses/LICENSE-2.0"),
         LicenseItem(R.string.license_retrofit_title, R.string.license_apache_2, "https://www.apache.org/licenses/LICENSE-2.0"),
+        LicenseItem(R.string.license_sentry_title, R.string.license_bsl, "https://github.com/getsentry/sentry-android"),
+        LicenseItem(R.string.license_room_title, R.string.license_apache_2, "https://developer.android.com/training/data-storage/room"),
+        LicenseItem(R.string.license_leakcanary_title, R.string.license_apache_2, "https://square.github.io/leakcanary/"),
+        LicenseItem(R.string.license_android_svg_title, R.string.license_apache_2, "https://bigbadaboom.github.io/androidsvg/"),
         LicenseItem(R.string.license_proton_go_vpn_title, R.string.license_app_desc, "https://github.com/ProtonMail/gopenpgp"),
         LicenseItem(R.string.license_amneziawg_title, R.string.license_apache_2, "https://github.com/wgtunnel/amneziawg-android")
     )
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(R.string.licenses_title),
-                        fontWeight = FontWeight.Bold,
-                        color = colors.textNorm
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.desc_back_button),
-                            tint = colors.textNorm
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
-            )
-        },
-        containerColor = colors.backgroundNorm
+        containerColor = colors.backgroundNorm,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             // Background gradient
             Box(
                 modifier = Modifier
@@ -102,14 +84,22 @@ fun LicensesScreen(
             )
 
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentPadding = PaddingValues(16.dp),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                item {
+                    NavigationHeader(
+                        title = stringResource(R.string.licenses_title),
+                        onBack = onBack
+                    )
+                }
+
                 items(licenses) { item ->
-                    LicenseCard(item)
+                    LicenseCard(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        item = item
+                    )
                 }
             }
         }
@@ -117,14 +107,15 @@ fun LicensesScreen(
 }
 
 @Composable
-fun LicenseCard(item: LicenseItem) {
+fun LicenseCard(
+    modifier: Modifier = Modifier,
+    item: LicenseItem
+) {
     val colors = ProtonNextTheme.colors
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = colors.backgroundSecondary.copy(alpha = 0.8f)
-        ),
-        modifier = Modifier.fillMaxWidth()
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .liquidGlass(shape = RoundedCornerShape(16.dp), alpha = 0.4f, shadowElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp)

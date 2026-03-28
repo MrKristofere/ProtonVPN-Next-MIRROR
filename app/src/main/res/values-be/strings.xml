@@ -1,4 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ Copyright (C) 2026 SMH01
+  ~
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU General Public License as published by
+  ~ the Free Software Foundation, either version 3 of the License, or
+  ~ (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~ GNU General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU General Public License
+  ~ along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  -->
 <resources>
     <string name="app_name">Proton VPN-Next</string>
 
@@ -16,6 +32,7 @@
     <string name="hint_password">Пароль</string>
     <string name="forgot_password">Забыліся пароль?</string>
     <string name="desc_back_button">Назад</string>
+    <string name="desc_back">Назад</string>
     <string name="desc_toggle_password">Паказаць/схаваць пароль</string>
     <string name="login_success">Уваход выкананы!</string>
     <string name="login_error">Памылка: %1$s</string>
@@ -40,6 +57,10 @@
     <string name="desc_toggle_connection">Пераключыць падключэнне</string>
     <string name="desc_country">Краіна</string>
     <string name="map_placeholder">Заглушка інтэрактыўнай карты</string>
+    <string name="ip_placeholder">0.0.0.0</string>
+    <string name="status_vpn">VPN</string>
+    <string name="location_format">%1$s • %2$s</string>
+    <string name="location_city_format">%1$s, %2$s</string>
     <string name="label_fastest_server">Самы хуткі сервер</string>
     <string name="label_select_location">Выберыце лакацыю</string>
     <string name="label_server_unavailable">Сервер недаступны</string>
@@ -70,11 +91,14 @@
     <string name="settings_split_tunneling_desc">Выключыць прыкладанні або IP з VPN</string>
     <string name="settings_excluded_apps">Выключаныя прыкладанні</string>
     <string name="settings_excluded_ips">Выключаныя IP-адрасы</string>
+    <string name="settings_excluded_domains">Выключаныя дамены</string>
+    <string name="settings_included_domains">Дамены праз VPN</string>
     <string name="settings_privacy">Прыватнасць і апавяшчэнні</string>
     <string name="settings_notifications">Апавяшчэнні</string>
     <string name="settings_notifications_desc">Атрымліваць апавяшчэнні аб статусе VPN</string>
     <string name="settings_about">Аб прыкладанні</string>
     <string name="settings_version">Версія %1$s</string>
+    <string name="settings_version_short">v%1$s</string>
     <string name="settings_licenses">Ліцэнзіі адкрытага ПЗ</string>
     <string name="settings_licenses_desc">Баковыя ПЗ, якія выкарыстоўваюцца ў прыкладанні</string>
     <string name="settings_on">Укл</string>
@@ -103,6 +127,27 @@
     <string name="settings_custom_dns_reset">Скінуць</string>
     <string name="settings_custom_dns_placeholder">напр. 1.1.1.1 або 94.140.14.14</string>
 
+    <!-- Customization -->
+    <string name="settings_customization">Кастамізацыя</string>
+    <string name="settings_app_theme">Тэма прыкладання</string>
+    <string name="settings_load_display_mode">Адлюстраванне нагрузкі</string>
+    <string name="load_mode_all">Лінія і працэнты</string>
+    <string name="load_mode_line">Толькі лінія</string>
+    <string name="load_mode_percent">Толькі працэнты</string>
+    <string name="load_mode_hidden">Схаваць</string>
+    <string name="theme_light">Светлая</string>
+    <string name="theme_dark">Цёмная</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_gold_light">Золата светлая</string>
+    <string name="theme_gold_dark">Золата цёмная</string>
+    <string name="theme_gold_amoled">Золата AMOLED</string>
+    <string name="theme_surfshark">Surfshark</string>
+    <string name="theme_nord">NordVPN</string>
+    <string name="theme_ipvanish">IPVanish</string>
+    <string name="theme_purevpn">PureVPN</string>
+    <string name="theme_mullvad">Mullvad</string>
+    <string name="theme_windscribe">Windscribe</string>
+
     <!-- Error Reporting Settings -->
     <string name="settings_error_reporting">Справаздачы аб памылках</string>
     <string name="settings_error_reporting_desc">Кіраванне справаздачамі аб збоях і аналітыкай</string>
@@ -110,6 +155,16 @@
     <string name="settings_crash_reports_desc">Падрабязныя справаздачы пры нечаканым прыпынку прыкладання</string>
     <string name="settings_analytics">Адпраўляць аналітыку</string>
     <string name="settings_analytics_desc">Ананімныя даныя аб выкарыстанні, якія дапамагаюць нам паляпшаць прыкладанне</string>
+    <string name="settings_sentry_performance">Прадукцыйнасць прыкладання</string>
+    <string name="settings_sentry_performance_desc">Збор ананімных трасіровак і даных аб хуткасці запуску</string>
+    <string name="settings_sentry_non_fatal">Нефатальныя памылкі</string>
+    <string name="settings_sentry_non_fatal_desc">Адпраўка справаздач аб перахопленых выключэннях і дробных праблемах логікі</string>
+    <string name="settings_sentry_anr">Дэтэкцыя ANR</string>
+    <string name="settings_sentry_anr_desc">Выяўленне завісанняў прыкладання больш чым на 5 секунд</string>
+    <string name="settings_sentry_metrics">Метрыкі прыкладання</string>
+    <string name="settings_sentry_metrics_desc">Адсочванне стану прыкладання з дапамогай лікавых даных (лічыльнікі, шкалы)</string>
+    <string name="settings_sentry_session_replay">Паўторы сесій</string>
+    <string name="settings_sentry_session_replay_desc">Ананімнае прайграванне ўзаемадзеянняў для адладкі праблем інтэрфейсу</string>
 
     <!-- Kill Switch Screen -->
     <string name="kill_switch_title">Kill Switch</string>
@@ -126,11 +181,28 @@
     <string name="obfuscation_jmax">Макс. памер смеццевага пакета (Jmax)</string>
     <string name="obfuscation_s1">Памер смецця ў Init пакеце (S1)</string>
     <string name="obfuscation_s2">Памер смецця ў Response пакеце (S2)</string>
+    <string name="obfuscation_s3">Памер смецця ў Cookie Reply (S3)</string>
+    <string name="obfuscation_s4">Памер смецця ў Transport (S4)</string>
     <string name="obfuscation_h1">Init Packet Magic (H1)</string>
     <string name="obfuscation_h2">Response Packet Magic (H2)</string>
     <string name="obfuscation_h3">Underload Packet Magic (H3)</string>
     <string name="obfuscation_h4">Transport Packet Magic (H4)</string>
-    <string name="obfuscation_i1">Special Junk (I1)</string>
+    <string name="obfuscation_i1">Спецыяльнае смецце (I1)</string>
+    <string name="obfuscation_i2">Спецыяльнае смецце (I2)</string>
+    <string name="obfuscation_i3">Спецыяльнае смецце (I3)</string>
+    <string name="obfuscation_i4">Спецыяльнае смецце (I4)</string>
+    <string name="obfuscation_i5">Спецыяльнае смецце (I5)</string>
+
+    <!-- Obfuscation Modes -->
+    <string name="obfuscation_mode_easy">Просты</string>
+    <string name="obfuscation_mode_advanced">Пашыраны</string>
+    <string name="obfuscation_junk_level">Інтэнсіўнасць смецця</string>
+    <string name="obfuscation_junk_low">Нізкая (Стандарт)</string>
+    <string name="obfuscation_junk_medium">Сярэдняя</string>
+    <string name="obfuscation_junk_high">Высокая</string>
+    <string name="obfuscation_junk_custom">Свая</string>
+    <string name="obfuscation_regenerate_i1">Абнавіць ідэнтыфікацыю</string>
+    <string name="obfuscation_i1_desc">Унікальная радок ідэнтыфікацыі для абыходу DPI. Абнавіце, калі злучэнне нестабільнае.</string>
 
     <!-- Settings: Protocol & Obfuscation -->
     <string name="settings_protocol">Пратакол</string>
@@ -154,9 +226,14 @@
     <!-- About App Screen -->
     <string name="about_community">Супольнасць</string>
     <string name="about_github">GitHub</string>
+    <string name="about_github_unavailable">GitHub (%1$s)</string>
     <string name="about_telegram">Telegram</string>
     <string name="about_codeberg">Codeberg</string>
     <string name="about_unavailable">Часова недаступна</string>
+
+    <string name="url_github">https://github.com/SMH01-MOD-NEXT/ProtonMOD-NEXT</string>
+    <string name="url_codeberg">https://codeberg.org/SMH01/ProtonVPN-Next</string>
+    <string name="url_telegram">https://t.me/ProtonVPN_MOD</string>
 
     <!-- Licenses Screen -->
     <string name="licenses_title">Ліцэнзіі</string>
@@ -170,9 +247,22 @@
     <string name="license_retrofit_title">Retrofit і OkHttp</string>
     <string name="license_proton_go_vpn_title">Бібліятэка Proton GO VPN</string>
     <string name="license_amneziawg_title">AmneziaWG Android</string>
+    <string name="license_sentry_title">Sentry SDK</string>
+    <string name="license_room_title">База даных Room</string>
+    <string name="license_leakcanary_title">LeakCanary</string>
+    <string name="license_android_svg_title">Android SVG</string>
+    <string name="license_mit">MIT License</string>
+    <string name="license_bsl">Business Source License 1.1</string>
 
     <!-- Split Tunneling -->
-    <string name="st_enabled_subtitle">VPN-падключэнне будзе абыходзіць выбраныя прыкладанні і IP-адрасы</string>
+    <string name="settings_st_mode">Рэжым раздзельнага тунэлявання</string>
+    <string name="st_mode_exclude">Рэжым выключэння</string>
+    <string name="st_mode_exclude_desc">Выбраныя прыкладанні і IP будуць абыходзіць VPN</string>
+    <string name="st_mode_include">Рэжым уключэння</string>
+    <string name="st_mode_include_desc">Толькі выбраныя прыкладанні і IP будуць выкарыстоўваць VPN</string>
+    <string name="st_enabled_subtitle">VPN-падключэнне будзе прытрымлівацца правілаў раздзельнага тунэлявання</string>
+    <string name="settings_included_apps">Прыкладанні праз VPN</string>
+    <string name="settings_included_ips">IP-адрасы праз VPN</string>
     <string name="st_disabled_subtitle">Увесь трафік ідзе праз VPN</string>
     <plurals name="st_apps_selected">
         <item quantity="one">Выбрана %1$d прыкладанне</item>
@@ -185,6 +275,12 @@
         <item quantity="few">Выбрана %1$d IP-адрасы</item>
         <item quantity="many">Выбрана %1$d IP-адрасоў</item>
         <item quantity="other">Выбрана %1$d IP-адрасоў</item>
+    </plurals>
+    <plurals name="st_domains_selected">
+        <item quantity="one">Выбраны %1$d дамен</item>
+        <item quantity="few">Выбрана %1$d дамены</item>
+        <item quantity="many">Выбрана %1$d даменаў</item>
+        <item quantity="other">Выбрана %1$d даменаў</item>
     </plurals>
 
     <plurals name="settings_apps_excluded_count">
@@ -207,8 +303,17 @@
     <string name="st_add_ip_desc">Дадаць IP</string>
     <string name="st_invalid_ip_error">Няправільны фармат IP-адраса</string>
     <string name="st_excluded_ips_header">Выключаныя IP (%1$d)</string>
+    <string name="st_included_ips_header">Уключаныя IP (%1$d)</string>
     <string name="st_no_ips_added">IP-адрасы яшчэ не дададзены</string>
     <string name="st_remove_ip_desc">Выдаліць IP</string>
+
+    <string name="st_domain_hint">напр. example.com</string>
+    <string name="st_add_domain_desc">Дадаць дамен</string>
+    <string name="st_invalid_domain_error">Няправільны фармат дамена</string>
+    <string name="st_excluded_domains_header">Выключаныя дамены (%1$d)</string>
+    <string name="st_included_domains_header">Уключаныя дамены (%1$d)</string>
+    <string name="st_no_domains_added">Дамены яшчэ не дададзены</string>
+    <string name="st_remove_domain_desc">Выдаліць дамен</string>
 
     <!-- Notification -->
     <string name="notification_channel_name">Статус VPN</string>
@@ -236,6 +341,7 @@
     <string name="profile_city_info">🏙️ %1$s, %2$s</string>
     <string name="profile_country_info">%1$s %2$s</string>
     <string name="profile_fastest_info">⚡ %1$s</string>
+    <string name="profile_info_format">%1$s • %2$s • %3$s</string>
 
     <!-- Edit Profile Screen -->
     <string name="title_create_profile">Стварыць профіль</string>
@@ -253,7 +359,7 @@
     <string name="location_fastest">Самы хуткі</string>
     <string name="label_target_location">Мэтавая лакацыя</string>
     <string name="label_location">Лакацыя</string>
-    <string name="category_connection">Падключэнне</string>
+    <string name="category_connection">Подключэнне</string>
     <string name="label_protocol">Пратакол</string>
     <string name="label_port">Порт</string>
     <string name="category_advanced">Пашыраныя</string>
@@ -270,7 +376,7 @@
     <string name="title_select_server">Выберыце сервер</string>
     <string name="location_fastest_in_country">Самы хуткі ў %1$s</string>
     <string name="location_fastest_in_city">Самы хуткі ў %1$s</string>
-    <string name="location_load">Нагрузка: %1$d%%</string>
+    <string name="location_load">%1$d%%</string>
     <string name="title_select_obfuscation_config">Выберыце канфігурацыю абфускацыі</string>
     <string name="title_auto_open_url">Аўтаадкрыццё URL</string>
     <string name="btn_create_new_config">Стварыць новую канфігурацыю</string>
@@ -282,7 +388,71 @@
     <string name="title_edit_obfuscation_config">Рэдагаваць канфігурацыю абфускацыі</string>
     <string name="error_empty_profile_name">Назва профілю не можа быць пустой</string>
 
+    <!-- Debug Tools -->
+    <string name="settings_debug">Інструменты адладкі</string>
+    <string name="debug_title">Панэль адладкі</string>
+    <string name="debug_session_header">VPN Сесія і Сертыфікат</string>
+    <string name="debug_cert_id">ID серт.: %1$s</string>
+    <string name="debug_cert_issued">Выдадзены: %1$s</string>
+    <string name="debug_cert_expires">Заканчваецца: %1$s</string>
+    <string name="debug_btn_refresh_cert">Абнавіць сертыфікат прымусова</string>
+    <string name="debug_exports_header">Экспарт і Дыягностыка</string>
+    <string name="debug_btn_export_logs">Экспарт Logcat у Downloads</string>
+    <string name="debug_btn_export_config">Экспарт WG канфігурацыі (.conf)</string>
+    <string name="debug_danger_header">Небяспечная зона</string>
+    <string name="debug_btn_nuke">Скід усіх даных (Factory Reset)</string>
+    <string name="debug_nuke_confirm">Вы ўпэўнены? Усе налады, акаўнты і кэш сервераў будуць беззваротна выдалены.</string>
+    <string name="debug_device_header">Інфармацыя аб прыладзе</string>
+    <string name="debug_select_server">Выберыце сервер для экспарту канфігурацыі</string>
+
+    <!-- Sentry Debug -->
+    <string name="debug_sentry_header">Тэставанне Sentry SDK</string>
+    <string name="debug_btn_crash_java">Выклікаць Java Crash</string>
+    <string name="debug_btn_crash_native">Выклікаць Native Crash</string>
+    <string name="debug_btn_anr">Выклікаць ANR (5 сек)</string>
+    <string name="debug_btn_oom">Выклікаць OutOfMemory</string>
+    <string name="debug_btn_background_crash">Краш у фонавым патоку</string>
+    <string name="debug_btn_capture_exception">Адправіць памылку (Non-fatal)</string>
+    <string name="debug_btn_arithmetic_error">Арыфметычная памылка (1/0)</string>
+    <string name="debug_btn_null_pointer">NullPointer Exception</string>
+
+    <string name="debug_btn_fake_crash">Фэйкавы краш прыкладання</string>
+
+    <string name="title_quick_connect_config">Налада хуткага падключэння</string>
+    <string name="qc_strategy_fastest">Самы хуткі сервер</string>
+    <string name="qc_strategy_fastest_desc">Заўсёды падключацца да самага хуткага сервера.</string>
+    <string name="qc_strategy_recent">Апошні выкарыстаны</string>
+    <string name="qc_strategy_recent_desc">Падключыцца да сервера з мінулай сесіі.</string>
+    <string name="qc_header_profiles">ВЫКАРЫСТОЎВАЦЬ ПРОФІЛЬ</string>
+    <string name="qc_header_recent">АПОШНІЯ СЕРВЕРЫ</string>
+    <string name="qc_strategy_profile_desc">Падключыцца з наладамі профілю.</string>
+
+    <string name="tile_subtitle_connected">Падключана: %s</string>
+    <string name="tile_subtitle_fastest">Хуткае: Самы хуткі</string>
+    <string name="tile_subtitle_last">Хуткае: Апошні раз</string>
+    <string name="tile_subtitle_specific">Хуткае: %s</string>
+
+    <string name="obfuscation_btn_generate_from_domain">Генерацыя па дамене</string>
+    <string name="obfuscation_dialog_domain_title">Увядзіце дамен</string>
+    <string name="obfuscation_dialog_domain_desc">Увядзіце дамен (напр., google.com) для генерацыі ідэнтыфікатара на аснове QUIC.</string>
+
+    <string name="settings_widget">Віджэт</string>
+    <string name="settings_widget_desc">Дадаць віджэт на галоўны экран для хуткага кіравання падключэннем</string>
+    <string name="settings_widget_add_to_home">Дадаць на галоўны экран</string>
+    <string name="settings_widget_add_to_home_desc">Размясціць віджэт VPN на рабочым стале</string>
+    <string name="widget_added_successfully">Віджэт паспяхова дададзены!</string>
+    <string name="widget_error_not_supported">Ваш рабочы стол не падтрымлівае даданне віджэтаў.</string>
+
+    <!-- Speed Units -->
+    <string name="unit_kb_s">КБ/с</string>
+    <string name="unit_mb_s">МБ/с</string>
+    <string name="unit_gb_s">ГБ/с</string>
+    <string name="unit_b_s">Б/с</string>
+    <string name="vpn_speed_format">↑ %1$s ↓ %2$s</string>
+
     <!-- Captcha Screen -->
     <string name="captcha_title">Праверка на чалавечнасць</string>
+    <string name="captcha_message">Для забеспячэння бяспекі акаўнта, калі ласка, прайдзіце праверку ніжэй.</string>
+    <string name="captcha_proxy_active">Антыблакіровачны проксі актыўны</string>
     <string name="desc_close">Закрыць</string>
 </resources>

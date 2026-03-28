@@ -12,7 +12,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * along with this program.  See <https://www.gnu.org/licenses/>.
  */
 
 package ru.protonmod.next.ui.screens.profiles
@@ -20,6 +20,7 @@ package ru.protonmod.next.ui.screens.profiles
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -30,35 +31,48 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import kotlinx.coroutines.launch
 import ru.protonmod.next.R
+import ru.protonmod.next.data.local.ServerLoadDisplayMode
 import ru.protonmod.next.data.model.ObfuscationProfile
 import ru.protonmod.next.data.network.LogicalServer
 import ru.protonmod.next.ui.components.FlagIcon
+import ru.protonmod.next.ui.components.LoadIndicator
+import ru.protonmod.next.ui.components.LoadProgressBar
 import ru.protonmod.next.ui.screens.countries.CityDisplayItem
 import ru.protonmod.next.ui.screens.countries.CountryDisplayItem
+import ru.protonmod.next.ui.components.MainHeader
+import ru.protonmod.next.ui.components.NavigationHeader
 import ru.protonmod.next.ui.theme.ProtonNextTheme
+import ru.protonmod.next.ui.theme.liquidGlass
 import ru.protonmod.next.ui.utils.CountryUtils
+import ru.protonmod.next.ui.utils.isTablet
 import java.util.Locale
 import java.util.UUID
 
 // Helper function to dynamically localize city names based on string resources
-// For example: "New York" -> looks for R.string.city_new_york
 private fun getLocalizedCityName(context: Context, cityName: String): String {
     if (cityName.isBlank()) return cityName
     val resourceName = "city_${cityName.lowercase(Locale.ROOT).replace(" ", "_").replace("-", "_")}"
@@ -71,6 +85,10 @@ private fun getLocalizedCityName(context: Context, cityName: String): String {
 fun EditProfileScreen(
     profileId: String?,
     viewModel: ProfilesViewModel,
+    onNavigateToPortSelection: (Int) -> Unit,
+    onNavigateToProtocolSelection: (String) -> Unit,
+    onNavigateToUrlSelection: (String) -> Unit,
+    navController: NavHostController,
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -78,239 +96,250 @@ fun EditProfileScreen(
     val profiles by viewModel.profiles.collectAsState()
     val countries by viewModel.countries.collectAsState()
     val customObfuscationConfigs by viewModel.customObfuscationConfigs.collectAsState()
+    val serverLoadDisplayMode by viewModel.serverLoadDisplayMode.collectAsState()
+    val isTablet = isTablet()
 
     val editingProfile = remember(profileId, profiles) {
         profiles.find { it.id == profileId }
     }
 
-    var profileName by remember { mutableStateOf("") }
-    var targetCountry by remember { mutableStateOf<String?>(null) }
-    var targetCity by remember { mutableStateOf<String?>(null) }
-    var targetServerId by remember { mutableStateOf<String?>(null) }
-    var targetServerName by remember { mutableStateOf<String?>(null) }
-    var selectedProtocol by remember { mutableStateOf("AmneziaWG") }
-    var selectedPort by remember { mutableIntStateOf(0) }
-    var autoOpenUrl by remember { mutableStateOf("") }
-    var obfuscationEnabled by remember { mutableStateOf(false) }
-    var obfuscationProfileId by remember { mutableStateOf("standard_1") }
+    var profileName by rememberSaveable { mutableStateOf("") }
+    var targetCountry by rememberSaveable { mutableStateOf<String?>(null) }
+    var targetCity by rememberSaveable { mutableStateOf<String?>(null) }
+    var targetServerId by rememberSaveable { mutableStateOf<String?>(null) }
+    var targetServerName by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedProtocol by rememberSaveable { mutableStateOf("AmneziaWG") }
+    var selectedPort by rememberSaveable { mutableIntStateOf(0) }
+    var autoOpenUrl by rememberSaveable { mutableStateOf("") }
+    var obfuscationEnabled by rememberSaveable { mutableStateOf(false) }
+    var obfuscationProfileId by rememberSaveable { mutableStateOf("standard_1") }
+
+    var isLoaded by rememberSaveable { mutableStateOf(false) }
+
+    // Navigation and results
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    LaunchedEffect(navBackStackEntry) {
+        navBackStackEntry?.savedStateHandle?.get<Int>("selectedPort")?.let { port ->
+            selectedPort = port
+            navBackStackEntry?.savedStateHandle?.remove<Int>("selectedPort")
+        }
+        navBackStackEntry?.savedStateHandle?.get<String>("selectedProtocol")?.let { protocol ->
+            selectedProtocol = protocol
+            navBackStackEntry?.savedStateHandle?.remove<String>("selectedProtocol")
+        }
+        navBackStackEntry?.savedStateHandle?.get<String>("selectedUrl")?.let { url ->
+            autoOpenUrl = url
+            navBackStackEntry?.savedStateHandle?.remove<String>("selectedUrl")
+        }
+    }
 
     // Update state when editingProfile is loaded
     LaunchedEffect(editingProfile) {
-        editingProfile?.let {
-            profileName = it.name
-            targetCountry = it.targetCountry
-            targetCity = it.targetCity
-            targetServerId = it.targetServerId
-            targetServerName = it.targetServerName
-            selectedProtocol = it.protocol
-            selectedPort = it.port
-            autoOpenUrl = it.autoOpenUrl ?: ""
-            obfuscationEnabled = it.isObfuscationEnabled
-            obfuscationProfileId = it.obfuscationProfileId ?: "standard_1"
+        if (!isLoaded && editingProfile != null) {
+            editingProfile?.let {
+                profileName = it.name
+                targetCountry = it.targetCountry
+                targetCity = it.targetCity
+                targetServerId = it.targetServerId
+                targetServerName = it.targetServerName
+                selectedProtocol = it.protocol
+                selectedPort = it.port
+                autoOpenUrl = it.autoOpenUrl ?: ""
+                obfuscationEnabled = it.isObfuscationEnabled
+                obfuscationProfileId = it.obfuscationProfileId ?: "standard_1"
+            }
+            isLoaded = true
         }
     }
 
     var showLocationDialog by remember { mutableStateOf(false) }
-    var showProtocolDialog by remember { mutableStateOf(false) }
-    var showPortDialog by remember { mutableStateOf(false) }
-    var showUrlDialog by remember { mutableStateOf(false) }
     var showObfuscationConfigDialog by remember { mutableStateOf(false) }
 
     val standardProfileName = stringResource(R.string.obfuscation_config_standard)
 
-    Scaffold(
-        containerColor = colors.backgroundNorm,
-        topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = colors.backgroundNorm,
-                    titleContentColor = colors.textNorm
-                ),
-                title = { Text(if (profileId == null) stringResource(R.string.title_create_profile) else stringResource(R.string.title_edit_profile)) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = colors.textNorm)
-                    }
-                },
-                actions = {
-                    Button(
-                        onClick = {
-                            if (profileName.isBlank()) {
-                                Toast.makeText(context, R.string.error_empty_profile_name, Toast.LENGTH_SHORT).show()
-                                return@Button
-                            }
-
-                            val validatedUrl = if (autoOpenUrl.isNotBlank() && !autoOpenUrl.startsWith("http://") && !autoOpenUrl.startsWith("https://")) {
-                                "https://$autoOpenUrl"
-                            } else autoOpenUrl
-
-                            val newProfile = VpnProfileUiModel(
-                                id = profileId ?: UUID.randomUUID().toString(),
-                                name = profileName,
-                                targetCountry = targetCountry,
-                                targetCity = targetCity,
-                                targetServerId = targetServerId,
-                                targetServerName = targetServerName,
-                                protocol = selectedProtocol,
-                                port = selectedPort,
-                                autoOpenUrl = validatedUrl,
-                                isObfuscationEnabled = obfuscationEnabled,
-                                obfuscationProfileId = if (obfuscationEnabled) obfuscationProfileId else null
-                            )
-                            viewModel.saveProfile(newProfile)
-                            onNavigateBack()
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.brandNorm)
-                    ) {
-                        Text(stringResource(R.string.btn_save), color = Color.White)
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        LazyColumn(
+    Box(modifier = Modifier.fillMaxSize().background(colors.backgroundNorm)) {
+        // Background gradient
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                Category(title = stringResource(R.string.category_general)) {
-                    SettingTextFieldRow(
-                        label = stringResource(R.string.label_profile_name),
-                        value = profileName,
-                        onValueChange = { profileName = it }
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            colors.brandNorm.copy(alpha = 0.25f),
+                            colors.backgroundNorm.copy(alpha = 0.1f),
+                            colors.backgroundNorm
+                        )
+                    )
+                )
+        )
+
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                horizontalAlignment = if (isTablet) Alignment.CenterHorizontally else Alignment.Start,
+                contentPadding = PaddingValues(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                val contentModifier = if (isTablet) Modifier.widthIn(max = 600.dp) else Modifier.fillMaxWidth()
+
+                item {
+                    NavigationHeader(
+                        title = if (profileId == null) stringResource(R.string.title_create_profile) else stringResource(R.string.title_edit_profile),
+                        onBack = onNavigateBack,
+                        actions = {
+                            Button(
+                                onClick = {
+                                    if (profileName.isBlank()) {
+                                        Toast.makeText(context, R.string.error_empty_profile_name, Toast.LENGTH_SHORT).show()
+                                        return@Button
+                                    }
+
+                                    var validatedUrl = autoOpenUrl.trim()
+                                    if (validatedUrl.isNotBlank() && !validatedUrl.contains("://")) {
+                                        validatedUrl = "https://$validatedUrl"
+                                    }
+
+                                    val newProfile = VpnProfileUiModel(
+                                        id = profileId ?: UUID.randomUUID().toString(),
+                                        name = profileName,
+                                        targetCountry = targetCountry,
+                                        targetCity = targetCity,
+                                        targetServerId = targetServerId,
+                                        targetServerName = targetServerName,
+                                        protocol = selectedProtocol,
+                                        port = selectedPort,
+                                        autoOpenUrl = validatedUrl,
+                                        isObfuscationEnabled = obfuscationEnabled,
+                                        obfuscationProfileId = if (obfuscationEnabled) obfuscationProfileId else null
+                                    )
+                                    viewModel.saveProfile(newProfile)
+                                    onNavigateBack()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = colors.brandNorm),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.padding(end = 8.dp)
+                            ) {
+                                Text(stringResource(R.string.btn_save), color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     )
                 }
-            }
 
-            item {
-                Category(title = stringResource(R.string.category_connection)) {
-                    val locationSubtitle = when {
-                        targetServerId != null -> stringResource(R.string.location_server, (targetServerName ?: targetServerId) as Any)
-                        targetCity != null -> "🏙️ ${getLocalizedCityName(context, targetCity!!)}, ${CountryUtils.getCountryName(context, targetCountry)}"
-                        targetCountry != null -> CountryUtils.getCountryName(context, targetCountry)
-                        else -> stringResource(R.string.location_fastest)
-                    }
-
-                    SettingRowWithIcon(
-                        countryCode = targetCountry,
-                        title = stringResource(R.string.label_location),
-                        subtitle = locationSubtitle,
-                        onClick = { showLocationDialog = true }
-                    )
-
-                    SettingRowWithIcon(
-                        icon = Icons.Rounded.Security,
-                        title = stringResource(R.string.label_protocol),
-                        subtitle = selectedProtocol,
-                        onClick = { showProtocolDialog = true }
-                    )
-
-                    SettingRowWithIcon(
-                        icon = Icons.Rounded.Power,
-                        title = stringResource(R.string.label_port),
-                        subtitle = (if (selectedPort == 0) stringResource(R.string.settings_port_auto) else selectedPort.toString()),
-                        onClick = { showPortDialog = true }
-                    )
-                }
-            }
-
-            item {
-                Category(title = stringResource(R.string.category_advanced)) {
-                    SettingToggleRow(
-                        icon = Icons.Rounded.VisibilityOff,
-                        title = stringResource(R.string.label_obfuscation),
-                        subtitle = stringResource(R.string.obfuscation_desc),
-                        checked = obfuscationEnabled,
-                        onCheckedChange = { obfuscationEnabled = it }
-                    )
-
-                    if (obfuscationEnabled) {
-                        val allConfigs = listOf(ObfuscationProfile.getStandardProfile(standardProfileName)) + customObfuscationConfigs
-                        val selectedConfig = allConfigs.find { it.id == obfuscationProfileId } ?: allConfigs.first()
-
-                        SettingRowWithIcon(
-                            icon = Icons.Rounded.Settings,
-                            title = stringResource(R.string.label_obfuscation_config),
-                            subtitle = selectedConfig.name,
-                            onClick = { showObfuscationConfigDialog = true },
-                            modifier = Modifier.padding(start = 16.dp)
+                item {
+                    Category(modifier = contentModifier.padding(horizontal = 16.dp), title = stringResource(R.string.category_general)) {
+                        SettingTextFieldRow(
+                            label = stringResource(R.string.label_profile_name),
+                            value = profileName,
+                            onValueChange = { profileName = it }
                         )
                     }
                 }
-            }
 
-            item {
-                Category(title = stringResource(R.string.category_automation)) {
-                    SettingRowWithIcon(
-                        icon = Icons.Rounded.OpenInBrowser,
-                        title = stringResource(R.string.label_connect_go_website),
-                        subtitle = autoOpenUrl.ifEmpty { stringResource(R.string.label_not_configured) },
-                        onClick = { showUrlDialog = true }
+                item {
+                    Category(modifier = contentModifier.padding(horizontal = 16.dp), title = stringResource(R.string.category_connection)) {
+                        val locationSubtitle = when {
+                            targetServerId != null -> stringResource(R.string.location_server, (targetServerName ?: targetServerId) as Any)
+                            targetCity != null -> {
+                                val city = getLocalizedCityName(context, targetCity!!)
+                                val country = CountryUtils.getCountryName(context, targetCountry)
+                                stringResource(R.string.location_city_format, city, country)
+                            }
+                            targetCountry != null -> CountryUtils.getCountryName(context, targetCountry)
+                            else -> stringResource(R.string.location_fastest)
+                        }
+
+                        SettingRowWithIcon(
+                            countryCode = targetCountry,
+                            title = stringResource(R.string.label_location),
+                            subtitle = locationSubtitle,
+                            onClick = { showLocationDialog = true }
+                        )
+
+                        SettingRowWithIcon(
+                            icon = Icons.Rounded.Security,
+                            title = stringResource(R.string.label_protocol),
+                            subtitle = selectedProtocol,
+                            onClick = { onNavigateToProtocolSelection(selectedProtocol) }
+                        )
+
+                        SettingRowWithIcon(
+                            icon = Icons.Rounded.Power,
+                            title = stringResource(R.string.label_port),
+                            subtitle = (if (selectedPort == 0) stringResource(R.string.settings_port_auto) else selectedPort.toString()),
+                            onClick = { onNavigateToPortSelection(selectedPort) }
+                        )
+                    }
+                }
+
+                item {
+                    Category(modifier = contentModifier.padding(horizontal = 16.dp), title = stringResource(R.string.category_advanced)) {
+                        SettingToggleRow(
+                            icon = Icons.Rounded.VisibilityOff,
+                            title = stringResource(R.string.label_obfuscation),
+                            subtitle = stringResource(R.string.obfuscation_desc),
+                            checked = obfuscationEnabled,
+                            onCheckedChange = { obfuscationEnabled = it }
+                        )
+
+                        if (obfuscationEnabled) {
+                            val allConfigs = listOf(ObfuscationProfile.getStandardProfile(standardProfileName)) + customObfuscationConfigs
+                            val selectedConfig = allConfigs.find { it.id == obfuscationProfileId } ?: allConfigs.first()
+
+                            SettingRowWithIcon(
+                                icon = Icons.Rounded.Settings,
+                                title = stringResource(R.string.label_obfuscation_config),
+                                subtitle = selectedConfig.name,
+                                onClick = { showObfuscationConfigDialog = true },
+                                modifier = Modifier.padding(start = 16.dp)
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    Category(modifier = contentModifier.padding(horizontal = 16.dp), title = stringResource(R.string.category_automation)) {
+                        SettingRowWithIcon(
+                            icon = Icons.Rounded.OpenInBrowser,
+                            title = stringResource(R.string.label_connect_go_website),
+                            subtitle = autoOpenUrl.ifEmpty { stringResource(R.string.label_not_configured) },
+                            onClick = { onNavigateToUrlSelection(autoOpenUrl) }
+                        )
+                    }
+
+                    Text(
+                        text = stringResource(R.string.automation_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textWeak,
+                        modifier = contentModifier.padding(start = 28.dp, top = 8.dp, end = 28.dp)
                     )
                 }
 
-                Text(
-                    text = stringResource(R.string.automation_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.textWeak,
-                    modifier = Modifier.padding(start = 12.dp, top = 8.dp, end = 12.dp)
-                )
-            }
-
-            if (profileId != null) {
-                item {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(
-                        onClick = {
-                            viewModel.deleteProfile(profileId)
-                            onNavigateBack()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.1f)),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Icon(Icons.Rounded.Delete, contentDescription = null, tint = Color.Red)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.btn_delete), color = Color.Red)
+                if (profileId != null) {
+                    item {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(
+                            onClick = {
+                                viewModel.deleteProfile(profileId)
+                                onNavigateBack()
+                            },
+                            modifier = contentModifier.padding(horizontal = 16.dp).height(56.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.1f)),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Icon(Icons.Rounded.Delete, contentDescription = null, tint = Color.Red)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.btn_delete), color = Color.Red, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
         }
-    }
-
-    if (showPortDialog) {
-        PortSelectionDialog(
-            currentPort = selectedPort,
-            onDismiss = {  },
-            onPortSelected = {
-                selectedPort = it
-            }
-        )
-    }
-
-    if (showProtocolDialog) {
-        ProtocolSelectionDialog(
-            currentProtocol = selectedProtocol,
-            onDismiss = { showProtocolDialog = false },
-            onProtocolSelected = {
-                selectedProtocol = it
-                showProtocolDialog = false
-            }
-        )
-    }
-
-    if (showUrlDialog) {
-        AutoOpenUrlDialog(
-            currentUrl = autoOpenUrl,
-            onDismiss = { showUrlDialog = false },
-            onSave = {
-                autoOpenUrl = it
-                showUrlDialog = false
-            }
-        )
     }
 
     if (showLocationDialog) {
@@ -318,6 +347,7 @@ fun EditProfileScreen(
             countries = countries,
             selectedCountry = targetCountry,
             selectedCity = targetCity,
+            loadDisplayMode = serverLoadDisplayMode,
             viewModel = viewModel,
             onDismiss = { showLocationDialog = false },
             onLocationSelected = { country, city, serverId, serverName ->
@@ -363,78 +393,59 @@ fun EditProfileScreen(
     }
 }
 
-// Reusable card for the selection dialog to match CountriesScreen styling
 @Composable
 fun SelectionCard(
     title: String,
     icon: @Composable () -> Unit,
     load: Int? = null,
+    displayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL,
     onClick: () -> Unit
 ) {
     val colors = ProtonNextTheme.colors
-    Card(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.backgroundSecondary.copy(alpha = 0.5f)) // Lighter card on a darker background
+            .liquidGlass(shape = RoundedCornerShape(20.dp), alpha = 0.5f)
+            .clickable(onClick = onClick)
     ) {
         Column {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Box(
-                    modifier = Modifier.size(36.dp, 24.dp),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    icon()
+                    Box(
+                        modifier = Modifier.size(36.dp, 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        icon()
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textNorm,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = colors.textNorm,
-                    modifier = Modifier.weight(1f)
-                )
-
                 if (load != null) {
-                    val loadColor = CountryUtils.getColorForLoad(load)
-                    Surface(
-                        color = loadColor.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = "$load%",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = loadColor,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
+                    LoadIndicator(load = load, displayMode = displayMode)
                 }
             }
 
-            // Premium Load Progress Bar at the bottom of the card
             if (load != null) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .background(colors.textNorm.copy(alpha = 0.05f))
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(load / 100f)
-                            .fillMaxHeight()
-                            .background(CountryUtils.getColorForLoad(load))
-                    )
-                }
+                LoadProgressBar(load = load, displayMode = displayMode)
             }
         }
     }
@@ -445,6 +456,7 @@ fun LocationSelectionDialog(
     countries: List<CountryDisplayItem>,
     selectedCountry: String?,
     selectedCity: String?,
+    loadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL,
     viewModel: ProfilesViewModel,
     onDismiss: () -> Unit,
     onLocationSelected: (String?, String?, String?, String?) -> Unit
@@ -464,21 +476,51 @@ fun LocationSelectionDialog(
     Dialog(onDismissRequest = onDismiss) {
         Card(
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.backgroundNorm) // Darker dialog background
+            colors = CardDefaults.cardColors(containerColor = colors.backgroundNorm),
+            border = BorderStroke(1.dp, colors.shade100.copy(alpha = 0.05f))
         ) {
             Column(
-                modifier = Modifier.padding(vertical = 16.dp).fillMaxWidth().fillMaxHeight(0.7f)
+                modifier = Modifier
+                    .padding(vertical = 16.dp)
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.85f)
             ) {
-                Text(
-                    text = when(step) {
-                        0 -> stringResource(R.string.title_select_country)
-                        1 -> stringResource(R.string.title_select_city)
-                        else -> stringResource(R.string.title_select_server)
-                    },
-                    style = MaterialTheme.typography.titleLarge,
-                    color = colors.textNorm,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (step > 0) {
+                        IconButton(onClick = { step-- }, enabled = !isTransitioning) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = stringResource(R.string.desc_back),
+                                tint = colors.textNorm
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    
+                    Text(
+                        text = when(step) {
+                            0 -> stringResource(R.string.title_select_country)
+                            1 -> stringResource(R.string.title_select_city)
+                            else -> stringResource(R.string.title_select_server)
+                        },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textNorm,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.desc_close), tint = colors.iconWeak)
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = colors.shade20.copy(alpha = 0.5f))
 
                 AnimatedContent(
                     targetState = step,
@@ -487,8 +529,8 @@ fun LocationSelectionDialog(
                 ) { currentStep ->
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         item {
                             SelectionCard(
@@ -497,6 +539,7 @@ fun LocationSelectionDialog(
                                     1 -> stringResource(R.string.location_fastest_in_country, CountryUtils.getCountryName(context, currentCountry))
                                     else -> stringResource(R.string.location_fastest_in_city, getLocalizedCityName(context, currentCity ?: ""))
                                 },
+                                displayMode = loadDisplayMode,
                                 icon = {
                                     FlagIcon(
                                         countryFlag = R.drawable.flag_fastest,
@@ -531,19 +574,17 @@ fun LocationSelectionDialog(
                                             } else {
                                                 Box(
                                                     modifier = Modifier
-                                                        .fillMaxSize()
+                                                        .size(36.dp, 24.dp)
                                                         .clip(RoundedCornerShape(6.dp))
                                                         .background(colors.backgroundNorm),
                                                     contentAlignment = Alignment.Center
                                                 ) {
-                                                    Text(
-                                                        text = CountryUtils.getFlagForCountry(countryItem.code),
-                                                        style = MaterialTheme.typography.bodyLarge
-                                                    )
+                                                    Icon(imageVector = Icons.Rounded.Public, contentDescription = null, tint = colors.iconNorm, modifier = Modifier.size(20.dp))
                                                 }
                                             }
                                         },
                                         load = countryItem.averageLoad,
+                                        displayMode = loadDisplayMode,
                                         onClick = {
                                             if (!isTransitioning) {
                                                 scope.launch {
@@ -566,15 +607,16 @@ fun LocationSelectionDialog(
                                         icon = {
                                             Box(
                                                 modifier = Modifier
-                                                    .fillMaxSize()
+                                                    .size(36.dp, 24.dp)
                                                     .clip(RoundedCornerShape(6.dp))
                                                     .background(colors.backgroundNorm),
                                                 contentAlignment = Alignment.Center
                                             ) {
-                                                Text(text = "🏙️", style = MaterialTheme.typography.bodyLarge)
+                                                Icon(imageVector = Icons.Default.LocationCity, contentDescription = null, tint = colors.iconNorm, modifier = Modifier.size(20.dp))
                                             }
                                         },
                                         load = cityItem.averageLoad,
+                                        displayMode = loadDisplayMode,
                                         onClick = {
                                             if (!isTransitioning) {
                                                 scope.launch {
@@ -596,20 +638,21 @@ fun LocationSelectionDialog(
                                         icon = {
                                             Box(
                                                 modifier = Modifier
-                                                    .fillMaxSize()
+                                                    .size(36.dp, 24.dp)
                                                     .clip(RoundedCornerShape(6.dp))
-                                                    .background(colors.backgroundNorm), // Match CountriesScreen styling
+                                                    .background(colors.backgroundNorm),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Rounded.Public,
                                                     contentDescription = null,
                                                     tint = colors.iconNorm,
-                                                    modifier = Modifier.size(18.dp)
+                                                    modifier = Modifier.size(20.dp)
                                                 )
                                             }
                                         },
                                         load = server.averageLoad,
+                                        displayMode = loadDisplayMode,
                                         onClick = {
                                             if (!isTransitioning) {
                                                 onLocationSelected(currentCountry, currentCity, server.id, server.name)
@@ -619,22 +662,6 @@ fun LocationSelectionDialog(
                                 }
                             }
                         }
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    if (step > 0) {
-                        TextButton(onClick = { step-- }, enabled = !isTransitioning) {
-                            Text(stringResource(R.string.desc_back_button), color = colors.brandNorm)
-                        }
-                    } else {
-                        Spacer(modifier = Modifier.width(1.dp))
-                    }
-                    TextButton(onClick = onDismiss, enabled = !isTransitioning) {
-                        Text(stringResource(android.R.string.cancel), color = colors.brandNorm)
                     }
                 }
             }
@@ -660,13 +687,10 @@ fun Category(
         )
     }
 
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = colors.backgroundSecondary.copy(alpha = 0.5f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = modifier.fillMaxWidth()
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .liquidGlass(shape = RoundedCornerShape(20.dp), alpha = 0.5f)
     ) {
         Column(modifier = Modifier.padding(vertical = 4.dp)) {
             content()
@@ -819,191 +843,6 @@ fun SettingTextFieldRow(
         singleLine = true
     )
 }
-
-@Composable
-fun PortSelectionDialog(
-    currentPort: Int,
-    onDismiss: () -> Unit,
-    onPortSelected: (Int) -> Unit
-) {
-    val colors = ProtonNextTheme.colors
-    val portOptions = listOf(0, 443, 123, 1194, 51820)
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.backgroundSecondary)
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(vertical = 16.dp)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = stringResource(R.string.label_port),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = colors.textNorm,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-
-                LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                    items(portOptions) { port ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onPortSelected(port) }
-                                .padding(vertical = 12.dp, horizontal = 24.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = if (port == 0) stringResource(R.string.settings_port_auto) else port.toString(),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = colors.textNorm,
-                                modifier = Modifier.weight(1f)
-                            )
-                            RadioButton(
-                                selected = (port == currentPort),
-                                onClick = { onPortSelected(port) },
-                                colors = RadioButtonDefaults.colors(selectedColor = colors.brandNorm)
-                            )
-                        }
-                    }
-                }
-
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.align(Alignment.End).padding(end = 16.dp)
-                ) {
-                    Text(stringResource(id = android.R.string.cancel), color = colors.brandNorm)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ProtocolSelectionDialog(
-    currentProtocol: String,
-    onDismiss: () -> Unit,
-    onProtocolSelected: (String) -> Unit
-) {
-    val colors = ProtonNextTheme.colors
-    val protocols = listOf("AmneziaWG")
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.backgroundSecondary)
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(vertical = 16.dp)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = stringResource(R.string.title_select_protocol),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = colors.textNorm,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-
-                LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                    items(protocols) { protocol ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onProtocolSelected(protocol) }
-                                .padding(vertical = 12.dp, horizontal = 24.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = protocol,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = colors.textNorm,
-                                modifier = Modifier.weight(1f)
-                            )
-                            RadioButton(
-                                selected = (protocol == currentProtocol),
-                                onClick = { onProtocolSelected(protocol) },
-                                colors = RadioButtonDefaults.colors(selectedColor = colors.brandNorm)
-                            )
-                        }
-                    }
-                }
-
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.align(Alignment.End).padding(end = 16.dp)
-                ) {
-                    Text(stringResource(id = android.R.string.cancel), color = colors.brandNorm)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun AutoOpenUrlDialog(
-    currentUrl: String,
-    onDismiss: () -> Unit,
-    onSave: (String) -> Unit
-) {
-    val colors = ProtonNextTheme.colors
-    var url by remember { mutableStateOf(currentUrl) }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.backgroundSecondary)
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .fillMaxWidth()
-            ) {
-                Text(
-                    text = stringResource(R.string.title_auto_open_url),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = colors.textNorm
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = { url = it },
-                    label = { Text(stringResource(R.string.label_enter_url)) },
-                    placeholder = { Text("https://example.com") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = colors.brandNorm,
-                        unfocusedBorderColor = colors.shade20
-                    ),
-                    singleLine = true
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(android.R.string.cancel), color = colors.textWeak)
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Button(
-                        onClick = { onSave(url) },
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.brandNorm),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(stringResource(R.string.btn_save))
-                    }
-                }
-            }
-        }
-    }
-}
-
 
 @Composable
 fun ObfuscationConfigSelectionDialog(
@@ -1256,11 +1095,10 @@ private fun EditCategoryHeader(title: String) {
 
 @Composable
 private fun EditSettingsCard(content: @Composable ColumnScope.() -> Unit) {
-    val colors = ProtonNextTheme.colors
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.backgroundSecondary.copy(alpha = 0.5f)),
-        modifier = Modifier.fillMaxWidth()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .liquidGlass(shape = RoundedCornerShape(20.dp), alpha = 0.5f)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
