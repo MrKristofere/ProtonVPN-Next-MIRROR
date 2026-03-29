@@ -154,7 +154,7 @@ class DesktopVpnClient {
             val obfuscationParams = ObfuscationParams(
                 jc = 3, jmin = 1, jmax = 3, s1 = 0, s2 = 0,
                 h1 = "1", h2 = "2", h3 = "3", h4 = "4",
-                i1 = ""
+                i1 = VpnConstants.DEFAULT_I1
             )
             
             val uapiConfig = configGenerator.buildConfig(
@@ -169,20 +169,20 @@ class DesktopVpnClient {
             println("Generated UAPI Config:\n$uapiConfig")
 
             // 5. Connect via root helper daemon
-            startHelper("wg0", uapiConfig)
+            startHelper("wg0", uapiConfig, VpnConstants.PROTON_CLIENT_IP, targetIp)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    private suspend fun startHelper(iface: String, config: String): Result<Unit> = withContext(Dispatchers.IO) {
+    private suspend fun startHelper(iface: String, config: String, localIp: String, serverIp: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val paths = listOf(File("libs/vpn-helper"), File("desktop/libs/vpn-helper"))
             val helperFile = paths.find { it.exists() } ?: return@withContext Result.failure(Exception("VPN Helper not found in any of: $paths"))
             val helperPath = helperFile.absolutePath
 
             println("Starting VPN helper via pkexec from $helperPath...")
-            val process = ProcessBuilder("pkexec", helperPath, iface)
+            val process = ProcessBuilder("pkexec", helperPath, iface, localIp, serverIp)
                 .redirectErrorStream(true)
                 .start()
 

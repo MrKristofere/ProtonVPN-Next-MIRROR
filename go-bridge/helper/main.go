@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -18,12 +19,14 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <interface-name>\n", os.Args[0])
+	if len(os.Args) < 4 {
+		fmt.Fprintf(os.Stderr, "Usage: %s <interface-name> <local-ip> <server-ip>\n", os.Args[0])
 		os.Exit(1)
 	}
 
 	interfaceName := os.Args[1]
+	localIp := os.Args[2]
+	serverIp := os.Args[3]
 
 	// Create TUN device
 	tdev, err := tun.CreateTUN(interfaceName, device.DefaultMTU)
@@ -70,6 +73,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Setup routing
+	gateway, defaultIface, err := getDefaultGateway()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: Failed to get default gateway: %v\n", err)
+	} else {
+		fmt.Printf("Default gateway: %s on %s\n", gateway, defaultIface)
+		// Add host route for server via current gateway
+		setupHostRoute(serverIp, gateway, defaultIface)
+	}
+
+	// Set IP and MTU for TUN
+	setupTunInterface(interfaceName, localIp)
+
+	// Add default routes via tunnel
+	setupTunnelRouting(interfaceName)
+
 	fmt.Println("CONNECTED")
 
 	// Wait for signals or stdin closure
@@ -90,5 +109,55 @@ func main() {
 		fmt.Println("STDIN CLOSED, SHUTTING DOWN")
 	}
 
+	// Cleanup routing
+	cleanupRouting(serverIp, gateway, defaultIface)
+
 	dev.Close()
+}
+
+func setupTunInterface(iface, localIp string) {
+	fmt.Printf("Configuring interface %s with IP %s\n", iface, localIp)
+	exec.Command("ip", "addr", "add", localIp+"/32", "dev", iface).Run()
+	exec.Command("ip", "link", "set", "mtu", "1280", "up", "dev", iface).Run()
+}
+
+func setupTunnelRouting(iface string) {
+	fmt.Printf("Setting up default routes via %s\n", iface)
+	// We use 0.0.0.0/1 and 128.0.0.0/1 to override the default route without deleting it
+	exec.Command("ip", "route", "add", "0.0.0.0/1", "dev", iface).Run()
+	exec.Command("ip", "route", "add", "128.0.0.0/1", "dev", iface).Run()
+}
+
+func setupHostRoute(serverIp, gateway, iface string) {
+	fmt.Printf("Adding host route for server %s via gateway %s on %s\n", serverIp, gateway, iface)
+	exec.Command("ip", "route", "add", serverIp, "via", gateway, "dev", iface).Run()
+}
+
+func cleanupRouting(serverIp, gateway, iface string) {
+	fmt.Println("Cleaning up routing...")
+	exec.Command("ip", "route", "del", serverIp).Run()
+	// Default routes via dev will be removed when the interface is closed
+}
+
+func getDefaultGateway() (string, string, error) {
+	// Simple way: parse 'ip route show default'
+	out, err := exec.Command("ip", "route", "show", "default").Output()
+	if err != nil {
+		return "", "", err
+	}
+	// Expected: "default via 192.168.1.1 dev eth0 ..."
+	fields := strings.Fields(string(out))
+	var gateway, iface string
+	for i, f := range fields {
+		if f == "via" && i+1 < len(fields) {
+			gateway = fields[i+1]
+		}
+		if f == "dev" && i+1 < len(fields) {
+			iface = fields[i+1]
+		}
+	}
+	if gateway == "" || iface == "" {
+		return "", "", fmt.Errorf("could not find default gateway in output: %s", string(out))
+	}
+	return gateway, iface, nil
 }
