@@ -297,7 +297,26 @@
     </plurals>
 
     <string name="st_search_apps_hint">Пошук прыкладанняў</string>
+    <string name="st_enable">Уключыць раздзельнае тунэляванне</string>
+    <string name="st_enable_desc">Выключыць ці ўключыць пэўныя прыкладанні, IP ці дамены ў VPN-тунэль</string>
+    <string name="st_apps_header">Прыкладанні</string>
+    <string name="st_ips_header">IP-адрасы / CIDR</string>
+    <string name="st_domains_header">Дамены</string>
+    <string name="st_add_app">Дадаць прыкладанне</string>
+    <string name="st_add_ip">Дадаць IP-адрас</string>
+    <string name="st_add_domain">Дадаць дамен</string>
+    <string name="st_input_app_label">Шлях да файла (напр. /usr/bin/firefox)</string>
+    <string name="st_input_ip_label">IP ці CIDR (напр. 1.1.1.1 ці 192.168.1.0/24)</string>
+    <string name="st_input_domain_label">Імя дамена (напр. example.com)</string>
     <string name="st_selected_apps_header">Выбраныя прыкладанні (%1$d)</string>
+    <string name="dns_use_custom">Выкарыстоўваць свой DNS</string>
+    <string name="dns_use_custom_desc">Выкарыстоўваць старонні DNS-сервер замест стандартнага ад Proton</string>
+    <string name="dns_presets_header">Прэсэты</string>
+    <string name="dns_custom_header">Свой варыянт</string>
+    <string name="dns_manual_ip">Наладзіць IP уручную</string>
+    <string name="dns_input_label">IP-адрас (IPv4 ці IPv6)</string>
+    <string name="sentry_breadcrumbs">Адсочванне падзей (Breadcrumbs)</string>
+    <string name="sentry_breadcrumbs_desc">Запіс падзей прыкладання для лепшай дыягностыкі памылак</string>
     <string name="st_available_apps_header">Даступныя прыкладанні (%1$d)</string>
     <string name="st_ip_hint">напр. 192.168.1.0/24</string>
     <string name="st_add_ip_desc">Дадаць IP</string>

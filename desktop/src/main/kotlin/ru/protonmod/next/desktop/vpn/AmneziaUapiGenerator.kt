@@ -55,7 +55,14 @@ class AmneziaUapiGenerator : AmneziaConfigGenerator {
         sb.append("persistent_keepalive_interval=60\n")
         
         // Allowed IPs
-        val allowedIps = if (selectedIps.isEmpty()) listOf("0.0.0.0/0") else selectedIps
+        val allowedIps = if (isIncludeMode) {
+            if (selectedIps.isEmpty()) listOf("0.0.0.0/0") else selectedIps.toList()
+        } else {
+            // Exclude mode: calculate complement of selected IPs
+            if (selectedIps.isEmpty()) listOf("0.0.0.0/0")
+            else ru.protonmod.next.vpn.IpSubnetCalculator.complementOfExcluded(selectedIps)
+        }
+
         allowedIps.forEach {
             sb.append("allowed_ip=").append(it).append("\n")
         }

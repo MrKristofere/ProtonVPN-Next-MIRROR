@@ -23,7 +23,8 @@ sentry.properties
 /desktop/libs/vpn-helper
 /desktop/libs/libgovpn.so
 /desktop/libs/libgovpn.h
-bin/
+**/bin/
+**/build/
 pkg/
 vendor/./
 

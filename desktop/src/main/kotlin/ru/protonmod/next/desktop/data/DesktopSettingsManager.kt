@@ -38,7 +38,17 @@ data class DesktopSettings(
     val language: String = "en",
     val isFirstRun: Boolean = true,
     val accessToken: String? = null,
-    val sessionId: String? = null
+    val sessionId: String? = null,
+    // Sentry & Analytics
+    val sentryMetricsEnabled: Boolean = true,
+    val sentryCrashReportingEnabled: Boolean = true,
+    val sentryAnalyticsEnabled: Boolean = true,
+    // Split Tunneling
+    val splitTunnelingEnabled: Boolean = false,
+    val splitTunnelingMode: String = "exclude",
+    // Custom DNS
+    val customDns: String = "",
+    val useCustomDns: Boolean = false
 )
 
 class DesktopSettingsManager(private val settingsFile: File = File("settings.json")) {
@@ -131,5 +141,50 @@ class DesktopSettingsManager(private val settingsFile: File = File("settings.jso
 
     fun clearSession() {
         saveSettings(_settings.value.copy(accessToken = null, sessionId = null))
+    }
+
+    // ===== Sentry & Analytics =====
+
+    fun setSentryMetricsEnabled(enabled: Boolean) {
+        saveSettings(_settings.value.copy(sentryMetricsEnabled = enabled))
+    }
+
+    fun setSentryCrashReportingEnabled(enabled: Boolean) {
+        saveSettings(_settings.value.copy(sentryCrashReportingEnabled = enabled))
+    }
+
+    fun setSentryAnalyticsEnabled(enabled: Boolean) {
+        saveSettings(_settings.value.copy(sentryAnalyticsEnabled = enabled))
+    }
+
+    // ===== Split Tunneling =====
+
+    fun setSplitTunnelingEnabled(enabled: Boolean) {
+        saveSettings(_settings.value.copy(splitTunnelingEnabled = enabled))
+    }
+
+    fun setSplitTunnelingMode(mode: String) {
+        if (mode in listOf("exclude", "include")) {
+            saveSettings(_settings.value.copy(splitTunnelingMode = mode))
+        }
+    }
+
+    // ===== Custom DNS =====
+
+    fun setCustomDns(dns: String) {
+        saveSettings(_settings.value.copy(customDns = dns))
+    }
+
+    fun setUseCustomDns(enable: Boolean) {
+        saveSettings(_settings.value.copy(useCustomDns = enable))
+    }
+
+    fun getActiveDns(): String {
+        val s = _settings.value
+        return if (s.useCustomDns && s.customDns.isNotEmpty()) {
+            s.customDns
+        } else {
+            "1.1.1.1"  // Default
+        }
     }
 }

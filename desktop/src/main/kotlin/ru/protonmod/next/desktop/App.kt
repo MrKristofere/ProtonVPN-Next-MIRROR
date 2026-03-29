@@ -29,7 +29,7 @@ import ru.protonmod.next.desktop.ui.components.DesktopConnectionCard
 import ru.protonmod.next.desktop.ui.components.LiquidGlassBottomBar
 import ru.protonmod.next.desktop.ui.screens.*
 import ru.protonmod.next.data.local.ServerLoadDisplayMode
-import ru.protonmod.next.desktop.data.DesktopSettingsManager
+import ru.protonmod.next.desktop.data.*
 import ru.protonmod.next.desktop.ui.components.*
 import ru.protonmod.next.desktop.ui.utils.*
 import ru.protonmod.next.ui.theme.ProtonNextTheme as Theme
@@ -37,12 +37,38 @@ import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
 
 @Composable
 fun App() {
-    val settingsManager = remember { DesktopSettingsManager() }
-    val authClient = remember { DesktopAuthClient() }
-    val vpnClient = remember { DesktopVpnClient(settingsManager) }
-    val viewModel = remember { DesktopLoginViewModel(authClient, vpnClient) }
+    val dataManager = remember { DesktopVpnDataManager() }
+    
+    // Initialize data layer on start
+    LaunchedEffect(Unit) {
+        dataManager.initialize()
+    }
+
+    val settingsManager = dataManager.settingsManager
+    val authClient = remember { DesktopAuthClient(dataManager.sentryManager) }
+    val vpnClient = remember { 
+        DesktopVpnClient(
+            database = dataManager.database,
+            vpnRepository = dataManager.vpnRepository,
+            certificateManager = dataManager.certificateManager,
+            settingsManager = settingsManager,
+            splitTunnelingManager = dataManager.splitTunnelingManager,
+            dnsManager = dataManager.dnsManager,
+            sentryManager = dataManager.sentryManager
+        ) 
+    }
+    val viewModel = remember { 
+        DesktopLoginViewModel(
+            authClient = authClient,
+            vpnClient = vpnClient,
+            database = dataManager.database,
+            certificateManager = dataManager.certificateManager,
+            sentryManager = dataManager.sentryManager
+        ) 
+    }
 
     val uiState by viewModel.uiState.collectAsState()
+    val certificateState by viewModel.certificateState.collectAsState()
     val servers by viewModel.servers.collectAsState()
     val recentConnections by viewModel.recentConnections.collectAsState()
     val connectedServer by viewModel.connectedServer.collectAsState()
@@ -126,9 +152,12 @@ fun App() {
                                     onDisconnect = {
                                         viewModel.disconnect()
                                     },
+                                    certificateState = certificateState,
+                                    onRefreshCert = { viewModel.refreshCertificate() },
                                     settingsManager = settingsManager,
                                     loadDisplayMode = settings.serverLoadDisplayMode,
-                                    countriesViewModel = countriesViewModel
+                                    countriesViewModel = countriesViewModel,
+                                    dataManager = dataManager
                                 )
                             }
                             else -> {
@@ -224,9 +253,12 @@ private fun DashboardScreen(
     onLogout: () -> Unit,
     onConnect: (ServerEntry) -> Unit,
     onDisconnect: () -> Unit,
+    certificateState: ru.protonmod.next.desktop.data.local.CertificateState,
+    onRefreshCert: () -> Unit,
     settingsManager: DesktopSettingsManager,
     loadDisplayMode: ServerLoadDisplayMode,
-    countriesViewModel: DesktopCountriesViewModel
+    countriesViewModel: DesktopCountriesViewModel,
+    dataManager: ru.protonmod.next.desktop.data.DesktopVpnDataManager
 ) {
     val isTablet = isTablet()
 
@@ -241,6 +273,8 @@ private fun DashboardScreen(
                     onLogout = onLogout,
                     onConnect = onConnect,
                     onDisconnect = onDisconnect,
+                    certificateState = certificateState,
+                    onRefreshCert = onRefreshCert,
                     isTablet = isTablet,
                     loadDisplayMode = loadDisplayMode
                 )
@@ -283,6 +317,24 @@ private fun DashboardScreen(
                     settingsManager = settingsManager
                 )
             }
+            MainTarget.SplitTunneling -> {
+                SplitTunnelingScreen(
+                    onBack = { onTargetSelected(MainTarget.Settings) },
+                    manager = dataManager.splitTunnelingManager
+                )
+            }
+            MainTarget.CustomDns -> {
+                CustomDnsScreen(
+                    onBack = { onTargetSelected(MainTarget.Settings) },
+                    manager = dataManager.dnsManager
+                )
+            }
+            MainTarget.ErrorReporting -> {
+                ErrorReportingScreen(
+                    onBack = { onTargetSelected(MainTarget.Settings) },
+                    settingsManager = settingsManager
+                )
+            }
             MainTarget.Profiles -> {
                 ProfilesScreen()
             }
@@ -309,6 +361,8 @@ private fun HomeScreen(
     onLogout: () -> Unit,
     onConnect: (ServerEntry) -> Unit,
     onDisconnect: () -> Unit,
+    certificateState: ru.protonmod.next.desktop.data.local.CertificateState,
+    onRefreshCert: () -> Unit,
     isTablet: Boolean,
     loadDisplayMode: ServerLoadDisplayMode
 ) {
@@ -342,6 +396,11 @@ private fun HomeScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
+                    CertificateBanner(
+                        state = certificateState,
+                        onRefresh = onRefreshCert
+                    )
+
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -414,6 +473,14 @@ private fun HomeScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(top = 80.dp)
             ) {
+                item {
+                    CertificateBanner(
+                        state = certificateState,
+                        onRefresh = onRefreshCert,
+                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp)
+                    )
+                }
+
                 item {
                     Box(
                         modifier = Modifier

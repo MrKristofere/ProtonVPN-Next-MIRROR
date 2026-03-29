@@ -282,7 +282,26 @@
     </plurals>
 
     <string name="st_search_apps_hint">搜索应用</string>
+    <string name="st_enable">启用分流隧道</string>
+    <string name="st_enable_desc">在 VPN 隧道中排除或包含特定的应用、IP 或域名</string>
+    <string name="st_apps_header">应用程序</string>
+    <string name="st_ips_header">IP 地址 / CIDR</string>
+    <string name="st_domains_header">域名</string>
+    <string name="st_add_app">添加应用</string>
+    <string name="st_add_ip">添加 IP 地址</string>
+    <string name="st_add_domain">添加域名</string>
+    <string name="st_input_app_label">可执行文件路径 (例如 /usr/bin/firefox)</string>
+    <string name="st_input_ip_label">IP 或 CIDR (例如 1.1.1.1 或 192.168.1.0/24)</string>
+    <string name="st_input_domain_label">域名 (例如 example.com)</string>
     <string name="st_selected_apps_header">已选择应用 (%1$d)</string>
+    <string name="dns_use_custom">使用自定义 DNS</string>
+    <string name="dns_use_custom_desc">使用自定义 DNS 服务器而不是 Proton 的默认服务器</string>
+    <string name="dns_presets_header">预设</string>
+    <string name="dns_custom_header">自定义</string>
+    <string name="dns_manual_ip">手动配置 IP</string>
+    <string name="dns_input_label">IP 地址 (IPv4 或 IPv6)</string>
+    <string name="sentry_breadcrumbs">事件追踪 (Breadcrumbs)</string>
+    <string name="sentry_breadcrumbs_desc">记录应用事件以实现更好的错误诊断</string>
     <string name="st_available_apps_header">可用应用 (%1$d)</string>
     <string name="st_ip_hint">例如 192.168.1.0/24</string>
     <string name="st_add_ip_desc">添加 IP</string>

@@ -13,6 +13,7 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import ru.protonmod.next.data.network.*
 import ru.protonmod.next.desktop.native.VpnNative
+import ru.protonmod.next.desktop.monitoring.DesktopSentryManager
 import java.util.*
 import kotlin.math.abs
 
@@ -58,7 +59,7 @@ interface DesktopAuthApi {
     ): LoginResponse
 }
 
-class DesktopAuthClient {
+class DesktopAuthClient(private val sentryManager: DesktopSentryManager? = null) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     private val authApi: DesktopAuthApi by lazy {
@@ -81,10 +82,12 @@ class DesktopAuthClient {
 
     suspend fun login(username: String, password: String, captchaToken: String? = null): Result<LoginResponse> {
         try {
+            sentryManager?.addBreadcrumb("Initiating login", "auth")
             val tokenType = if (captchaToken != null) "captcha" else null
             
             // 1. Ensure anonymous session for initial requests
             if (pendingAnonToken == null || pendingAnonUid == null) {
+                sentryManager?.addBreadcrumb("Creating anonymous session", "auth")
                 val challengePayload = pendingChallengePayload ?: buildChallengePayload().also { pendingChallengePayload = it }
                 val anonSession = authApi.createAnonymousSession(challengePayload, captchaToken, tokenType)
                 pendingAnonToken = anonSession.accessToken
@@ -96,10 +99,15 @@ class DesktopAuthClient {
             val bearer = "Bearer $anonToken"
             
             // 2. Get Auth Info
+            sentryManager?.addBreadcrumb("Fetching auth info", "auth")
             val info = authApi.getAuthInfo(bearer, anonUid, AuthInfoRequest(username), captchaToken, tokenType)
-            if (info.code != 1000) return Result.failure(Exception("Auth info failed: ${info.code}"))
+            if (info.code != 1000) {
+                sentryManager?.addBreadcrumb("Auth info failed with code ${info.code}", "auth", level = io.sentry.SentryLevel.ERROR)
+                return Result.failure(Exception("Auth info failed: ${info.code}"))
+            }
             
             // 3. Compute SRP proofs using native bridge
+            sentryManager?.addBreadcrumb("Computing SRP proofs", "auth")
             val proofsStr = VpnNative.INSTANCE.SRPCompute(
                 username, password,
                 info.salt ?: "",
@@ -112,6 +120,7 @@ class DesktopAuthClient {
             val parts = proofsStr.split(" ")
             
             // 4. Perform real login
+            sentryManager?.addBreadcrumb("Performing real login", "auth")
             val loginRequest = LoginRequest(
                 username = username,
                 clientEphemeral = parts[0],
@@ -122,11 +131,14 @@ class DesktopAuthClient {
             
             val response = authApi.performLogin(bearer, anonUid, loginRequest, captchaToken, tokenType)
             if (response.code == 1000) {
+                sentryManager?.addBreadcrumb("Login successful", "auth")
                 return Result.success(response)
             }
+            sentryManager?.addBreadcrumb("Login failed with code ${response.code}", "auth", level = io.sentry.SentryLevel.ERROR)
             return Result.failure(Exception("Login failed: Code ${response.code}"))
             
         } catch (e: Exception) {
+            sentryManager?.addBreadcrumb("Login exception: ${e.message}", "auth", level = io.sentry.SentryLevel.ERROR)
             return handleHttpError(e)
         }
     }

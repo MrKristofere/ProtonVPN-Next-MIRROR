@@ -128,6 +128,12 @@
     <string name="settings_custom_dns_desc">Введите IPv4 или IPv6 адрес. Оставьте пустым, чтобы использовать безопасный DNS Proton по умолчанию.</string>
     <string name="settings_custom_dns_reset">Сбросить</string>
     <string name="settings_custom_dns_placeholder">напр. 1.1.1.1 или 94.140.14.14</string>
+    <string name="dns_use_custom">Использовать свой DNS</string>
+    <string name="dns_use_custom_desc">Использовать сторонний DNS-сервер вместо стандартного от Proton</string>
+    <string name="dns_presets_header">Пресеты</string>
+    <string name="dns_custom_header">Свой вариант</string>
+    <string name="dns_manual_ip">Настроить IP вручную</string>
+    <string name="dns_input_label">IP-адрес (IPv4 или IPv6)</string>
 
     <!-- Customization -->
     <string name="settings_customization">Кастомизация</string>
@@ -167,6 +173,8 @@
     <string name="settings_sentry_metrics_desc">Отслеживание состояния приложения с помощью числовых данных (счетчики, шкалы)</string>
     <string name="settings_sentry_session_replay">Повторы сессий</string>
     <string name="settings_sentry_session_replay_desc">Анонимное воспроизведение взаимодействий для отладки проблем интерфейса</string>
+    <string name="sentry_breadcrumbs">Отслеживание событий (Breadcrumbs)</string>
+    <string name="sentry_breadcrumbs_desc">Запись событий приложения для лучшей диагностики ошибок</string>
 
     <!-- Kill Switch Screen -->
     <string name="kill_switch_title">Kill Switch</string>
@@ -297,6 +305,17 @@
     </plurals>
 
     <string name="st_search_apps_hint">Поиск приложений</string>
+    <string name="st_enable">Включить раздельное туннелирование</string>
+    <string name="st_enable_desc">Исключить или включить определенные приложения, IP или домены в VPN-туннель</string>
+    <string name="st_apps_header">Приложения</string>
+    <string name="st_ips_header">IP-адреса / CIDR</string>
+    <string name="st_domains_header">Домены</string>
+    <string name="st_add_app">Добавить приложение</string>
+    <string name="st_add_ip">Добавить IP-адрес</string>
+    <string name="st_add_domain">Добавить домен</string>
+    <string name="st_input_app_label">Путь к файлу (напр. /usr/bin/firefox)</string>
+    <string name="st_input_ip_label">IP или CIDR (напр. 1.1.1.1 или 192.168.1.0/24)</string>
+    <string name="st_input_domain_label">Имя домена (напр. example.com)</string>
     <string name="st_selected_apps_header">Выбранные приложения (%1$d)</string>
     <string name="st_available_apps_header">Доступные приложения (%1$d)</string>
     <string name="st_ip_hint">например, 192.168.1.0/24</string>

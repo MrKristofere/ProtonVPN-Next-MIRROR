@@ -297,7 +297,26 @@
     </plurals>
 
     <string name="st_search_apps_hint">Пошук додатків</string>
+    <string name="st_enable">Увімкнути роздільне тунелювання</string>
+    <string name="st_enable_desc">Виключити або включити певні додатки, IP або домени у VPN-тунель</string>
+    <string name="st_apps_header">Додатки</string>
+    <string name="st_ips_header">IP-адреси / CIDR</string>
+    <string name="st_domains_header">Домени</string>
+    <string name="st_add_app">Додати додаток</string>
+    <string name="st_add_ip">Додати IP-адресу</string>
+    <string name="st_add_domain">Додати домен</string>
+    <string name="st_input_app_label">Шлях до файлу (напр. /usr/bin/firefox)</string>
+    <string name="st_input_ip_label">IP або CIDR (напр. 1.1.1.1 або 192.168.1.0/24)</string>
+    <string name="st_input_domain_label">Ім\'я домену (напр. example.com)</string>
     <string name="st_selected_apps_header">Вибрані додатки (%1$d)</string>
+    <string name="dns_use_custom">Використовувати свій DNS</string>
+    <string name="dns_use_custom_desc">Використовувати сторонній DNS-сервер замість стандартного від Proton</string>
+    <string name="dns_presets_header">Пресети</string>
+    <string name="dns_custom_header">Свій варіант</string>
+    <string name="dns_manual_ip">Налаштувати IP вручну</string>
+    <string name="dns_input_label">IP-адреса (IPv4 або IPv6)</string>
+    <string name="sentry_breadcrumbs">Відстеження подій (Breadcrumbs)</string>
+    <string name="sentry_breadcrumbs_desc">Запис подій додатка для кращої діагностики помилок</string>
     <string name="st_available_apps_header">Доступні додатки (%1$d)</string>
     <string name="st_ip_hint">напр. 192.168.1.0/24</string>
     <string name="st_add_ip_desc">Додати IP</string>

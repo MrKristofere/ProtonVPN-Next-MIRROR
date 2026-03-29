@@ -7,13 +7,23 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import ru.protonmod.next.desktop.data.local.CertificateState
+import ru.protonmod.next.desktop.data.local.DesktopDatabase
+import ru.protonmod.next.desktop.data.local.DesktopSessionEntity
+import ru.protonmod.next.desktop.monitoring.DesktopSentryManager
+import ru.protonmod.next.desktop.data.repository.DesktopCertificateManager
 
 class DesktopLoginViewModel(
     private val authClient: DesktopAuthClient,
-    private val vpnClient: DesktopVpnClient
+    private val vpnClient: DesktopVpnClient,
+    private val database: DesktopDatabase,
+    private val certificateManager: DesktopCertificateManager,
+    private val sentryManager: DesktopSentryManager? = null
 ) {
     private val job = Job()
     private val scope = CoroutineScope(Dispatchers.IO + job)
+
+    val certificateState = certificateManager.certState
 
     private val _uiState = MutableStateFlow<DesktopLoginUiState>(DesktopLoginUiState.Idle)
     val uiState: StateFlow<DesktopLoginUiState> = _uiState.asStateFlow()
@@ -31,44 +41,75 @@ class DesktopLoginViewModel(
     val connectedServer: StateFlow<ServerEntry?> = _connectedServer.asStateFlow()
 
     fun login(username: String, passwordRaw: String, captchaToken: String? = null) {
+        val startTime = System.currentTimeMillis()
         scope.launch {
             _uiState.value = DesktopLoginUiState.Loading
+            sentryManager?.trackLoginAttempt()
+            
             val result = authClient.login(username, passwordRaw, captchaToken)
             result.onSuccess { response ->
+                val duration = System.currentTimeMillis() - startTime
+                sentryManager?.trackLoginSuccess(duration)
+                
                 val accessToken = response.accessToken.orEmpty()
                 val sessionId = response.sessionId.orEmpty()
                 
-                // Perform one-time VPN setup (key registration) after login
-                val setupResult = vpnClient.setupVpn(accessToken, sessionId)
-                if (setupResult.isSuccess) {
-                    _uiState.value = DesktopLoginUiState.Success(accessToken, sessionId)
-                    loadServers(accessToken, sessionId)
-                } else {
-                    _uiState.value = DesktopLoginUiState.Error("VPN Setup failed: ${setupResult.exceptionOrNull()?.message}")
-                }
+                // Save session to database
+                database.saveSession(DesktopSessionEntity(
+                    accessToken = accessToken,
+                    refreshToken = response.refreshToken.orEmpty(),
+                    sessionId = sessionId,
+                    userId = response.userId.orEmpty(),
+                    userTier = 0 // Default
+                ))
+
+                sentryManager?.setUserContext(username)
+                
+                // Try perform one-time VPN setup (key registration) after login
+                // We proceed even if it fails, as CertificateManager will retry or user can manual refresh
+                vpnClient.setupVpn(accessToken, sessionId)
+                
+                _uiState.value = DesktopLoginUiState.Success(accessToken, sessionId)
+                loadServers(accessToken, sessionId)
             }.onFailure { error ->
+                sentryManager?.trackLoginError(error.message ?: "Unknown login error")
                 handleLoginFailure(error)
             }
         }
     }
 
     fun loginAnonymous(captchaToken: String? = null) {
+        val startTime = System.currentTimeMillis()
         scope.launch {
             _uiState.value = DesktopLoginUiState.Loading
+            sentryManager?.trackLoginAttempt()
+            
             val result = authClient.loginAnonymous(captchaToken)
             result.onSuccess { response ->
+                val duration = System.currentTimeMillis() - startTime
+                sentryManager?.trackLoginSuccess(duration)
+                
                 val accessToken = response.accessToken.orEmpty()
                 val sessionId = response.sessionId.orEmpty()
                 
-                // Perform one-time VPN setup (key registration) after guest login
-                val setupResult = vpnClient.setupVpn(accessToken, sessionId)
-                if (setupResult.isSuccess) {
-                    _uiState.value = DesktopLoginUiState.Success(accessToken, sessionId)
-                    loadServers(accessToken, sessionId)
-                } else {
-                    _uiState.value = DesktopLoginUiState.Error("VPN Setup failed: ${setupResult.exceptionOrNull()?.message}")
-                }
+                // Save anonymous session to database
+                database.saveSession(DesktopSessionEntity(
+                    accessToken = accessToken,
+                    refreshToken = response.refreshToken.orEmpty(),
+                    sessionId = sessionId,
+                    userId = response.userId.orEmpty(),
+                    userTier = 0
+                ))
+
+                sentryManager?.setUserContext("anonymous")
+                
+                // Try perform one-time VPN setup (key registration) after guest login
+                vpnClient.setupVpn(accessToken, sessionId)
+                
+                _uiState.value = DesktopLoginUiState.Success(accessToken, sessionId)
+                loadServers(accessToken, sessionId)
             }.onFailure { error ->
+                sentryManager?.trackLoginError(error.message ?: "Unknown guest login error")
                 handleLoginFailure(error)
             }
         }
@@ -139,6 +180,12 @@ class DesktopLoginViewModel(
         scope.launch {
             vpnClient.disconnect()
             _connectedServer.value = null
+        }
+    }
+
+    fun refreshCertificate() {
+        scope.launch {
+            certificateManager.forceRefreshCertificate()
         }
     }
 

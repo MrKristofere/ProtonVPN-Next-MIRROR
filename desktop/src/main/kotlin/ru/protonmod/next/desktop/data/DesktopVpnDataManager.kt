@@ -17,12 +17,14 @@
 
 package ru.protonmod.next.desktop.data
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.*
 import ru.protonmod.next.desktop.data.local.DesktopDatabase
 import ru.protonmod.next.desktop.data.repository.DesktopVpnRepository
 import ru.protonmod.next.desktop.data.repository.DesktopCertificateManager
+import ru.protonmod.next.desktop.monitoring.DesktopSentryManager
+import ru.protonmod.next.desktop.network.DesktopSplitTunnelingManager
+import ru.protonmod.next.desktop.network.DesktopDnsManager
+import java.io.File
 
 /**
  * Desktop VPN Data Initialization
@@ -31,6 +33,8 @@ import ru.protonmod.next.desktop.data.repository.DesktopCertificateManager
  * - SQLite database for persistence
  * - Server update repository with intelligent caching
  * - Certificate manager with proactive refresh
+ * - Sentry monitoring and analytics
+ * - Split tunneling and DNS management
  *
  * Usage in your main Application class:
  *
@@ -52,6 +56,29 @@ class DesktopVpnDataManager {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     // Lazy initialization of components
+    val settingsManager by lazy { DesktopSettingsManager() }
+    
+    val sentryManager by lazy { 
+        val s = settingsManager.settings.value
+        DesktopSentryManager(
+            isMetricsEnabled = s.sentryMetricsEnabled,
+            isCrashReportingEnabled = s.sentryCrashReportingEnabled,
+            isAnalyticsEnabled = s.sentryAnalyticsEnabled
+        ).also { sm ->
+            // Update Sentry manager reactively when settings change
+            applicationScope.launch {
+                settingsManager.settings.collect { s ->
+                    sm.isMetricsEnabled = s.sentryMetricsEnabled
+                    sm.isCrashReportingEnabled = s.sentryCrashReportingEnabled
+                    sm.isAnalyticsEnabled = s.sentryAnalyticsEnabled
+                }
+            }
+        }
+    }
+    
+    val splitTunnelingManager by lazy { DesktopSplitTunnelingManager(sentryManager = sentryManager) }
+    val dnsManager by lazy { DesktopDnsManager(sentryManager = sentryManager) }
+
     val database by lazy { DesktopDatabase() }
     val vpnRepository by lazy { DesktopVpnRepository(database, applicationScope = applicationScope) }
     val certificateManager by lazy { DesktopCertificateManager(database, vpnRepository, applicationScope) }

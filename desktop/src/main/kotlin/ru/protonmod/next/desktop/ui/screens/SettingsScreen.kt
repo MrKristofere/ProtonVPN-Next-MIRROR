@@ -32,6 +32,8 @@ import ru.protonmod.next.ui.theme.liquidGlass
 import ru.protonmod.next.desktop.ui.utils.isTablet
 import ru.protonmod.next.desktop.ui.MainTarget
 
+import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -48,7 +50,7 @@ fun SettingsScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold, color = colors.textNorm) },
+                title = { Text(Strings.settings_title(), fontWeight = FontWeight.Bold, color = colors.textNorm) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
                     scrolledContainerColor = Color.Transparent
@@ -76,7 +78,7 @@ fun SettingsScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             FeatureCategory(
                                 isTablet = true,
-                                onNavigateToSplitTunneling = { /* Coming soon */ },
+                                onNavigateToSplitTunneling = { navigateTo(MainTarget.SplitTunneling) },
                                 onNavigateToProtocol = { navigateTo(MainTarget.ProtocolSelection) }
                             )
 
@@ -95,7 +97,8 @@ fun SettingsScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             PrivacySettingsSection(
                                 settings = settings,
-                                settingsManager = settingsManager
+                                settingsManager = settingsManager,
+                                navigateTo = navigateTo
                             )
 
                             AboutSettingsSection()
@@ -107,7 +110,7 @@ fun SettingsScreen(
                 item {
                     FeatureCategory(
                         isTablet = false,
-                        onNavigateToSplitTunneling = { /* Coming soon */ },
+                        onNavigateToSplitTunneling = { navigateTo(MainTarget.SplitTunneling) },
                         onNavigateToProtocol = { navigateTo(MainTarget.ProtocolSelection) }
                     )
                 }
@@ -130,7 +133,8 @@ fun SettingsScreen(
                 item {
                     PrivacySettingsSection(
                         settings = settings,
-                        settingsManager = settingsManager
+                        settingsManager = settingsManager,
+                        navigateTo = navigateTo
                     )
                 }
 
@@ -157,10 +161,10 @@ private fun FeatureCategory(
 
         FeatureTile(
             modifier = tileModifier,
-            title = "Split Tunneling",
-            subtitle = "Coming soon",
+            title = Strings.settings_split_tunneling(),
+            subtitle = Strings.settings_split_tunneling_desc(),
             icon = Icons.AutoMirrored.Rounded.AltRoute,
-            isActive = false,
+            isActive = true,
             onClick = onNavigateToSplitTunneling
         )
 
@@ -168,7 +172,7 @@ private fun FeatureCategory(
 
         FeatureTile(
             modifier = tileModifier,
-            title = "Protocol",
+            title = Strings.protocol_title(),
             subtitle = "AmneziaWG",
             icon = Icons.Rounded.Security,
             isActive = true,
@@ -183,26 +187,26 @@ private fun ConnectionSettingsSection(
     settingsManager: DesktopSettingsManager,
     navigateTo: (MainTarget) -> Unit
 ) {
-    Category(title = "Connection") {
+    Category(title = Strings.settings_connection()) {
         SettingToggleRow(
             icon = Icons.Rounded.Autorenew,
-            title = "Auto Connect",
-            subtitle = "Automatically connect when the app starts",
+            title = Strings.settings_auto_connect(),
+            subtitle = Strings.settings_auto_connect_desc(),
             checked = settings.autoConnectEnabled,
             onCheckedChange = { settingsManager.setAutoConnectEnabled(it) }
         )
 
         SettingRowWithIcon(
             icon = Icons.Rounded.CloudSync,
-            title = "API Bypass",
-            subtitle = "Coming soon",
+            title = Strings.settings_api_bypass(),
+            subtitle = Strings.settings_api_bypass_desc(),
             onClick = { /* Coming soon */ }
         )
 
         SettingRowWithIcon(
             icon = Icons.Rounded.Numbers,
-            title = "VPN Port",
-            subtitle = if (settings.vpnPort == 0) "Automatic" else settings.vpnPort.toString(),
+            title = Strings.settings_port(),
+            subtitle = if (settings.vpnPort == 0) Strings.settings_port_auto() else settings.vpnPort.toString(),
             onClick = { /* Implement port selection if needed */ }
         )
     }
@@ -213,17 +217,17 @@ private fun CustomizationSettingsSection(
     settings: ru.protonmod.next.desktop.data.DesktopSettings,
     navigateTo: (MainTarget) -> Unit
 ) {
-    Category(title = "Customization") {
+    Category(title = Strings.settings_customization()) {
         SettingRowWithIcon(
             icon = Icons.Rounded.Palette,
-            title = "App Theme",
+            title = Strings.settings_app_theme(),
             subtitle = settings.appTheme.name,
             onClick = { navigateTo(MainTarget.ThemeSelection) }
         )
 
         SettingRowWithIcon(
             icon = Icons.Rounded.BarChart,
-            title = "Server Load Display",
+            title = Strings.settings_load_display_mode(),
             subtitle = settings.serverLoadDisplayMode.name,
             onClick = { navigateTo(MainTarget.ServerLoadSelection) }
         )
@@ -233,42 +237,43 @@ private fun CustomizationSettingsSection(
 @Composable
 private fun PrivacySettingsSection(
     settings: ru.protonmod.next.desktop.data.DesktopSettings,
-    settingsManager: DesktopSettingsManager
+    settingsManager: DesktopSettingsManager,
+    navigateTo: (MainTarget) -> Unit
 ) {
-    Category(title = "Privacy & Security") {
+    Category(title = Strings.settings_privacy()) {
         SettingRowWithIcon(
             icon = Icons.Rounded.Dns,
-            title = "Custom DNS",
-            subtitle = "Coming soon",
-            onClick = { /* Coming soon */ }
+            title = Strings.settings_custom_dns(),
+            subtitle = if (settings.useCustomDns) settings.customDns else Strings.settings_custom_dns_default(),
+            onClick = { navigateTo(MainTarget.CustomDns) }
         )
 
         SettingRowWithIcon(
             icon = Icons.Rounded.GppMaybe,
-            title = "Kill Switch",
-            subtitle = "Block traffic when VPN is disconnected",
+            title = Strings.settings_kill_switch(),
+            subtitle = Strings.kill_switch_desc(),
             onClick = { /* Functionality handled by toggle below, or dedicated screen */ }
         )
         
         SettingToggleRow(
             icon = Icons.Rounded.GppGood,
-            title = "Kill Switch",
-            subtitle = if (settings.killSwitchEnabled) "Enabled" else "Disabled",
+            title = Strings.settings_kill_switch(),
+            subtitle = if (settings.killSwitchEnabled) Strings.settings_on() else Strings.settings_off(),
             checked = settings.killSwitchEnabled,
             onCheckedChange = { settingsManager.setKillSwitchEnabled(it) }
         )
 
         SettingRowWithIcon(
             icon = Icons.Rounded.BugReport,
-            title = "Error Reporting",
-            subtitle = "Coming soon",
-            onClick = { /* Coming soon */ }
+            title = Strings.settings_error_reporting(),
+            subtitle = Strings.settings_error_reporting_desc(),
+            onClick = { navigateTo(MainTarget.ErrorReporting) }
         )
 
         SettingToggleRow(
             icon = Icons.Rounded.Notifications,
-            title = "Notifications",
-            subtitle = "Enabled",
+            title = Strings.settings_notifications(),
+            subtitle = if (settings.notificationsEnabled) Strings.settings_on() else Strings.settings_off(),
             checked = settings.notificationsEnabled,
             onCheckedChange = { /* Implement in manager */ }
         )
@@ -277,18 +282,18 @@ private fun PrivacySettingsSection(
 
 @Composable
 private fun AboutSettingsSection() {
-    Category(title = "About") {
+    Category(title = Strings.settings_about()) {
         SettingRowWithIcon(
             icon = Icons.Rounded.Info,
             title = "Version",
-            subtitle = "1.0.0-desktop",
+            subtitle = Strings.settings_version("1.0.0-desktop"),
             onClick = {}
         )
         
         SettingRowWithIcon(
             icon = Icons.Rounded.BugReport,
-            title = "Debug",
-            subtitle = "Developer settings",
+            title = Strings.settings_debug(),
+            subtitle = Strings.debug_title(),
             onClick = { /* Coming soon */ }
         )
     }

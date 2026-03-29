@@ -287,7 +287,26 @@
     </plurals>
 
     <string name="st_search_apps_hint">جستجوی برنامه‌ها</string>
+    <string name="st_enable">فعال‌سازی تونل‌زنی تقسیم‌شده</string>
+    <string name="st_enable_desc">استثنا کردن یا گنجاندن برنامه‌ها، IPها یا دامنه‌های خاص در تونل VPN</string>
+    <string name="st_apps_header">برنامه‌ها</string>
+    <string name="st_ips_header">آدرس‌های IP / CIDR</string>
+    <string name="st_domains_header">دامنه‌ها</string>
+    <string name="st_add_app">افزودن برنامه</string>
+    <string name="st_add_ip">افزودن آدرس IP</string>
+    <string name="st_add_domain">افزودن دامنه</string>
+    <string name="st_input_app_label">مسیر فایل اجرایی (مثلاً /usr/bin/firefox)</string>
+    <string name="st_input_ip_label">IP یا CIDR (مثلاً 1.1.1.1 یا 192.168.1.0/24)</string>
+    <string name="st_input_domain_label">نام دامنه (مثلاً example.com)</string>
     <string name="st_selected_apps_header">برنامه‌های انتخاب شده (%1$d)</string>
+    <string name="dns_use_custom">استفاده از DNS سفارشی</string>
+    <string name="dns_use_custom_desc">استفاده از سرور DNS سفارشی به جای پیش‌فرض Proton</string>
+    <string name="dns_presets_header">پیش‌فرض‌ها</string>
+    <string name="dns_custom_header">سفارشی</string>
+    <string name="dns_manual_ip">تنظیم دستی IP</string>
+    <string name="dns_input_label">آدرس IP (IPv4 یا IPv6)</string>
+    <string name="sentry_breadcrumbs">ردیابی رویدادها (Breadcrumbs)</string>
+    <string name="sentry_breadcrumbs_desc">ثبت رویدادهای برنامه برای تشخیص بهتر خطاها</string>
     <string name="st_available_apps_header">برنامه‌های موجود (%1$d)</string>
     <string name="st_ip_hint">مثلاً 192.168.1.0/24</string>
     <string name="st_add_ip_desc">افزودن IP</string>
