@@ -48,7 +48,7 @@ fun LiquidGlassBottomBar(
 
     Box(
         modifier = modifier
-            .padding(horizontal = 24.dp, vertical = 24.dp)
+            .padding(horizontal = 24.dp)
             .shadow(15.dp, glassShape)
             .clip(glassShape)
             .background(glassBackgroundColor)

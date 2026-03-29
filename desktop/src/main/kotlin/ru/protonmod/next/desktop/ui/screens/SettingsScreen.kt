@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.AltRoute
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -19,63 +18,21 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.border
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import ru.protonmod.next.data.local.ServerLoadDisplayMode
 import ru.protonmod.next.ui.theme.AppTheme
 import ru.protonmod.next.desktop.data.DesktopSettingsManager
 import ru.protonmod.next.ui.theme.ProtonNextTheme
+import ru.protonmod.next.ui.theme.liquidGlass
 import ru.protonmod.next.desktop.ui.utils.isTablet
 import ru.protonmod.next.desktop.ui.MainTarget
 
-@Composable
-fun Modifier.liquidGlass(
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(24.dp),
-    alpha: Float = 0.4f,
-    borderAlpha: Float = 0.1f,
-    shadowElevation: androidx.compose.ui.unit.Dp = 0.dp
-): Modifier {
-    val colors = ProtonNextTheme.colors
-    val isDark = colors.isDark
-    
-    val highlightColor = if (isDark) Color.White else Color.Black
-    
-    val borderBrush = Brush.verticalGradient(
-        colors = listOf(
-            highlightColor.copy(alpha = borderAlpha),
-            Color.Transparent
-        )
-    )
-
-    val glassBackgroundColor = colors.backgroundSecondary.copy(alpha = alpha)
-
-    return this
-        .then(
-            if (shadowElevation > 0.dp) {
-                Modifier.shadow(
-                    elevation = shadowElevation,
-                    shape = shape,
-                    clip = false,
-                    ambientColor = Color.Black.copy(alpha = 0.05f),
-                    spotColor = Color.Black.copy(alpha = 0.1f)
-                )
-            } else Modifier
-        )
-        .clip(shape)
-        .background(glassBackgroundColor)
-        .border(
-            width = 0.8.dp,
-            brush = borderBrush,
-            shape = shape
-        )
-}
+import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,7 +50,7 @@ fun SettingsScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold, color = colors.textNorm) },
+                title = { Text(Strings.settings_title(), fontWeight = FontWeight.Bold, color = colors.textNorm) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
                     scrolledContainerColor = Color.Transparent
@@ -102,159 +59,240 @@ fun SettingsScreen(
             )
         }
     ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(paddingValues),
+            horizontalAlignment = if (isTablet) Alignment.CenterHorizontally else Alignment.Start,
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = 16.dp,
+                bottom = 16.dp
+            )
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = if (isTablet) Alignment.CenterHorizontally else Alignment.Start,
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 16.dp,
-                    bottom = if (isTablet) 140.dp else 120.dp
-                )
-            ) {
-                if (isTablet) {
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .widthIn(max = 1000.dp)
-                                .fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(32.dp)
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                FeatureCategory(
-                                    isTablet = true,
-                                    obfuscationEnabled = settings.obfuscationEnabled,
-                                    onObfuscationToggle = { navigateTo(MainTarget.ObfuscationSettings) }
-                                )
-
-                                Category(title = "Connection") {
-                                    SettingRowWithIcon(
-                                        icon = Icons.Rounded.Security,
-                                        title = "Protocol",
-                                        subtitle = "AmneziaWG",
-                                        onClick = { navigateTo(MainTarget.ProtocolSelection) }
-                                    )
-                                    SettingToggleRow(
-                                        icon = Icons.Rounded.Autorenew,
-                                        title = "Auto Connect",
-                                        subtitle = "Automatically connect when the app starts",
-                                        checked = settings.autoConnectEnabled,
-                                        onCheckedChange = { settingsManager.setAutoConnectEnabled(it) }
-                                    )
-                                    SettingRowWithIcon(
-                                        icon = Icons.Rounded.Numbers,
-                                        title = "VPN Port",
-                                        subtitle = if (settings.vpnPort == 0) "Automatic" else settings.vpnPort.toString(),
-                                        onClick = { /* Implement port selection dialog if needed */ }
-                                    )
-                                    SettingRowWithIcon(
-                                        icon = Icons.Rounded.BarChart,
-                                        title = "Server Load Display",
-                                        subtitle = settings.serverLoadDisplayMode.name,
-                                        onClick = { navigateTo(MainTarget.ServerLoadSelection) }
-                                    )
-                                }
-                            }
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Category(title = "Appearance") {
-                                    SettingRowWithIcon(
-                                        icon = Icons.Rounded.Palette,
-                                        title = "App Theme",
-                                        subtitle = settings.appTheme.name,
-                                        onClick = { navigateTo(MainTarget.ThemeSelection) }
-                                    )
-                                }
-                                Category(title = "Privacy & Security") {
-                                    SettingToggleRow(
-                                        icon = Icons.Rounded.GppGood,
-                                        title = "Kill Switch",
-                                        subtitle = "Block traffic when VPN is disconnected",
-                                        checked = settings.killSwitchEnabled,
-                                        onCheckedChange = { settingsManager.setKillSwitchEnabled(it) }
-                                    )
-                                }
-
-                                Category(title = "About") {
-                                    SettingRowWithIcon(
-                                        icon = Icons.Rounded.Info,
-                                        title = "Version",
-                                        subtitle = "1.0.0-desktop",
-                                        onClick = {}
-                                    )
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // Phone Layout (Narrow window)
-                    item {
-                        FeatureCategory(
-                            isTablet = false,
-                            obfuscationEnabled = settings.obfuscationEnabled,
-                            onObfuscationToggle = { navigateTo(MainTarget.ObfuscationSettings) }
-                        )
-                    }
-
-                    item {
-                        Category(title = "Connection") {
-                            SettingRowWithIcon(
-                                icon = Icons.Rounded.Security,
-                                title = "Protocol",
-                                subtitle = "AmneziaWG",
-                                onClick = { navigateTo(MainTarget.ProtocolSelection) }
+            if (isTablet) {
+                item {
+                    Row(
+                        modifier = Modifier.widthIn(max = 1000.dp).fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(32.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            FeatureCategory(
+                                isTablet = true,
+                                onNavigateToSplitTunneling = { /* Coming soon */ },
+                                onNavigateToProtocol = { navigateTo(MainTarget.ProtocolSelection) }
                             )
-                            SettingToggleRow(
-                                icon = Icons.Rounded.Autorenew,
-                                title = "Auto Connect",
-                                subtitle = "Automatically connect when the app starts",
-                                checked = settings.autoConnectEnabled,
-                                onCheckedChange = { settingsManager.setAutoConnectEnabled(it) }
+
+                            ConnectionSettingsSection(
+                                settings = settings,
+                                settingsManager = settingsManager,
+                                navigateTo = navigateTo
+                            )
+
+                            CustomizationSettingsSection(
+                                settings = settings,
+                                navigateTo = navigateTo
                             )
                         }
-                    }
 
-                    item {
-                        Category(title = "Appearance") {
-                            SettingRowWithIcon(
-                                icon = Icons.Rounded.Palette,
-                                title = "App Theme",
-                                subtitle = settings.appTheme.name,
-                                onClick = { navigateTo(MainTarget.ThemeSelection) }
+                        Column(modifier = Modifier.weight(1f)) {
+                            PrivacySettingsSection(
+                                settings = settings,
+                                settingsManager = settingsManager
                             )
-                        }
-                    }
 
-                    item {
-                        Category(title = "Privacy & Security") {
-                            SettingToggleRow(
-                                icon = Icons.Rounded.GppGood,
-                                title = "Kill Switch",
-                                subtitle = "Block traffic when VPN is disconnected",
-                                checked = settings.killSwitchEnabled,
-                                onCheckedChange = { settingsManager.setKillSwitchEnabled(it) }
-                            )
-                        }
-                    }
-
-                    item {
-                        Category(title = "About") {
-                            SettingRowWithIcon(
-                                icon = Icons.Rounded.Info,
-                                title = "Version",
-                                subtitle = "1.0.0-desktop",
-                                onClick = {}
-                            )
+                            AboutSettingsSection()
                         }
                     }
                 }
+            } else {
+                // Phone Layout
+                item {
+                    FeatureCategory(
+                        isTablet = false,
+                        onNavigateToSplitTunneling = { /* Coming soon */ },
+                        onNavigateToProtocol = { navigateTo(MainTarget.ProtocolSelection) }
+                    )
+                }
+
+                item {
+                    ConnectionSettingsSection(
+                        settings = settings,
+                        settingsManager = settingsManager,
+                        navigateTo = navigateTo
+                    )
+                }
+
+                item {
+                    CustomizationSettingsSection(
+                        settings = settings,
+                        navigateTo = navigateTo
+                    )
+                }
+
+                item {
+                    PrivacySettingsSection(
+                        settings = settings,
+                        settingsManager = settingsManager
+                    )
+                }
+
+                item {
+                    AboutSettingsSection()
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun FeatureCategory(
+    isTablet: Boolean,
+    onNavigateToSplitTunneling: () -> Unit,
+    onNavigateToProtocol: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        horizontalArrangement = if (isTablet) Arrangement.Start else Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val tileModifier = if (isTablet) Modifier.size(160.dp) else Modifier.weight(1f)
+
+        FeatureTile(
+            modifier = tileModifier,
+            title = "Split Tunneling",
+            subtitle = "Coming soon",
+            icon = Icons.AutoMirrored.Rounded.AltRoute,
+            isActive = false,
+            onClick = onNavigateToSplitTunneling
+        )
+
+        if (isTablet) Spacer(modifier = Modifier.width(16.dp))
+
+        FeatureTile(
+            modifier = tileModifier,
+            title = "Protocol",
+            subtitle = "AmneziaWG",
+            icon = Icons.Rounded.Security,
+            isActive = true,
+            onClick = onNavigateToProtocol
+        )
+    }
+}
+
+@Composable
+private fun ConnectionSettingsSection(
+    settings: ru.protonmod.next.desktop.data.DesktopSettings,
+    settingsManager: DesktopSettingsManager,
+    navigateTo: (MainTarget) -> Unit
+) {
+    Category(title = "Connection") {
+        SettingToggleRow(
+            icon = Icons.Rounded.Autorenew,
+            title = "Auto Connect",
+            subtitle = "Automatically connect when the app starts",
+            checked = settings.autoConnectEnabled,
+            onCheckedChange = { settingsManager.setAutoConnectEnabled(it) }
+        )
+
+        SettingRowWithIcon(
+            icon = Icons.Rounded.CloudSync,
+            title = "API Bypass",
+            subtitle = "Coming soon",
+            onClick = { /* Coming soon */ }
+        )
+
+        SettingRowWithIcon(
+            icon = Icons.Rounded.Numbers,
+            title = "VPN Port",
+            subtitle = if (settings.vpnPort == 0) "Automatic" else settings.vpnPort.toString(),
+            onClick = { /* Implement port selection if needed */ }
+        )
+    }
+}
+
+@Composable
+private fun CustomizationSettingsSection(
+    settings: ru.protonmod.next.desktop.data.DesktopSettings,
+    navigateTo: (MainTarget) -> Unit
+) {
+    Category(title = "Customization") {
+        SettingRowWithIcon(
+            icon = Icons.Rounded.Palette,
+            title = "App Theme",
+            subtitle = settings.appTheme.name,
+            onClick = { navigateTo(MainTarget.ThemeSelection) }
+        )
+
+        SettingRowWithIcon(
+            icon = Icons.Rounded.BarChart,
+            title = "Server Load Display",
+            subtitle = settings.serverLoadDisplayMode.name,
+            onClick = { navigateTo(MainTarget.ServerLoadSelection) }
+        )
+    }
+}
+
+@Composable
+private fun PrivacySettingsSection(
+    settings: ru.protonmod.next.desktop.data.DesktopSettings,
+    settingsManager: DesktopSettingsManager
+) {
+    Category(title = "Privacy & Security") {
+        SettingRowWithIcon(
+            icon = Icons.Rounded.Dns,
+            title = "Custom DNS",
+            subtitle = "Coming soon",
+            onClick = { /* Coming soon */ }
+        )
+
+        SettingRowWithIcon(
+            icon = Icons.Rounded.GppMaybe,
+            title = "Kill Switch",
+            subtitle = "Block traffic when VPN is disconnected",
+            onClick = { /* Functionality handled by toggle below, or dedicated screen */ }
+        )
+        
+        SettingToggleRow(
+            icon = Icons.Rounded.GppGood,
+            title = "Kill Switch",
+            subtitle = if (settings.killSwitchEnabled) "Enabled" else "Disabled",
+            checked = settings.killSwitchEnabled,
+            onCheckedChange = { settingsManager.setKillSwitchEnabled(it) }
+        )
+
+        SettingRowWithIcon(
+            icon = Icons.Rounded.BugReport,
+            title = "Error Reporting",
+            subtitle = "Coming soon",
+            onClick = { /* Coming soon */ }
+        )
+
+        SettingToggleRow(
+            icon = Icons.Rounded.Notifications,
+            title = "Notifications",
+            subtitle = "Enabled",
+            checked = settings.notificationsEnabled,
+            onCheckedChange = { /* Implement in manager */ }
+        )
+    }
+}
+
+@Composable
+private fun AboutSettingsSection() {
+    Category(title = "About") {
+        SettingRowWithIcon(
+            icon = Icons.Rounded.Info,
+            title = "Version",
+            subtitle = "1.0.0-desktop",
+            onClick = {}
+        )
+        
+        SettingRowWithIcon(
+            icon = Icons.Rounded.BugReport,
+            title = "Debug",
+            subtitle = "Developer settings",
+            onClick = { /* Coming soon */ }
+        )
     }
 }
 
@@ -381,43 +419,6 @@ fun SettingToggleRow(
                 uncheckedThumbColor = colors.textWeak,
                 uncheckedTrackColor = colors.backgroundSecondary
             )
-        )
-    }
-}
-
-@Composable
-private fun FeatureCategory(
-    isTablet: Boolean = false,
-    obfuscationEnabled: Boolean,
-    onObfuscationToggle: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 12.dp),
-        horizontalArrangement = if (isTablet) Arrangement.Start else Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        val tileModifier = if (isTablet) Modifier.size(160.dp) else Modifier.weight(1f)
-
-        FeatureTile(
-            modifier = tileModifier,
-            title = "Split Tunneling",
-            subtitle = "Coming Soon",
-            icon = Icons.AutoMirrored.Rounded.AltRoute,
-            isActive = false,
-            onClick = { }
-        )
-
-        if (isTablet) Spacer(modifier = Modifier.width(16.dp))
-
-        FeatureTile(
-            modifier = tileModifier,
-            title = "Obfuscation",
-            subtitle = if (obfuscationEnabled) "On" else "Off",
-            icon = Icons.Rounded.Security,
-            isActive = obfuscationEnabled,
-            onClick = onObfuscationToggle
         )
     }
 }

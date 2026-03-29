@@ -41,6 +41,7 @@ import ru.protonmod.next.ui.theme.AppTheme
 import ru.protonmod.next.ui.theme.LocalColors
 import ru.protonmod.next.ui.theme.ProtonColors
 import ru.protonmod.next.ui.theme.ProtonNextTheme
+import ru.protonmod.next.ui.theme.liquidGlass
 
 import ru.protonmod.next.data.local.ServerLoadDisplayMode
 import ru.protonmod.next.desktop.ServerEntry
@@ -80,7 +81,7 @@ fun ServerLoadDisplayModeScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(ServerLoadDisplayMode.entries) { mode ->
@@ -140,7 +141,7 @@ fun LoadModePreviewCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = colors.backgroundSecondary.copy(alpha = 0.8f)),
-                border = androidx.compose.foundation.BorderStroke(1.dp, colors.shade100.copy(alpha = 0.05f))
+                border = BorderStroke(1.dp, colors.shade100.copy(alpha = 0.05f))
             ) {
                 Column {
                     Row(
@@ -221,7 +222,7 @@ fun ThemeSelectionScreen(
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 180.dp),
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -380,7 +381,8 @@ fun MiniDashboardPreview(theme: AppTheme) {
 fun ProtocolSelectionScreen(
     currentProtocol: String,
     onBack: () -> Unit,
-    onProtocolSelected: (String) -> Unit
+    onProtocolSelected: (String) -> Unit,
+    onNavigateToObfuscation: () -> Unit
 ) {
     val colors = ProtonNextTheme.colors
     val protocols = listOf("AmneziaWG")
@@ -439,6 +441,19 @@ fun ProtocolSelectionScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = colors.textWeak
                                 )
+                            }
+
+                            if (protocol == "AmneziaWG") {
+                                IconButton(
+                                    onClick = onNavigateToObfuscation,
+                                    modifier = Modifier.padding(end = 8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Settings,
+                                        contentDescription = "Obfuscation Settings",
+                                        tint = colors.brandNorm
+                                    )
+                                }
                             }
 
                             if (isSelected) {
