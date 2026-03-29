@@ -29,6 +29,7 @@ import ru.protonmod.next.data.network.*
 import ru.protonmod.next.desktop.data.local.DesktopDatabase
 import ru.protonmod.next.desktop.data.local.DesktopServerEntity
 import ru.protonmod.next.desktop.data.local.DesktopServersCacheEntity
+import ru.protonmod.next.desktop.data.local.DesktopRecentConnectionEntity
 import ru.protonmod.next.desktop.network.DesktopHeadersInterceptor
 import ru.protonmod.next.desktop.network.DesktopNetworkConstants
 import java.util.concurrent.TimeUnit
@@ -142,6 +143,16 @@ class DesktopVpnRepository(
     fun stopAutoUpdate() {
         autoUpdateJob?.cancel()
         autoUpdateJob = null
+    }
+
+    // ===== Recent Connections =====
+
+    suspend fun getRecentConnections(): List<DesktopRecentConnectionEntity> {
+        return database.getRecentConnections()
+    }
+
+    suspend fun addRecentConnection(entity: DesktopRecentConnectionEntity) {
+        database.addRecentConnection(entity)
     }
 
     /**

@@ -473,5 +473,11 @@
     <string name="captcha_title">Праверка на чалавечнасць</string>
     <string name="captcha_message">Для забеспячэння бяспекі акаўнта, калі ласка, прайдзіце праверку ніжэй.</string>
     <string name="captcha_proxy_active">Антыблакіровачны проксі актыўны</string>
-    <string name="desc_close">Закрыць</string>
+    <string name="desc_close">Зачыніць</string>
+    <string name="qc_title">Налада хуткага падключэння</string>
+    <string name="qc_fastest">Самы хуткі сервер</string>
+    <string name="qc_fastest_desc">Заўсёды падключацца да самага хуткага даступнага сервера</string>
+    <string name="qc_recent">Апошні выкарыстаны</string>
+    <string name="qc_recent_desc">Падключыцца да сервера з вашай апошняй сесіі</string>
+    <string name="qc_header_recent">НЯДАЎНІЯ СЕРВЕРЫ</string>
 </resources>

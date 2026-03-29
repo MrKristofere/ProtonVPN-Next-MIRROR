@@ -107,6 +107,17 @@ data class DesktopServersCacheEntity(
 )
 
 /**
+ * Desktop equivalent of Android's RecentConnectionEntity
+ */
+data class DesktopRecentConnectionEntity(
+    val serverId: String,
+    val serverName: String,
+    val city: String,
+    val country: String,
+    val lastConnectedAt: Long
+)
+
+/**
  * Certificate state management
  */
 sealed class CertificateState {

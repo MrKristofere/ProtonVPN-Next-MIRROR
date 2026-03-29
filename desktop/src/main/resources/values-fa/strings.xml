@@ -464,4 +464,10 @@
     <string name="captcha_message">برای ایمن نگه داشتن حساب خود، لطفاً تأیید زیر را کامل کنید.</string>
     <string name="captcha_proxy_active">پراکسی ضد مسدودسازی فعال است</string>
     <string name="desc_close">بستن</string>
+    <string name="qc_title">تنظیمات اتصال سریع</string>
+    <string name="qc_fastest">سریع‌ترین سرور</string>
+    <string name="qc_fastest_desc">همیشه به سریع‌ترین سرور موجود متصل شوید</string>
+    <string name="qc_recent">آخرین اتصال</string>
+    <string name="qc_recent_desc">به سرور آخرین نشست خود متصل شوید</string>
+    <string name="qc_header_recent">سرورهای اخیر</string>
 </resources>

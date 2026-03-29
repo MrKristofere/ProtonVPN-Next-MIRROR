@@ -473,4 +473,10 @@
     <string name="captcha_message">Для обеспечения безопасности аккаунта, пожалуйста, пройдите проверку ниже.</string>
     <string name="captcha_proxy_active">Антиблокировочный прокси активен</string>
     <string name="desc_close">Закрыть</string>
+    <string name="qc_title">Настройка быстрого подключения</string>
+    <string name="qc_fastest">Самый быстрый сервер</string>
+    <string name="qc_fastest_desc">Всегда подключаться к самому быстрому серверу</string>
+    <string name="qc_recent">Последний использованный</string>
+    <string name="qc_recent_desc">Подключиться к серверу из прошлой сессии</string>
+    <string name="qc_header_recent">НЕДАВНИЕ СЕРВЕРЫ</string>
 </resources>

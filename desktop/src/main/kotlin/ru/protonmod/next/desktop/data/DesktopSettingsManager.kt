@@ -48,7 +48,10 @@ data class DesktopSettings(
     val splitTunnelingMode: String = "exclude",
     // Custom DNS
     val customDns: String = "",
-    val useCustomDns: Boolean = false
+    val useCustomDns: Boolean = false,
+    // Quick Connect
+    val quickConnectStrategy: String = "fastest",
+    val quickConnectTargetId: String? = null
 )
 
 class DesktopSettingsManager(private val settingsFile: File = File("settings.json")) {
@@ -177,6 +180,15 @@ class DesktopSettingsManager(private val settingsFile: File = File("settings.jso
 
     fun setUseCustomDns(enable: Boolean) {
         saveSettings(_settings.value.copy(useCustomDns = enable))
+    }
+
+    // ===== Quick Connect =====
+
+    fun setQuickConnectStrategy(strategy: String, targetId: String? = null) {
+        saveSettings(_settings.value.copy(
+            quickConnectStrategy = strategy,
+            quickConnectTargetId = targetId
+        ))
     }
 
     fun getActiveDns(): String {

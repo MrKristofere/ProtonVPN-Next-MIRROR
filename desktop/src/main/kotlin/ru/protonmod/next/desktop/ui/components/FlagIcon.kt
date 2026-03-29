@@ -55,6 +55,7 @@ fun FlagIcon(
 
         val normalizedCode = when (val code = countryCode.lowercase()) {
             "uk" -> "gb"
+            "fastest" -> "fastest"
             else -> code
         }
         val resourcePath = "drawable/flag_$normalizedCode.xml"

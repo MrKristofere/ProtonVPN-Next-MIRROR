@@ -463,4 +463,10 @@
     <string name="captcha_message">To keep your account secure, please complete the verification below.</string>
     <string name="captcha_proxy_active">Anti-blocking proxy is active</string>
     <string name="desc_close">Close</string>
+    <string name="qc_title">Quick Connect Configuration</string>
+    <string name="qc_fastest">Fastest Server</string>
+    <string name="qc_fastest_desc">Always connect to the fastest available server</string>
+    <string name="qc_recent">Last Connected</string>
+    <string name="qc_recent_desc">Connect to the server from your last session</string>
+    <string name="qc_header_recent">RECENT SERVERS</string>
 </resources>

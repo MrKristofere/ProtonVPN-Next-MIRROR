@@ -146,4 +146,12 @@ object DesktopStrings {
     @Composable fun sentry_analytics_desc() = get("settings_analytics_desc")
     @Composable fun sentry_breadcrumbs() = get("sentry_breadcrumbs")
     @Composable fun sentry_breadcrumbs_desc() = get("sentry_breadcrumbs_desc")
+    
+    // Quick Connect
+    @Composable fun qc_title() = get("qc_title")
+    @Composable fun qc_fastest() = get("qc_fastest")
+    @Composable fun qc_fastest_desc() = get("qc_fastest_desc")
+    @Composable fun qc_recent() = get("qc_recent")
+    @Composable fun qc_recent_desc() = get("qc_recent_desc")
+    @Composable fun qc_header_recent() = get("qc_header_recent")
 }

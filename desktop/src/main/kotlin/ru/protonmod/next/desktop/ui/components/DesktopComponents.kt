@@ -11,10 +11,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Public
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Terminal
+import androidx.compose.material.icons.automirrored.rounded.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import ru.protonmod.next.desktop.ui.MainTarget
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.ui.utils.CommonCountryUtils
+import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
 
 @Composable
 fun LiquidGlassBottomBar(
@@ -112,11 +111,14 @@ fun DesktopConnectionCard(
     countryCode: String,
     cityName: String = "",
     ipAddress: String,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
+    onChangeStrategy: () -> Unit = {},
+    quickConnectStrategy: String = "fastest"
 ) {
     val colors = ProtonNextTheme.colors
-    val countryName = CommonCountryUtils.getCountryName(countryCode).ifBlank { countryCode }
-    val displayLocation = if (cityName.isNotEmpty()) "$countryName, $cityName" else countryName
+    val countryName: String = if (countryCode == "fastest") Strings.get("qc_fastest") 
+                      else CommonCountryUtils.getCountryName(countryCode).ifBlank { countryCode }
+    val displayLocation: String = if (cityName.isNotEmpty()) "$countryName, $cityName" else countryName
     
     val cardContainerColor = when {
         isConnected -> colors.notificationSuccess.copy(alpha = 0.18f)
@@ -135,7 +137,10 @@ fun DesktopConnectionCard(
         )
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Text(
                     text = if (isConnected) "CONNECTED" else if (isConnecting) "CONNECTING..." else "NOT CONNECTED",
                     style = MaterialTheme.typography.labelLarge,
@@ -158,20 +163,41 @@ fun DesktopConnectionCard(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable(enabled = !isConnecting) { onChangeStrategy() }
+                    .padding(vertical = 8.dp)
+            ) {
                 Box(
                     modifier = Modifier.size(48.dp, 32.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(colors.backgroundNorm),
                     contentAlignment = Alignment.Center
                 ) {
-                    FlagIcon(countryCode = countryCode, size = DpSize(48.dp, 32.dp))
+                    if (isConnected || isConnecting || countryCode.length == 2) {
+                        FlagIcon(countryCode = countryCode, size = DpSize(48.dp, 32.dp))
+                    } else {
+                        val strategyIcon = when (quickConnectStrategy) {
+                            "recent" -> Icons.Rounded.History
+                            else -> Icons.Rounded.Speed
+                        }
+                        Icon(strategyIcon, null, tint = colors.brandNorm)
+                    }
                 }
                 Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(displayLocation, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(displayLocation.ifBlank { "Quick Connect" }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(serverName, style = MaterialTheme.typography.bodyMedium, color = colors.textWeak)
                 }
+                
+                Icon(
+                    imageVector = Icons.Rounded.ChevronRight,
+                    contentDescription = "Change Strategy",
+                    tint = colors.iconWeak.copy(alpha = 0.5f)
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))

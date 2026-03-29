@@ -62,6 +62,7 @@ fun App() {
             authClient = authClient,
             vpnClient = vpnClient,
             database = dataManager.database,
+            vpnRepository = dataManager.vpnRepository,
             certificateManager = dataManager.certificateManager,
             sentryManager = dataManager.sentryManager
         ) 
@@ -156,6 +157,9 @@ fun App() {
                                     },
                                     onConnect = { server ->
                                         viewModel.connectToServer(server)
+                                    },
+                                    onQuickConnect = { strategy, targetId ->
+                                        viewModel.quickConnect(strategy, targetId)
                                     },
                                     onDisconnect = {
                                         viewModel.disconnect()
@@ -262,6 +266,7 @@ private fun DashboardScreen(
     onTargetSelected: (MainTarget) -> Unit,
     onLogout: () -> Unit,
     onConnect: (ServerEntry) -> Unit,
+    onQuickConnect: (String, String?) -> Unit,
     onDisconnect: () -> Unit,
     certificateState: ru.protonmod.next.desktop.data.local.CertificateState,
     onRefreshCert: () -> Unit,
@@ -271,6 +276,8 @@ private fun DashboardScreen(
     dataManager: DesktopVpnDataManager
 ) {
     val isTablet = isTablet()
+    val settings by settingsManager.settings.collectAsState()
+    var showQuickConnectConfig by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         AnimatedContent(
@@ -295,11 +302,17 @@ private fun DashboardScreen(
                         isConnecting = isConnecting,
                         onLogout = onLogout,
                         onConnect = onConnect,
+                        onQuickConnect = { 
+                            onQuickConnect(settings.quickConnectStrategy, settings.quickConnectTargetId)
+                        },
+                        onChangeQuickConnect = { showQuickConnectConfig = true },
                         onDisconnect = onDisconnect,
                         certificateState = certificateState,
                         onRefreshCert = onRefreshCert,
                         isTablet = isTablet,
-                        loadDisplayMode = loadDisplayMode
+                        loadDisplayMode = loadDisplayMode,
+                        quickConnectStrategy = settings.quickConnectStrategy,
+                        quickConnectTargetId = settings.quickConnectTargetId
                     )
                 }
                 MainTarget.Countries -> {
@@ -373,6 +386,18 @@ private fun DashboardScreen(
                 .widthIn(max = if (isTablet) 400.dp else 600.dp)
                 .padding(bottom = 24.dp)
         )
+
+        if (showQuickConnectConfig) {
+            QuickConnectBottomSheet(
+                onDismiss = { showQuickConnectConfig = false },
+                currentStrategy = settings.quickConnectStrategy,
+                currentTargetId = settings.quickConnectTargetId,
+                recentServers = recentConnections,
+                onStrategySelect = { strategy, targetId ->
+                    settingsManager.setQuickConnectStrategy(strategy, targetId)
+                }
+            )
+        }
     }
 }
 
@@ -384,11 +409,15 @@ private fun HomeScreen(
     isConnecting: Boolean,
     onLogout: () -> Unit,
     onConnect: (ServerEntry) -> Unit,
+    onQuickConnect: () -> Unit,
+    onChangeQuickConnect: () -> Unit,
     onDisconnect: () -> Unit,
     certificateState: ru.protonmod.next.desktop.data.local.CertificateState,
     onRefreshCert: () -> Unit,
     isTablet: Boolean,
-    loadDisplayMode: ServerLoadDisplayMode
+    loadDisplayMode: ServerLoadDisplayMode,
+    quickConnectStrategy: String,
+    quickConnectTargetId: String?
 ) {
     val colors = Theme.colors
     
@@ -444,17 +473,19 @@ private fun HomeScreen(
                     DesktopConnectionCard(
                         isConnected = connectedServer != null,
                         isConnecting = isConnecting,
-                        serverName = connectedServer?.name ?: Strings.btn_quick_connect(),
-                        countryCode = connectedServer?.country ?: "",
+                        serverName = connectedServer?.name ?: getQuickConnectName(quickConnectStrategy, quickConnectTargetId, servers),
+                        countryCode = connectedServer?.country ?: getQuickConnectCountry(quickConnectStrategy, quickConnectTargetId, servers),
                         cityName = connectedServer?.city ?: "",
                         ipAddress = if (connectedServer != null) "10.2.0.2" else "0.0.0.0",
                         onToggle = {
                             if (connectedServer != null) {
                                 onDisconnect()
-                            } else if (servers.isNotEmpty()) {
-                                onConnect(servers.first())
+                            } else {
+                                onQuickConnect()
                             }
-                        }
+                        },
+                        onChangeStrategy = onChangeQuickConnect,
+                        quickConnectStrategy = quickConnectStrategy
                     )
                 }
 
@@ -531,17 +562,19 @@ private fun HomeScreen(
                     DesktopConnectionCard(
                         isConnected = connectedServer != null,
                         isConnecting = isConnecting,
-                        serverName = connectedServer?.name ?: Strings.btn_quick_connect(),
-                        countryCode = connectedServer?.country ?: "",
+                        serverName = connectedServer?.name ?: getQuickConnectName(quickConnectStrategy, quickConnectTargetId, servers),
+                        countryCode = connectedServer?.country ?: getQuickConnectCountry(quickConnectStrategy, quickConnectTargetId, servers),
                         cityName = connectedServer?.city ?: "",
                         ipAddress = if (connectedServer != null) "10.2.0.2" else "0.0.0.0",
                         onToggle = {
                             if (connectedServer != null) {
                                 onDisconnect()
-                            } else if (servers.isNotEmpty()) {
-                                onConnect(servers.first())
+                            } else {
+                                onQuickConnect()
                             }
-                        }
+                        },
+                        onChangeStrategy = onChangeQuickConnect,
+                        quickConnectStrategy = quickConnectStrategy
                     )
                 }
 
@@ -574,6 +607,25 @@ private fun HomeScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun getQuickConnectName(strategy: String, targetId: String?, servers: List<ServerEntry>): String {
+    return when (strategy) {
+        "fastest" -> Strings.qc_fastest()
+        "recent" -> Strings.qc_recent()
+        "server" -> servers.find { it.id == targetId }?.name ?: Strings.btn_quick_connect()
+        else -> Strings.btn_quick_connect()
+    }
+}
+
+@Composable
+private fun getQuickConnectCountry(strategy: String, targetId: String?, servers: List<ServerEntry>): String {
+    return when (strategy) {
+        "server" -> servers.find { it.id == targetId }?.country ?: ""
+        "fastest", "recent" -> "fastest"
+        else -> ""
     }
 }
 

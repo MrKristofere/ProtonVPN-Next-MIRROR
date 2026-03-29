@@ -121,6 +121,16 @@ class DesktopDatabase(private val dbPath: String = getDefaultDatabasePath()) {
                 )"""
             )
 
+            statement.executeUpdate(
+                """CREATE TABLE IF NOT EXISTS recent_connections (
+                    server_id TEXT PRIMARY KEY,
+                    server_name TEXT NOT NULL,
+                    city TEXT NOT NULL,
+                    country TEXT NOT NULL,
+                    last_connected_at INTEGER NOT NULL
+                )"""
+            )
+
             println("Database schema initialized")
         }
     }
@@ -328,6 +338,52 @@ class DesktopDatabase(private val dbPath: String = getDefaultDatabasePath()) {
             connection.createStatement().executeUpdate("DELETE FROM servers_cache")
         } catch (e: Exception) {
             println("Error clearing cache info: ${e.message}")
+        }
+    }
+
+    // ===== Recent Connections =====
+
+    suspend fun getRecentConnections(): List<DesktopRecentConnectionEntity> = withContext(Dispatchers.IO) {
+        val connection = connection ?: return@withContext emptyList()
+        try {
+            val list = mutableListOf<DesktopRecentConnectionEntity>()
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT * FROM recent_connections ORDER BY last_connected_at DESC LIMIT 10").use { rs ->
+                    while (rs.next()) {
+                        list.add(
+                            DesktopRecentConnectionEntity(
+                                serverId = rs.getString("server_id"),
+                                serverName = rs.getString("server_name"),
+                                city = rs.getString("city"),
+                                country = rs.getString("country"),
+                                lastConnectedAt = rs.getLong("last_connected_at")
+                            )
+                        )
+                    }
+                }
+            }
+            list
+        } catch (e: Exception) {
+            println("Error getting recent connections: ${e.message}")
+            emptyList()
+        }
+    }
+
+    suspend fun addRecentConnection(entity: DesktopRecentConnectionEntity) = withContext(Dispatchers.IO) {
+        val connection = connection ?: return@withContext
+        try {
+            connection.prepareStatement(
+                "INSERT OR REPLACE INTO recent_connections (server_id, server_name, city, country, last_connected_at) VALUES (?, ?, ?, ?, ?)"
+            ).use { statement ->
+                statement.setString(1, entity.serverId)
+                statement.setString(2, entity.serverName)
+                statement.setString(3, entity.city)
+                statement.setString(4, entity.country)
+                statement.setLong(5, entity.lastConnectedAt)
+                statement.executeUpdate()
+            }
+        } catch (e: Exception) {
+            println("Error adding recent connection: ${e.message}")
         }
     }
 }

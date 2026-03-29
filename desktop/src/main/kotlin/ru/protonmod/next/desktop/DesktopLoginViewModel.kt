@@ -1,22 +1,21 @@
 package ru.protonmod.next.desktop
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import ru.protonmod.next.data.network.LogicalServer
 import ru.protonmod.next.desktop.data.local.CertificateState
 import ru.protonmod.next.desktop.data.local.DesktopDatabase
+import ru.protonmod.next.desktop.data.local.DesktopRecentConnectionEntity
 import ru.protonmod.next.desktop.data.local.DesktopSessionEntity
 import ru.protonmod.next.desktop.monitoring.DesktopSentryManager
 import ru.protonmod.next.desktop.data.repository.DesktopCertificateManager
+import ru.protonmod.next.desktop.data.repository.DesktopVpnRepository
 
 class DesktopLoginViewModel(
     private val authClient: DesktopAuthClient,
     private val vpnClient: DesktopVpnClient,
     private val database: DesktopDatabase,
+    private val vpnRepository: DesktopVpnRepository,
     private val certificateManager: DesktopCertificateManager,
     private val sentryManager: DesktopSentryManager? = null
 ) {
@@ -39,6 +38,26 @@ class DesktopLoginViewModel(
 
     private val _connectedServer = MutableStateFlow<ServerEntry?>(null)
     val connectedServer: StateFlow<ServerEntry?> = _connectedServer.asStateFlow()
+
+    init {
+        // Load recent connections on init
+        loadRecentConnections()
+    }
+
+    private fun loadRecentConnections() {
+        scope.launch {
+            val entities = vpnRepository.getRecentConnections()
+            // We need the full ServerEntry list to map these, but for now we can just use the entities
+            // Actually, we should probably wait until servers are loaded or map them when they arrive
+            combine(_servers, flowOf(entities)) { serverList, recent ->
+                recent.mapNotNull { r ->
+                    serverList.find { it.id == r.serverId }
+                }
+            }.collect { list ->
+                _recentConnections.value = list
+            }
+        }
+    }
 
     fun login(username: String, passwordRaw: String, captchaToken: String? = null) {
         val startTime = System.currentTimeMillis()
@@ -178,13 +197,45 @@ class DesktopLoginViewModel(
             
             result.onSuccess {
                 _connectedServer.value = server
-                val currentRecent = _recentConnections.value.toMutableList()
-                currentRecent.removeIf { it.id == server.id }
-                currentRecent.add(0, server)
-                _recentConnections.value = currentRecent.take(5)
+                // Add to recent connections
+                vpnRepository.addRecentConnection(
+                    DesktopRecentConnectionEntity(
+                        serverId = server.id,
+                        serverName = server.name,
+                        city = server.city,
+                        country = server.country,
+                        lastConnectedAt = System.currentTimeMillis()
+                    )
+                )
+                // Trigger reload of recent list
+                loadRecentConnections()
             }.onFailure { error ->
                 _uiState.value = DesktopLoginUiState.Error("VPN connection failed: ${error.localizedMessage}")
             }
+        }
+    }
+
+    fun quickConnect(strategy: String, targetId: String? = null) {
+        if (_uiState.value !is DesktopLoginUiState.Success) return
+        
+        scope.launch {
+            val serverList = _servers.value
+            if (serverList.isEmpty()) return@launch
+
+            val targetServer = when (strategy) {
+                "recent" -> {
+                    _recentConnections.value.firstOrNull() ?: serverList.minByOrNull { it.physicalServer?.load ?: 100 }
+                }
+                "server" -> {
+                    serverList.find { it.id == targetId } ?: serverList.minByOrNull { it.physicalServer?.load ?: 100 }
+                }
+                else -> {
+                    // Default: "fastest"
+                    serverList.minByOrNull { it.physicalServer?.load ?: 100 }
+                }
+            }
+
+            targetServer?.let { connectToServer(it) }
         }
     }
 

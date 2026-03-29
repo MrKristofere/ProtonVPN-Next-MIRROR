@@ -459,4 +459,10 @@
     <string name="captcha_message">为了您的账户安全，请完成下方验证。</string>
     <string name="captcha_proxy_active">防封锁代理已激活</string>
     <string name="desc_close">关闭</string>
+    <string name="qc_title">快速连接配置</string>
+    <string name="qc_fastest">最快服务器</string>
+    <string name="qc_fastest_desc">始终连接到最快的可用服务器</string>
+    <string name="qc_recent">最近连接</string>
+    <string name="qc_recent_desc">连接到上次会话的服务器</string>
+    <string name="qc_header_recent">最近使用的服务器</string>
 </resources>
