@@ -445,7 +445,7 @@ private fun HomeScreen(
                         isConnected = connectedServer != null,
                         isConnecting = isConnecting,
                         serverName = connectedServer?.name ?: Strings.btn_quick_connect(),
-                        countryCode = connectedServer?.country ?: "Select Location",
+                        countryCode = connectedServer?.country ?: "",
                         cityName = connectedServer?.city ?: "",
                         ipAddress = if (connectedServer != null) "10.2.0.2" else "0.0.0.0",
                         onToggle = {
@@ -532,7 +532,7 @@ private fun HomeScreen(
                         isConnected = connectedServer != null,
                         isConnecting = isConnecting,
                         serverName = connectedServer?.name ?: Strings.btn_quick_connect(),
-                        countryCode = connectedServer?.country ?: "Select Location",
+                        countryCode = connectedServer?.country ?: "",
                         cityName = connectedServer?.city ?: "",
                         ipAddress = if (connectedServer != null) "10.2.0.2" else "0.0.0.0",
                         onToggle = {
