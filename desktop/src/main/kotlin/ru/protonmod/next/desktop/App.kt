@@ -62,69 +62,72 @@ fun App() {
             Theme(appTheme = settings.appTheme) {
                 // Background gradient (moved to top level)
                 val colors = Theme.colors
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    colors.brandNorm.copy(alpha = 0.25f),
-                                    colors.backgroundNorm.copy(alpha = 0.1f),
-                                    colors.backgroundNorm
+                // Force root Surface to be transparent on Desktop to allow gradient visibility
+                Surface(color = Color.Transparent) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        colors.brandNorm.copy(alpha = 0.25f),
+                                        colors.backgroundNorm.copy(alpha = 0.1f),
+                                        colors.backgroundNorm
+                                    )
                                 )
                             )
-                        )
-                ) {
-                    when (uiState) {
-                        is DesktopLoginUiState.Idle, is DesktopLoginUiState.Loading, is DesktopLoginUiState.Error -> {
-                            WelcomeContent(
-                                uiState = uiState,
-                                onLogin = { u, p -> viewModel.login(u, p) },
-                                onGuest = { viewModel.loginAnonymous() },
-                                onRetry = { viewModel.loginAnonymous() },
-                                onClearError = { viewModel.clearError() }
-                            )
-                        }
-                        is DesktopLoginUiState.RequiresCaptcha -> {
-                            val state = uiState as DesktopLoginUiState.RequiresCaptcha
-                            captchaState = state
-                            showCaptcha = true
-                        }
-                        is DesktopLoginUiState.Success -> {
-                            DashboardScreen(
-                                servers = servers,
-                                recentConnections = recentConnections,
-                                connectedServer = connectedServer,
-                                isConnecting = isConnecting,
-                                selectedTarget = selectedTarget,
-                                onTargetSelected = { selectedTarget = it },
-                                onLogout = { viewModel.clearError() },
-                                onConnect = { server ->
-                                    viewModel.connectToServer(server)
-                                },
-                                onDisconnect = {
-                                    viewModel.disconnect()
-                                },
-                                settingsManager = settingsManager,
-                                loadDisplayMode = settings.serverLoadDisplayMode,
-                                countriesViewModel = countriesViewModel
-                            )
-                        }
-                    }
-
-                    if (showCaptcha && captchaState != null) {
-                        CaptchaDialog(
-                            webUrl = captchaState!!.webUrl,
-                            onDismiss = {
-                                showCaptcha = false
-                                viewModel.clearError()
-                            },
-                            onCaptchaSolved = { token ->
-                                showCaptcha = false
-                                captchaState = null
-                                viewModel.retryWithCaptcha(token)
+                    ) {
+                        when (uiState) {
+                            is DesktopLoginUiState.Idle, is DesktopLoginUiState.Loading, is DesktopLoginUiState.Error -> {
+                                WelcomeContent(
+                                    uiState = uiState,
+                                    onLogin = { u, p -> viewModel.login(u, p) },
+                                    onGuest = { viewModel.loginAnonymous() },
+                                    onRetry = { viewModel.loginAnonymous() },
+                                    onClearError = { viewModel.clearError() }
+                                )
                             }
-                        )
+                            is DesktopLoginUiState.RequiresCaptcha -> {
+                                val state = uiState as DesktopLoginUiState.RequiresCaptcha
+                                captchaState = state
+                                showCaptcha = true
+                            }
+                            is DesktopLoginUiState.Success -> {
+                                DashboardScreen(
+                                    servers = servers,
+                                    recentConnections = recentConnections,
+                                    connectedServer = connectedServer,
+                                    isConnecting = isConnecting,
+                                    selectedTarget = selectedTarget,
+                                    onTargetSelected = { selectedTarget = it },
+                                    onLogout = { viewModel.clearError() },
+                                    onConnect = { server ->
+                                        viewModel.connectToServer(server)
+                                    },
+                                    onDisconnect = {
+                                        viewModel.disconnect()
+                                    },
+                                    settingsManager = settingsManager,
+                                    loadDisplayMode = settings.serverLoadDisplayMode,
+                                    countriesViewModel = countriesViewModel
+                                )
+                            }
+                        }
+
+                        if (showCaptcha && captchaState != null) {
+                            CaptchaDialog(
+                                webUrl = captchaState!!.webUrl,
+                                onDismiss = {
+                                    showCaptcha = false
+                                    viewModel.clearError()
+                                },
+                                onCaptchaSolved = { token ->
+                                    showCaptcha = false
+                                    captchaState = null
+                                    viewModel.retryWithCaptcha(token)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -150,11 +153,6 @@ private fun WelcomeContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0x6611D8CC), Color(0x006E4BFF))
-                )
-            )
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -300,13 +298,11 @@ private fun DashboardScreen(
             MainTarget.Countries -> {
                 CountriesScreen(
                     viewModel = countriesViewModel,
-                    onBack = { onTargetSelected(MainTarget.Home) },
                     onConnect = onConnect
                 )
             }
             MainTarget.Settings -> {
                 SettingsScreen(
-                    onBack = { onTargetSelected(MainTarget.Home) },
                     settingsManager = settingsManager,
                     navigateTo = onTargetSelected
                 )
@@ -330,10 +326,14 @@ private fun DashboardScreen(
                     settingsManager = settingsManager
                 )
             }
-            MainTarget.Profiles -> {
-                ProfilesScreen(
-                    onBack = { onTargetSelected(MainTarget.Home) }
+            MainTarget.ServerLoadSelection -> {
+                ServerLoadDisplayModeScreen(
+                    onBack = { onTargetSelected(MainTarget.Settings) },
+                    settingsManager = settingsManager
                 )
+            }
+            MainTarget.Profiles -> {
+                ProfilesScreen()
             }
         }
 
@@ -369,7 +369,10 @@ private fun HomeScreen(
                     Icon(Icons.Rounded.Logout, "Logout", tint = colors.interactionNorm)
                 }
             },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = Color.Transparent
+            ),
             windowInsets = WindowInsets(0, 0, 0, 0)
         )
 

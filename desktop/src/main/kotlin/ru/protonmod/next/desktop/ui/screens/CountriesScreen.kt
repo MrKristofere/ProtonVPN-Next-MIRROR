@@ -48,8 +48,7 @@ import ru.protonmod.next.ui.theme.ProtonNextTheme
 @Composable
 fun CountriesScreen(
     viewModel: DesktopCountriesViewModel,
-    onConnect: (ServerEntry) -> Unit,
-    onBack: () -> Unit
+    onConnect: (ServerEntry) -> Unit
 ) {
     val colors = ProtonNextTheme.colors
     val uiState by viewModel.uiState.collectAsState()
@@ -69,15 +68,16 @@ fun CountriesScreen(
             TopAppBar(
                 title = { Text(title, fontWeight = FontWeight.Bold, color = colors.textNorm) },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        when (uiState) {
-                            is CountriesUiState.CountriesList -> onBack()
-                            is CountriesUiState.CitiesList -> viewModel.backToCountries()
-                            is CountriesUiState.ServersList -> viewModel.backToCities()
-                            else -> onBack()
+                    if (uiState !is CountriesUiState.CountriesList) {
+                        IconButton(onClick = {
+                            when (uiState) {
+                                is CountriesUiState.CitiesList -> viewModel.backToCountries()
+                                is CountriesUiState.ServersList -> viewModel.backToCities()
+                                else -> {}
+                            }
+                        }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.textNorm)
                         }
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.textNorm)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

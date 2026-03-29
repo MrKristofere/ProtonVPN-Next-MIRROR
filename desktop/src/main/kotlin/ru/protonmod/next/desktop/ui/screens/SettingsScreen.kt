@@ -80,7 +80,6 @@ fun Modifier.liquidGlass(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onBack: () -> Unit,
     settingsManager: DesktopSettingsManager,
     navigateTo: (MainTarget) -> Unit
 ) {
@@ -95,11 +94,6 @@ fun SettingsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Settings", fontWeight = FontWeight.Bold, color = colors.textNorm) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.textNorm)
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
                     scrolledContainerColor = Color.Transparent
@@ -162,15 +156,7 @@ fun SettingsScreen(
                                         icon = Icons.Rounded.BarChart,
                                         title = "Server Load Display",
                                         subtitle = settings.serverLoadDisplayMode.name,
-                                        onClick = {
-                                            val nextMode = when (settings.serverLoadDisplayMode) {
-                                                ServerLoadDisplayMode.ALL -> ServerLoadDisplayMode.PERCENT
-                                                ServerLoadDisplayMode.PERCENT -> ServerLoadDisplayMode.LINE
-                                                ServerLoadDisplayMode.LINE -> ServerLoadDisplayMode.HIDDEN
-                                                ServerLoadDisplayMode.HIDDEN -> ServerLoadDisplayMode.ALL
-                                            }
-                                            settingsManager.setServerLoadDisplayMode(nextMode)
-                                        }
+                                        onClick = { navigateTo(MainTarget.ServerLoadSelection) }
                                     )
                                 }
                             }

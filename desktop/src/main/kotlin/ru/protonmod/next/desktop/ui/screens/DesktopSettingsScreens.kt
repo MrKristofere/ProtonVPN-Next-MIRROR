@@ -42,6 +42,152 @@ import ru.protonmod.next.ui.theme.LocalColors
 import ru.protonmod.next.ui.theme.ProtonColors
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 
+import ru.protonmod.next.data.local.ServerLoadDisplayMode
+import ru.protonmod.next.desktop.ServerEntry
+import ru.protonmod.next.desktop.ui.components.FlagIcon
+import ru.protonmod.next.desktop.ui.components.LoadIndicator
+import ru.protonmod.next.desktop.ui.components.LoadProgressBar
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ServerLoadDisplayModeScreen(
+    onBack: () -> Unit,
+    settingsManager: DesktopSettingsManager
+) {
+    val settings by settingsManager.settings.collectAsState()
+    val colors = ProtonNextTheme.colors
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            TopAppBar(
+                title = { Text("Server Load Display", fontWeight = FontWeight.Bold, color = colors.textNorm) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.textNorm)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent
+                ),
+                windowInsets = WindowInsets(0, 0, 0, 0)
+            )
+        }
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(ServerLoadDisplayMode.entries) { mode ->
+                    LoadModePreviewCard(
+                        mode = mode,
+                        isSelected = settings.serverLoadDisplayMode == mode,
+                        onClick = { settingsManager.setServerLoadDisplayMode(mode) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LoadModePreviewCard(
+    mode: ServerLoadDisplayMode,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val colors = ProtonNextTheme.colors
+    val modeName = mode.name.lowercase().replaceFirstChar { it.uppercase() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = if (isSelected) 3.dp else 0.dp,
+                    color = if (isSelected) colors.brandNorm else Color.Transparent,
+                    shape = RoundedCornerShape(24.dp)
+                )
+        ) {
+            val mockServer = remember {
+                ServerEntry(
+                    id = "preview",
+                    name = "US-FREE #1",
+                    city = "New York",
+                    country = "US",
+                    tier = 0,
+                    physicalServer = ru.protonmod.next.data.network.PhysicalServer(
+                        id = "preview_phys",
+                        domain = "preview",
+                        status = 1,
+                        load = 45
+                    )
+                )
+            }
+            
+            // Reusing the ServerCard logic for preview
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.backgroundSecondary.copy(alpha = 0.8f)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, colors.shade100.copy(alpha = 0.05f))
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FlagIcon(countryCode = mockServer.country, size = androidx.compose.ui.unit.DpSize(36.dp, 24.dp))
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(mockServer.country, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(mockServer.name, style = MaterialTheme.typography.bodyMedium, color = colors.textWeak)
+                        }
+                        LoadIndicator(load = 45, displayMode = mode)
+                    }
+                    LoadProgressBar(load = 45, displayMode = mode)
+                }
+            }
+
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .align(Alignment.TopEnd)
+                        .background(colors.brandNorm, CircleShape)
+                        .padding(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.CheckCircle,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = modeName,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            color = if (isSelected) colors.brandNorm else colors.textNorm
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThemeSelectionScreen(
@@ -260,18 +406,6 @@ fun ProtocolSelectionScreen(
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // Background gradient
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.4f)
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(colors.brandNorm.copy(alpha = 0.25f), Color.Transparent)
-                        )
-                    )
-            )
-
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
@@ -359,21 +493,6 @@ fun ObfuscationSettingsScreen(
         }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            // Background gradient
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                colors.brandNorm.copy(alpha = 0.25f),
-                                colors.backgroundNorm.copy(alpha = 0.1f),
-                                colors.backgroundNorm
-                            )
-                        )
-                    )
-            )
-
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = if (isTablet) Alignment.CenterHorizontally else Alignment.Start,
