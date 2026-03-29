@@ -598,7 +598,14 @@ internal fun ProtonColors.toMaterial3ThemeColors() = androidx.compose.material3.
     outline = brandNorm,
     surfaceTint = Color.Unspecified,
     outlineVariant = brandNorm,
-    scrim = blenderNorm
+    scrim = blenderNorm,
+    surfaceBright = backgroundNorm,
+    surfaceDim = backgroundNorm,
+    surfaceContainer = backgroundNorm,
+    surfaceContainerHigh = backgroundNorm,
+    surfaceContainerHighest = backgroundNorm,
+    surfaceContainerLow = backgroundNorm,
+    surfaceContainerLowest = backgroundNorm
 )
 
 val LocalColors = staticCompositionLocalOf { ProtonColors.Light }

@@ -28,11 +28,13 @@ junit = "4.13.2"
 mockito = "5.23.0"
 mockitoKotlin = "6.3.0"
 coroutinesTest = "1.10.2"
+kotlinx-coroutines = "1.10.2"
 mockwebserver = "5.3.2"
 androidxJunit = "1.3.0"
 espressoCore = "3.7.0"
 material = "1.13.0"
 goVpnLib = "0.1.78"
+sqlite-jdbc = "3.51.3.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -84,6 +86,7 @@ sentry-android = { group = "io.sentry", name = "sentry-android", version.ref = "
 sentry-compose = { group = "io.sentry", name = "sentry-compose-android", version.ref = "sentryAndroid" }
 sentry-okhttp = { group = "io.sentry", name = "sentry-okhttp", version.ref = "sentryAndroid" }
 sentry-replay = { group = "io.sentry", name = "sentry-android-replay", version.ref = "sentryAndroid" }
+sentry-jvm = { group = "io.sentry", name = "sentry", version.ref = "sentryAndroid" }
 
 # Debug
 leakcanary-android = { group = "com.squareup.leakcanary", name = "leakcanary-android", version.ref = "leakcanary" }
@@ -93,10 +96,13 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
 mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version.ref = "mockitoKotlin" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
+kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "mockwebserver" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+sqliteJdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqlite-jdbc" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

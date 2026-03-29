@@ -63,16 +63,16 @@ tasks.withType<Zip> {
 dependencies {
     // Use the Compose plugin extensions to add proper desktop dependencies
     implementation(compose.desktop.currentOs)
-    implementation(compose.material)
-    implementation(compose.material3)
-    implementation(compose.runtime)
+    implementation("org.jetbrains.compose.material:material:1.10.3")
+    implementation("org.jetbrains.compose.material3:material3:1.9.0")
+    implementation("org.jetbrains.compose.runtime:runtime:1.10.3")
     // Use the specific JetBrains version of extended icons for Desktop
     implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
 
     implementation(kotlin("stdlib"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation(libs.kotlinx.coroutines.core)
     // Coroutines Swing is required for Compose Desktop UI thread management
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
+    implementation(libs.kotlinx.coroutines.swing)
 
     // Networking and serialization
     implementation("com.squareup.okhttp3:okhttp:5.3.2")
@@ -80,6 +80,13 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.kotlinx.serialization.converter)
     implementation(libs.kotlinx.serialization.json)
+    implementation("com.squareup.retrofit2:converter-scalars:2.11.0")
+
+    // Database
+    implementation(libs.sqliteJdbc)
+
+    // Sentry for error tracking
+    implementation(libs.sentry.jvm)
 
     // Native access for Go bridge
     implementation("net.java.dev.jna:jna:5.16.0")
