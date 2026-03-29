@@ -27,19 +27,11 @@ import androidx.compose.ui.unit.dp
 import ru.protonmod.next.desktop.ui.MainTarget
 import ru.protonmod.next.desktop.ui.components.DesktopConnectionCard
 import ru.protonmod.next.desktop.ui.components.LiquidGlassBottomBar
-import ru.protonmod.next.desktop.ui.screens.CountriesScreen
-import ru.protonmod.next.desktop.ui.screens.DesktopCountriesViewModel
-import ru.protonmod.next.desktop.ui.screens.ProfilesScreen
-import ru.protonmod.next.desktop.ui.screens.SettingsScreen
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
+import ru.protonmod.next.desktop.ui.screens.*
 import ru.protonmod.next.data.local.ServerLoadDisplayMode
 import ru.protonmod.next.desktop.data.DesktopSettingsManager
-import ru.protonmod.next.desktop.ui.components.FlagIcon
-import ru.protonmod.next.desktop.ui.components.LoadIndicator
-import ru.protonmod.next.desktop.ui.components.LoadProgressBar
-import ru.protonmod.next.desktop.ui.utils.ProvideDeviceType
-import ru.protonmod.next.desktop.ui.utils.isTablet
+import ru.protonmod.next.desktop.ui.components.*
+import ru.protonmod.next.desktop.ui.utils.*
 import ru.protonmod.next.ui.theme.ProtonNextTheme as Theme
 
 @Composable
@@ -68,7 +60,21 @@ fun App() {
         ProvideDeviceType(windowWidth) {
             val settings by settingsManager.settings.collectAsState()
             Theme(appTheme = settings.appTheme) {
-                Surface(modifier = Modifier.fillMaxSize()) {
+                // Background gradient (moved to top level)
+                val colors = Theme.colors
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    colors.brandNorm.copy(alpha = 0.25f),
+                                    colors.backgroundNorm.copy(alpha = 0.1f),
+                                    colors.backgroundNorm
+                                )
+                            )
+                        )
+                ) {
                     when (uiState) {
                         is DesktopLoginUiState.Idle, is DesktopLoginUiState.Loading, is DesktopLoginUiState.Error -> {
                             WelcomeContent(
@@ -276,7 +282,7 @@ private fun DashboardScreen(
     val colors = Theme.colors
     val isTablet = isTablet()
 
-    Box(modifier = Modifier.fillMaxSize().background(colors.backgroundNorm)) {
+    Box(modifier = Modifier.fillMaxSize()) {
         when (selectedTarget) {
             MainTarget.Home -> {
                 HomeScreen(
@@ -301,6 +307,26 @@ private fun DashboardScreen(
             MainTarget.Settings -> {
                 SettingsScreen(
                     onBack = { onTargetSelected(MainTarget.Home) },
+                    settingsManager = settingsManager,
+                    navigateTo = onTargetSelected
+                )
+            }
+            MainTarget.ThemeSelection -> {
+                ThemeSelectionScreen(
+                    onBack = { onTargetSelected(MainTarget.Settings) },
+                    settingsManager = settingsManager
+                )
+            }
+            MainTarget.ProtocolSelection -> {
+                ProtocolSelectionScreen(
+                    currentProtocol = "AmneziaWG",
+                    onBack = { onTargetSelected(MainTarget.Settings) },
+                    onProtocolSelected = { /* Already AmneziaWG */ }
+                )
+            }
+            MainTarget.ObfuscationSettings -> {
+                ObfuscationSettingsScreen(
+                    onBack = { onTargetSelected(MainTarget.Settings) },
                     settingsManager = settingsManager
                 )
             }
@@ -343,7 +369,8 @@ private fun HomeScreen(
                     Icon(Icons.Rounded.Logout, "Logout", tint = colors.interactionNorm)
                 }
             },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+            windowInsets = WindowInsets(0, 0, 0, 0)
         )
 
         if (isTablet) {

@@ -58,7 +58,7 @@ fun CountriesScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = colors.backgroundNorm,
+        containerColor = Color.Transparent,
         topBar = {
             val title = when (val state = uiState) {
                 is CountriesUiState.CountriesList -> "Countries"
@@ -80,7 +80,11 @@ fun CountriesScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.textNorm)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent
+                ),
+                windowInsets = WindowInsets(0, 0, 0, 0)
             )
         }
     ) { paddingValues ->
@@ -89,21 +93,6 @@ fun CountriesScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Background gradient
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                colors.brandNorm.copy(alpha = 0.25f),
-                                colors.backgroundNorm.copy(alpha = 0.1f),
-                                colors.backgroundNorm
-                            )
-                        )
-                    )
-            )
-
             AnimatedContent(targetState = uiState, label = "countries_navigation") { state ->
                 when (state) {
                     is CountriesUiState.Loading -> {

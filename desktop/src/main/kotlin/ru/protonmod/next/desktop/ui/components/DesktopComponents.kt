@@ -59,7 +59,7 @@ fun LiquidGlassBottomBar(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            MainTarget.entries.forEach { target ->
+            listOf(MainTarget.Home, MainTarget.Countries, MainTarget.Profiles, MainTarget.Settings).forEach { target ->
                 val isSelected = target == selectedTarget
                 val iconColor by animateColorAsState(
                     targetValue = if (isSelected) colors.brandNorm else colors.iconWeak,
@@ -99,6 +99,7 @@ private fun getIconForTarget(target: MainTarget): ImageVector = when (target) {
     MainTarget.Profiles -> Icons.Rounded.Terminal
     MainTarget.Countries -> Icons.Rounded.Public
     MainTarget.Settings -> Icons.Rounded.Settings
+    else -> Icons.Rounded.Settings
 }
 
 @Composable

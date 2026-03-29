@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2026 SMH01
+ */
+
 package ru.protonmod.next.desktop.ui.screens
 
 import androidx.compose.foundation.background
@@ -29,6 +33,7 @@ import ru.protonmod.next.ui.theme.AppTheme
 import ru.protonmod.next.desktop.data.DesktopSettingsManager
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.desktop.ui.utils.isTablet
+import ru.protonmod.next.desktop.ui.MainTarget
 
 @Composable
 fun Modifier.liquidGlass(
@@ -76,7 +81,8 @@ fun Modifier.liquidGlass(
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    settingsManager: DesktopSettingsManager
+    settingsManager: DesktopSettingsManager,
+    navigateTo: (MainTarget) -> Unit
 ) {
     val colors = ProtonNextTheme.colors
     val settings by settingsManager.settings.collectAsState()
@@ -84,7 +90,8 @@ fun SettingsScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = colors.backgroundNorm,
+        containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text("Settings", fontWeight = FontWeight.Bold, color = colors.textNorm) },
@@ -93,7 +100,11 @@ fun SettingsScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.textNorm)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent
+                ),
+                windowInsets = WindowInsets(0, 0, 0, 0)
             )
         }
     ) { paddingValues ->
@@ -102,21 +113,6 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Background gradient decoration (immersive)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                colors.brandNorm.copy(alpha = 0.25f),
-                                colors.backgroundNorm.copy(alpha = 0.1f),
-                                colors.backgroundNorm
-                            )
-                        )
-                    )
-            )
-
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = if (isTablet) Alignment.CenterHorizontally else Alignment.Start,
@@ -139,10 +135,16 @@ fun SettingsScreen(
                                 FeatureCategory(
                                     isTablet = true,
                                     obfuscationEnabled = settings.obfuscationEnabled,
-                                    onObfuscationToggle = { settingsManager.setObfuscationEnabled(!settings.obfuscationEnabled) }
+                                    onObfuscationToggle = { navigateTo(MainTarget.ObfuscationSettings) }
                                 )
 
                                 Category(title = "Connection") {
+                                    SettingRowWithIcon(
+                                        icon = Icons.Rounded.Security,
+                                        title = "Protocol",
+                                        subtitle = "AmneziaWG",
+                                        onClick = { navigateTo(MainTarget.ProtocolSelection) }
+                                    )
                                     SettingToggleRow(
                                         icon = Icons.Rounded.Autorenew,
                                         title = "Auto Connect",
@@ -179,12 +181,7 @@ fun SettingsScreen(
                                         icon = Icons.Rounded.Palette,
                                         title = "App Theme",
                                         subtitle = settings.appTheme.name,
-                                        onClick = {
-                                            val themes = AppTheme.entries
-                                            val currentIndex = themes.indexOf(settings.appTheme)
-                                            val nextTheme = themes[(currentIndex + 1) % themes.size]
-                                            settingsManager.setAppTheme(nextTheme)
-                                        }
+                                        onClick = { navigateTo(MainTarget.ThemeSelection) }
                                     )
                                 }
                                 Category(title = "Privacy & Security") {
@@ -214,18 +211,35 @@ fun SettingsScreen(
                         FeatureCategory(
                             isTablet = false,
                             obfuscationEnabled = settings.obfuscationEnabled,
-                            onObfuscationToggle = { settingsManager.setObfuscationEnabled(!settings.obfuscationEnabled) }
+                            onObfuscationToggle = { navigateTo(MainTarget.ObfuscationSettings) }
                         )
                     }
 
                     item {
                         Category(title = "Connection") {
+                            SettingRowWithIcon(
+                                icon = Icons.Rounded.Security,
+                                title = "Protocol",
+                                subtitle = "AmneziaWG",
+                                onClick = { navigateTo(MainTarget.ProtocolSelection) }
+                            )
                             SettingToggleRow(
                                 icon = Icons.Rounded.Autorenew,
                                 title = "Auto Connect",
                                 subtitle = "Automatically connect when the app starts",
                                 checked = settings.autoConnectEnabled,
                                 onCheckedChange = { settingsManager.setAutoConnectEnabled(it) }
+                            )
+                        }
+                    }
+
+                    item {
+                        Category(title = "Appearance") {
+                            SettingRowWithIcon(
+                                icon = Icons.Rounded.Palette,
+                                title = "App Theme",
+                                subtitle = settings.appTheme.name,
+                                onClick = { navigateTo(MainTarget.ThemeSelection) }
                             )
                         }
                     }
