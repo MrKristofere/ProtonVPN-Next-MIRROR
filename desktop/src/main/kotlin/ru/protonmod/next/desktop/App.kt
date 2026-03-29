@@ -34,8 +34,6 @@ import ru.protonmod.next.desktop.ui.components.*
 import ru.protonmod.next.desktop.ui.utils.*
 import ru.protonmod.next.ui.theme.ProtonNextTheme as Theme
 
-import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
-
 @Composable
 fun App() {
     val settingsManager = remember { DesktopSettingsManager() }
@@ -52,7 +50,6 @@ fun App() {
     var showCaptcha by remember { mutableStateOf(false) }
     var captchaState by remember { mutableStateOf<DesktopLoginUiState.RequiresCaptcha?>(null) }
     var selectedTarget by remember { mutableStateOf(MainTarget.Home) }
-    var authTarget by remember { mutableStateOf(MainTarget.Welcome) }
 
     val countriesViewModel = remember(servers, connectedServer) {
         DesktopCountriesViewModel(vpnClient, settingsManager, viewModel.servers, viewModel.connectedServer)
@@ -81,22 +78,15 @@ fun App() {
                             )
                     ) {
                         when (uiState) {
-                        is DesktopLoginUiState.Idle, is DesktopLoginUiState.Loading, is DesktopLoginUiState.Error -> {
-                            if (authTarget == MainTarget.Welcome) {
-                                WelcomeScreen(
+                            is DesktopLoginUiState.Idle, is DesktopLoginUiState.Loading, is DesktopLoginUiState.Error -> {
+                                WelcomeContent(
                                     uiState = uiState,
                                     onLogin = { u, p -> viewModel.login(u, p) },
                                     onGuest = { viewModel.loginAnonymous() },
-                                    onNavigateToLogin = { authTarget = MainTarget.Login }
-                                )
-                            } else {
-                                LoginScreen(
-                                    uiState = uiState,
-                                    onBackClick = { authTarget = MainTarget.Welcome },
-                                    onLogin = { u, p -> viewModel.login(u, p) }
+                                    onRetry = { viewModel.loginAnonymous() },
+                                    onClearError = { viewModel.clearError() }
                                 )
                             }
-                        }
                             is DesktopLoginUiState.RequiresCaptcha -> {
                                 val state = uiState as DesktopLoginUiState.RequiresCaptcha
                                 captchaState = state
@@ -346,7 +336,6 @@ private fun DashboardScreen(
             MainTarget.Profiles -> {
                 ProfilesScreen()
             }
-            else -> {}
         }
 
         LiquidGlassBottomBar(
@@ -355,7 +344,6 @@ private fun DashboardScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .widthIn(max = if (isTablet) 400.dp else 600.dp)
-                .padding(bottom = 24.dp)
         )
     }
 }
@@ -394,7 +382,7 @@ private fun HomeScreen(
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 80.dp, start = 24.dp, end = 24.dp),
+                    .padding(top = 80.dp, bottom = 120.dp, start = 24.dp, end = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(32.dp)
             ) {
                 // Left Column: Status and Connection
@@ -472,7 +460,7 @@ private fun HomeScreen(
             // Phone Layout
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 80.dp)
+                contentPadding = PaddingValues(top = 80.dp, bottom = 120.dp)
             ) {
                 item {
                     Box(

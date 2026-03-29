@@ -32,8 +32,6 @@ import ru.protonmod.next.ui.theme.liquidGlass
 import ru.protonmod.next.desktop.ui.utils.isTablet
 import ru.protonmod.next.desktop.ui.MainTarget
 
-import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -50,7 +48,7 @@ fun SettingsScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = { Text(Strings.settings_title(), fontWeight = FontWeight.Bold, color = colors.textNorm) },
+                title = { Text("Settings", fontWeight = FontWeight.Bold, color = colors.textNorm) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
                     scrolledContainerColor = Color.Transparent
@@ -66,7 +64,7 @@ fun SettingsScreen(
                 start = 16.dp,
                 end = 16.dp,
                 top = 16.dp,
-                bottom = 16.dp
+                bottom = if (isTablet) 140.dp else 120.dp
             )
         ) {
             if (isTablet) {

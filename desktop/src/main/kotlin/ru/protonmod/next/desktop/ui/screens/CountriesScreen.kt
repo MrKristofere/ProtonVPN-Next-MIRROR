@@ -45,8 +45,6 @@ import ru.protonmod.next.ui.screens.countries.*
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.ui.theme.liquidGlass
 
-import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CountriesScreen(
@@ -63,10 +61,10 @@ fun CountriesScreen(
         containerColor = Color.Transparent,
         topBar = {
             val title = when (val state = uiState) {
-                is CountriesUiState.CountriesList -> Strings.countries_title()
+                is CountriesUiState.CountriesList -> "Countries"
                 is CountriesUiState.CitiesList -> DesktopCountryUtils.getCountryName(state.country)
                 is CountriesUiState.ServersList -> "${DesktopCountryUtils.getCountryName(state.country)}, ${state.city}"
-                else -> Strings.countries_title()
+                else -> "Countries"
             }
             TopAppBar(
                 title = { Text(title, fontWeight = FontWeight.Bold, color = colors.textNorm) },
@@ -157,7 +155,7 @@ private fun CountriesListContent(
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 300.dp),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 16.dp),
+            contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 140.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -174,7 +172,7 @@ private fun CountriesListContent(
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 16.dp),
+            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 140.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(countries) { country ->
@@ -221,7 +219,7 @@ private fun CitiesListContent(
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 16.dp),
+            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 140.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(cities) { city ->
@@ -265,7 +263,7 @@ private fun ServersListContent(
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 16.dp),
+            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 140.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(servers) { server ->
