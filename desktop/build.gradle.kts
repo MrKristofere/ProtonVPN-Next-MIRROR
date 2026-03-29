@@ -15,22 +15,37 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
-    application
     // Apply Compose Compiler plugin for Kotlin 2.x compatibility
     alias(libs.plugins.kotlin.compose)
     // Apply Compose Multiplatform plugin to properly resolve desktop artifacts
     id("org.jetbrains.compose") version "1.10.0"
 }
 
-kotlin {
-    jvmToolchain(17)
+compose.desktop {
+    application {
+        mainClass = "ru.protonmod.next.desktop.MainKt"
+        nativeDistributions {
+            targetFormats(TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.AppImage)
+            packageName = "ProtonVPN-Next"
+            packageVersion = "1.0.0"
+
+            linux {
+                shortcut = true
+                appCategory = "Network"
+                menuGroup = "Network"
+                iconFile.set(project.file("src/main/resources/drawable/ic_launcher.png"))
+            }
+        }
+    }
 }
 
-application {
-    mainClass.set("ru.protonmod.next.desktop.MainKt")
+kotlin {
+    jvmToolchain(17)
 }
 
 tasks.withType<Copy> {
@@ -43,10 +58,6 @@ tasks.withType<Tar> {
 
 tasks.withType<Zip> {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
-
-tasks.withType<JavaExec> {
-    systemProperty("jna.library.path", file("libs").absolutePath)
 }
 
 dependencies {
@@ -82,4 +93,80 @@ dependencies {
         exclude(group = "androidx.compose.material3")
         exclude(group = "androidx.compose.foundation")
     }
+}
+
+// Fixed portable task using createDistributable as base
+tasks.register<Tar>("packagePortable") {
+    group = "distribution"
+    description = "Packages the application as a portable .tar.gz archive"
+    dependsOn(":desktop:createDistributable")
+
+    // Target the output of createDistributable
+    from(layout.buildDirectory.dir("compose/binaries/main/app"))
+    
+    // Explicitly add libs folder to ensure vpn-helper and libgovpn.so are included
+    from(project.file("libs")) {
+        into("ProtonVPN-Next/lib/app/resources")
+    }
+
+    archiveFileName.set("ProtonVPN-Next-Portable.tar.gz")
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    compression = Compression.GZIP
+}
+
+// Task to wrap the distributable into a single AppImage file using system appimagetool
+tasks.register<Exec>("packageAppImageFile") {
+    group = "distribution"
+    description = "Packages the application as a single .AppImage file"
+    dependsOn(":desktop:createDistributable")
+
+    val appDir = layout.buildDirectory.dir("compose/binaries/main/app/ProtonVPN-Next")
+    val outputDir = layout.buildDirectory.dir("distributions")
+    val outputFile = outputDir.get().file("ProtonVPN-Next-x86_64.AppImage")
+
+    workingDir(project.projectDir)
+    
+    doFirst {
+        outputDir.get().asFile.mkdirs()
+        
+        // Ensure resources directory exists in AppDir
+        val resDir = file("${appDir.get().asFile.absolutePath}/lib/app/resources")
+        resDir.mkdirs()
+        
+        // Copy native libs to AppDir resources
+        val libsDir = file("libs")
+        if (libsDir.exists()) {
+            libsDir.copyRecursively(resDir, overwrite = true)
+        }
+
+        // Create necessary AppDir structure
+        val runScript = file("${appDir.get().asFile.absolutePath}/AppRun")
+        val ds = '$'
+        runScript.writeText("""
+            #!/bin/sh
+            SELF=${ds}(readlink -f "${ds}0")
+            HERE=${ds}(dirname "${ds}SELF")
+            export LD_LIBRARY_PATH="${ds}HERE/lib:${ds}LD_LIBRARY_PATH"
+            exec "${ds}HERE/bin/ProtonVPN-Next" "${ds}@"
+        """.trimIndent())
+        runScript.setExecutable(true)
+        
+        val desktopFile = file("${appDir.get().asFile.absolutePath}/ProtonVPN-Next.desktop")
+        desktopFile.writeText("""
+            [Desktop Entry]
+            Type=Application
+            Name=ProtonVPN-Next
+            Exec=ProtonVPN-Next
+            Icon=ProtonVPN-Next
+            Categories=Network;
+        """.trimIndent())
+        
+        // Copy icon to root of AppDir
+        val iconSrc = file("src/main/resources/drawable/ic_launcher.png")
+        if (iconSrc.exists()) {
+            iconSrc.copyTo(file("${appDir.get().asFile.absolutePath}/ProtonVPN-Next.png"), overwrite = true)
+        }
+    }
+
+    commandLine("appimagetool", appDir.get().asFile.absolutePath, outputFile.asFile.absolutePath)
 }

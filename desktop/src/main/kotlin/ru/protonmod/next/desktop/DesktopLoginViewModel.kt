@@ -74,6 +74,19 @@ class DesktopLoginViewModel(
         }
     }
 
+    fun restoreSession(accessToken: String, sessionId: String) {
+        scope.launch {
+            _uiState.value = DesktopLoginUiState.Loading
+            try {
+                // Verify session by loading servers
+                loadServers(accessToken, sessionId)
+                _uiState.value = DesktopLoginUiState.Success(accessToken, sessionId)
+            } catch (e: Exception) {
+                _uiState.value = DesktopLoginUiState.Idle
+            }
+        }
+    }
+
     private fun handleLoginFailure(error: Throwable) {
         when (error) {
             is CaptchaRequiredException -> {

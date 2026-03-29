@@ -33,6 +33,7 @@ import ru.protonmod.next.desktop.data.DesktopSettingsManager
 import ru.protonmod.next.desktop.ui.components.*
 import ru.protonmod.next.desktop.ui.utils.*
 import ru.protonmod.next.ui.theme.ProtonNextTheme as Theme
+import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
 
 @Composable
 fun App() {
@@ -49,7 +50,31 @@ fun App() {
 
     var showCaptcha by remember { mutableStateOf(false) }
     var captchaState by remember { mutableStateOf<DesktopLoginUiState.RequiresCaptcha?>(null) }
+    
+    val settings by settingsManager.settings.collectAsState()
     var selectedTarget by remember { mutableStateOf(MainTarget.Home) }
+    var authTarget by remember { 
+        mutableStateOf(
+            if (settings.isFirstRun) MainTarget.SetupLanguage 
+            else if (settings.accessToken == null) MainTarget.Welcome 
+            else MainTarget.Home 
+        ) 
+    }
+
+    // Auto-login if session exists
+    LaunchedEffect(settings.accessToken) {
+        if (settings.accessToken != null && uiState is DesktopLoginUiState.Idle) {
+            viewModel.restoreSession(settings.accessToken!!, settings.sessionId!!)
+        }
+    }
+
+    // Persist session on success
+    LaunchedEffect(uiState) {
+        if (uiState is DesktopLoginUiState.Success) {
+            val state = uiState as DesktopLoginUiState.Success
+            settingsManager.saveSession(state.accessToken, state.sessionId)
+        }
+    }
 
     val countriesViewModel = remember(servers, connectedServer) {
         DesktopCountriesViewModel(vpnClient, settingsManager, viewModel.servers, viewModel.connectedServer)
@@ -58,7 +83,6 @@ fun App() {
     BoxWithConstraints {
         val windowWidth = maxWidth
         ProvideDeviceType(windowWidth) {
-            val settings by settingsManager.settings.collectAsState()
             Theme(appTheme = settings.appTheme) {
                 // Background gradient (moved to top level)
                 val colors = Theme.colors
@@ -77,22 +101,13 @@ fun App() {
                                 )
                             )
                     ) {
-                        when (uiState) {
-                            is DesktopLoginUiState.Idle, is DesktopLoginUiState.Loading, is DesktopLoginUiState.Error -> {
-                                WelcomeContent(
-                                    uiState = uiState,
-                                    onLogin = { u, p -> viewModel.login(u, p) },
-                                    onGuest = { viewModel.loginAnonymous() },
-                                    onRetry = { viewModel.loginAnonymous() },
-                                    onClearError = { viewModel.clearError() }
-                                )
-                            }
-                            is DesktopLoginUiState.RequiresCaptcha -> {
+                        when {
+                            uiState is DesktopLoginUiState.RequiresCaptcha -> {
                                 val state = uiState as DesktopLoginUiState.RequiresCaptcha
                                 captchaState = state
                                 showCaptcha = true
                             }
-                            is DesktopLoginUiState.Success -> {
+                            uiState is DesktopLoginUiState.Success && !settings.isFirstRun -> {
                                 DashboardScreen(
                                     servers = servers,
                                     recentConnections = recentConnections,
@@ -100,7 +115,11 @@ fun App() {
                                     isConnecting = isConnecting,
                                     selectedTarget = selectedTarget,
                                     onTargetSelected = { selectedTarget = it },
-                                    onLogout = { viewModel.clearError() },
+                                    onLogout = { 
+                                        viewModel.clearError() 
+                                        settingsManager.clearSession()
+                                        authTarget = MainTarget.Welcome
+                                    },
                                     onConnect = { server ->
                                         viewModel.connectToServer(server)
                                     },
@@ -111,6 +130,54 @@ fun App() {
                                     loadDisplayMode = settings.serverLoadDisplayMode,
                                     countriesViewModel = countriesViewModel
                                 )
+                            }
+                            else -> {
+                                // Setup / Auth screens
+                                when (authTarget) {
+                                    MainTarget.SetupLanguage -> {
+                                        SetupLanguageScreen(
+                                            settingsManager = settingsManager,
+                                            onNext = { authTarget = MainTarget.SetupObfuscation }
+                                        )
+                                    }
+                                    MainTarget.SetupObfuscation -> {
+                                        SetupObfuscationScreen(
+                                            settingsManager = settingsManager,
+                                            onNext = { authTarget = MainTarget.Welcome },
+                                            onBack = { authTarget = MainTarget.SetupLanguage }
+                                        )
+                                    }
+                                    MainTarget.Welcome -> {
+                                        SetupAuthScreen(
+                                            uiState = uiState,
+                                            onLogin = { u, p -> viewModel.login(u, p) },
+                                            onGuest = { viewModel.loginAnonymous() },
+                                            onNavigateToLogin = { authTarget = MainTarget.Login },
+                                            onBack = { if (settings.isFirstRun) authTarget = MainTarget.SetupObfuscation else authTarget = MainTarget.Welcome }
+                                        )
+                                    }
+                                    MainTarget.Login -> {
+                                        LoginScreen(
+                                            uiState = uiState,
+                                            onBackClick = { authTarget = MainTarget.Welcome },
+                                            onLogin = { u, p -> viewModel.login(u, p) }
+                                        )
+                                    }
+                                    MainTarget.Onboarding -> {
+                                        OnboardingScreen(
+                                            onComplete = {
+                                                settingsManager.setFirstRunComplete()
+                                                authTarget = MainTarget.Home
+                                            }
+                                        )
+                                    }
+                                    else -> {}
+                                }
+
+                                // Trigger onboarding after success if it's still first run
+                                if (uiState is DesktopLoginUiState.Success && settings.isFirstRun) {
+                                    authTarget = MainTarget.Onboarding
+                                }
                             }
                         }
 
@@ -143,123 +210,7 @@ private fun WelcomeContent(
     onRetry: () -> Unit,
     onClearError: () -> Unit
 ) {
-    val isLoading = uiState is DesktopLoginUiState.Loading
-    val errorMessage = (uiState as? DesktopLoginUiState.Error)?.message
-    val colors = Theme.colors
-
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "ProtonVPN Next",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = colors.textInverted,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = "Secure VPN access on desktop. Powered by AmneziaWG Go.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = colors.textWeak,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        OutlinedTextField(
-            value = username,
-            onValueChange = { username = it },
-            label = { Text("Username") },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            singleLine = true,
-            enabled = !isLoading
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            visualTransformation = PasswordVisualTransformation(),
-            singleLine = true,
-            enabled = !isLoading
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = { onLogin(username, password) },
-            enabled = !isLoading && username.isNotBlank() && password.isNotBlank(),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = colors.brandNorm,
-                contentColor = colors.textInverted
-            )
-        ) {
-            Text("Login")
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        TextButton(
-            onClick = { onGuest() },
-            enabled = !isLoading,
-            modifier = Modifier.padding(horizontal = 16.dp),
-            colors = ButtonDefaults.textButtonColors(contentColor = colors.textInverted)
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = colors.textInverted,
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Text(
-                    text = "Continue as Guest",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
-        errorMessage?.let {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = it,
-                color = colors.notificationError,
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .clickable { onClearError() }
-                    .padding(8.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "If you see a captcha prompt, follow the instructions in the popup.",
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.textWeak.copy(alpha = 0.7f),
-            textAlign = TextAlign.Center
-        )
-    }
+    // Legacy component, unused but kept for reference
 }
 
 @Composable
@@ -277,7 +228,6 @@ private fun DashboardScreen(
     loadDisplayMode: ServerLoadDisplayMode,
     countriesViewModel: DesktopCountriesViewModel
 ) {
-    val colors = Theme.colors
     val isTablet = isTablet()
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -336,6 +286,7 @@ private fun DashboardScreen(
             MainTarget.Profiles -> {
                 ProfilesScreen()
             }
+            else -> {}
         }
 
         LiquidGlassBottomBar(
@@ -344,6 +295,7 @@ private fun DashboardScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .widthIn(max = if (isTablet) 400.dp else 600.dp)
+                .padding(bottom = 24.dp)
         )
     }
 }
@@ -364,7 +316,7 @@ private fun HomeScreen(
     
     Box(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text("Proton VPN", fontWeight = FontWeight.Bold, color = colors.textNorm) },
+            title = { Text(Strings.app_name(), fontWeight = FontWeight.Bold, color = colors.textNorm) },
             actions = {
                 IconButton(onClick = onLogout) {
                     Icon(Icons.Rounded.Logout, "Logout", tint = colors.interactionNorm)
@@ -382,7 +334,7 @@ private fun HomeScreen(
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 80.dp, bottom = 120.dp, start = 24.dp, end = 24.dp),
+                    .padding(top = 80.dp, start = 24.dp, end = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(32.dp)
             ) {
                 // Left Column: Status and Connection
@@ -409,7 +361,7 @@ private fun HomeScreen(
                     DesktopConnectionCard(
                         isConnected = connectedServer != null,
                         isConnecting = isConnecting,
-                        serverName = connectedServer?.name ?: "Quick Connect",
+                        serverName = connectedServer?.name ?: Strings.btn_quick_connect(),
                         countryName = connectedServer?.country ?: "Select Location",
                         ipAddress = if (connectedServer != null) "10.2.0.2" else "0.0.0.0",
                         onToggle = {
@@ -460,7 +412,7 @@ private fun HomeScreen(
             // Phone Layout
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 80.dp, bottom = 120.dp)
+                contentPadding = PaddingValues(top = 80.dp)
             ) {
                 item {
                     Box(
@@ -487,7 +439,7 @@ private fun HomeScreen(
                     DesktopConnectionCard(
                         isConnected = connectedServer != null,
                         isConnecting = isConnecting,
-                        serverName = connectedServer?.name ?: "Quick Connect",
+                        serverName = connectedServer?.name ?: Strings.btn_quick_connect(),
                         countryName = connectedServer?.country ?: "Select Location",
                         ipAddress = if (connectedServer != null) "10.2.0.2" else "0.0.0.0",
                         onToggle = {

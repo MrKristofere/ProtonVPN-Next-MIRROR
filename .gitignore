@@ -30,3 +30,4 @@ vendor/
 # Editors
 .vscode/
 *.code-workspace
+/shared/build/

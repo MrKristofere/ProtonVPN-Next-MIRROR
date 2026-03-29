@@ -10,10 +10,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import ru.protonmod.next.data.local.ServerLoadDisplayMode
-import ru.protonmod.next.ui.theme.AppTheme
 import ru.protonmod.next.vpn.ObfuscationParams
 import ru.protonmod.next.vpn.VpnConstants
+import ru.protonmod.next.data.local.ServerLoadDisplayMode
+import ru.protonmod.next.ui.theme.AppTheme
 import java.io.File
 
 @Serializable
@@ -34,13 +34,22 @@ data class DesktopSettings(
     val h4: String = "4",
     val i1: String = VpnConstants.DEFAULT_I1,
     val appTheme: AppTheme = AppTheme.DARK,
-    val serverLoadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
+    val serverLoadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL,
+    val language: String = "en",
+    val isFirstRun: Boolean = true,
+    val accessToken: String? = null,
+    val sessionId: String? = null
 )
 
 class DesktopSettingsManager(private val settingsFile: File = File("settings.json")) {
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
     private val _settings = MutableStateFlow(loadSettings())
     val settings: StateFlow<DesktopSettings> = _settings.asStateFlow()
+
+    init {
+        // Initialize strings with saved language
+        ru.protonmod.next.desktop.ui.utils.DesktopStrings.loadLanguage(_settings.value.language)
+    }
 
     private fun loadSettings(): DesktopSettings {
         return try {
@@ -89,14 +98,6 @@ class DesktopSettingsManager(private val settingsFile: File = File("settings.jso
         ))
     }
 
-    fun setAppTheme(theme: AppTheme) {
-        saveSettings(_settings.value.copy(appTheme = theme))
-    }
-
-    fun setServerLoadDisplayMode(mode: ServerLoadDisplayMode) {
-        saveSettings(_settings.value.copy(serverLoadDisplayMode = mode))
-    }
-
     fun getObfuscationParams(): ObfuscationParams {
         val s = _settings.value
         return ObfuscationParams(
@@ -105,5 +106,30 @@ class DesktopSettingsManager(private val settingsFile: File = File("settings.jso
             h1 = s.h1, h2 = s.h2, h3 = s.h3, h4 = s.h4,
             i1 = s.i1
         )
+    }
+
+    fun setAppTheme(theme: AppTheme) {
+        saveSettings(_settings.value.copy(appTheme = theme))
+    }
+
+    fun setServerLoadDisplayMode(mode: ServerLoadDisplayMode) {
+        saveSettings(_settings.value.copy(serverLoadDisplayMode = mode))
+    }
+
+    fun setLanguage(lang: String) {
+        saveSettings(_settings.value.copy(language = lang))
+        ru.protonmod.next.desktop.ui.utils.DesktopStrings.loadLanguage(lang)
+    }
+
+    fun setFirstRunComplete() {
+        saveSettings(_settings.value.copy(isFirstRun = false))
+    }
+
+    fun saveSession(accessToken: String, sessionId: String) {
+        saveSettings(_settings.value.copy(accessToken = accessToken, sessionId = sessionId))
+    }
+
+    fun clearSession() {
+        saveSettings(_settings.value.copy(accessToken = null, sessionId = null))
     }
 }

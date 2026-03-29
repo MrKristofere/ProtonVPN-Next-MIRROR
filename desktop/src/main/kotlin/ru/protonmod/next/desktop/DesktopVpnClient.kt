@@ -199,7 +199,13 @@ class DesktopVpnClient(private val settingsManager: DesktopSettingsManager? = nu
 
     private suspend fun startHelper(iface: String, config: String, localIp: String, serverIp: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val paths = listOf(File("libs/vpn-helper"), File("desktop/libs/vpn-helper"))
+            val resourceDir = System.getProperty("compose.application.resources.dir")
+            val paths = mutableListOf(
+                File("libs/vpn-helper"),
+                File("desktop/libs/vpn-helper")
+            )
+            resourceDir?.let { paths.add(0, File(it, "vpn-helper")) }
+
             val helperFile = paths.find { it.exists() } ?: return@withContext Result.failure(Exception("VPN Helper not found in any of: $paths"))
             val helperPath = helperFile.absolutePath
 

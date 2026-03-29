@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.rounded.*
@@ -31,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -511,7 +513,7 @@ fun ObfuscationSettingsScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = if (isTablet) Alignment.CenterHorizontally else Alignment.Start,
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 val contentModifier = if (isTablet) Modifier.widthIn(max = 600.dp) else Modifier.fillMaxWidth()
@@ -557,6 +559,41 @@ fun ObfuscationSettingsScreen(
                 if (settings.obfuscationEnabled) {
                     item {
                         Column(modifier = contentModifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            
+                            CategoryHeader(title = "Packet Magic (H1-H4)")
+                            SettingsCard {
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    ObfuscationParamField(
+                                        modifier = Modifier.weight(1f),
+                                        label = "H1",
+                                        value = settings.h1,
+                                        isNumeric = false,
+                                        onValueChange = { settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(h1 = it)) }
+                                    )
+                                    ObfuscationParamField(
+                                        modifier = Modifier.weight(1f),
+                                        label = "H2",
+                                        value = settings.h2,
+                                        isNumeric = false,
+                                        onValueChange = { settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(h2 = it)) }
+                                    )
+                                    ObfuscationParamField(
+                                        modifier = Modifier.weight(1f),
+                                        label = "H3",
+                                        value = settings.h3,
+                                        isNumeric = false,
+                                        onValueChange = { settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(h3 = it)) }
+                                    )
+                                    ObfuscationParamField(
+                                        modifier = Modifier.weight(1f),
+                                        label = "H4",
+                                        value = settings.h4,
+                                        isNumeric = false,
+                                        onValueChange = { settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(h4 = it)) }
+                                    )
+                                }
+                            }
+
                             CategoryHeader(title = "Junk Packets")
                             SettingsCard {
                                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -581,21 +618,41 @@ fun ObfuscationSettingsScreen(
                                 }
                             }
 
-                            CategoryHeader(title = "Packet Magic")
+                            CategoryHeader(title = "Scrambling (S1-S2)")
                             SettingsCard {
-                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     ObfuscationParamField(
-                                        label = "Init Magic (H1)",
-                                        value = settings.h1,
-                                        isNumeric = false,
-                                        onValueChange = { settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(h1 = it)) }
+                                        modifier = Modifier.weight(1f),
+                                        label = "S1",
+                                        value = settings.s1.toString(),
+                                        onValueChange = { val v = it.toIntOrNull() ?: 0; settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(s1 = v)) }
                                     )
                                     ObfuscationParamField(
-                                        label = "Response Magic (H2)",
-                                        value = settings.h2,
-                                        isNumeric = false,
-                                        onValueChange = { settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(h2 = it)) }
+                                        modifier = Modifier.weight(1f),
+                                        label = "S2",
+                                        value = settings.s2.toString(),
+                                        onValueChange = { val v = it.toIntOrNull() ?: 0; settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(s2 = v)) }
                                     )
+                                }
+                            }
+
+                            CategoryHeader(title = "Advanced Scrambling (I1)")
+                            SettingsCard {
+                                ObfuscationParamField(
+                                    label = "Init Magic (I1)",
+                                    value = settings.i1,
+                                    isNumeric = false,
+                                    onValueChange = { settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(i1 = it)) }
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = { settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(i1 = java.util.UUID.randomUUID().toString())) },
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = colors.brandNorm)
+                                    ) {
+                                        Text("Randomize")
+                                    }
                                 }
                             }
                         }
@@ -654,6 +711,9 @@ fun ObfuscationParamField(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = if (isNumeric) KeyboardType.Number else KeyboardType.Text
+            ),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = colors.brandNorm,
                 unfocusedBorderColor = colors.shade20,
