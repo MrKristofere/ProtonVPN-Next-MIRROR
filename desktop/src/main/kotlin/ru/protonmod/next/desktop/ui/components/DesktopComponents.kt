@@ -25,9 +25,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import ru.protonmod.next.desktop.ui.MainTarget
 import ru.protonmod.next.ui.theme.ProtonNextTheme
+import ru.protonmod.next.ui.utils.CommonCountryUtils
 
 @Composable
 fun LiquidGlassBottomBar(
@@ -107,11 +109,15 @@ fun DesktopConnectionCard(
     isConnected: Boolean,
     isConnecting: Boolean,
     serverName: String,
-    countryName: String,
+    countryCode: String,
+    cityName: String = "",
     ipAddress: String,
     onToggle: () -> Unit
 ) {
     val colors = ProtonNextTheme.colors
+    val countryName = CommonCountryUtils.getCountryName(countryCode).ifBlank { countryCode }
+    val displayLocation = if (cityName.isNotEmpty()) "$countryName, $cityName" else countryName
+    
     val cardContainerColor = when {
         isConnected -> colors.notificationSuccess.copy(alpha = 0.18f)
         isConnecting -> colors.backgroundSecondary
@@ -142,7 +148,7 @@ fun DesktopConnectionCard(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        "$countryName • $ipAddress",
+                        "$displayLocation • $ipAddress",
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.textWeak
@@ -159,11 +165,11 @@ fun DesktopConnectionCard(
                         .background(colors.backgroundNorm),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Rounded.Public, null, tint = colors.iconNorm)
+                    FlagIcon(countryCode = countryCode, size = DpSize(48.dp, 32.dp))
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
-                    Text(countryName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(displayLocation, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(serverName, style = MaterialTheme.typography.bodyMedium, color = colors.textWeak)
                 }
             }

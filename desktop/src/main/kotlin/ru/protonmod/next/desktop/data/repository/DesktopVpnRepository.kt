@@ -21,14 +21,16 @@ import io.sentry.Sentry
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.Retrofit
-import retrofit2.converter.scalars.ScalarsConverterFactory
 import retrofit2.http.*
 import ru.protonmod.next.data.network.*
 import ru.protonmod.next.desktop.data.local.DesktopDatabase
 import ru.protonmod.next.desktop.data.local.DesktopServerEntity
 import ru.protonmod.next.desktop.data.local.DesktopServersCacheEntity
+import ru.protonmod.next.desktop.network.DesktopHeadersInterceptor
+import ru.protonmod.next.desktop.network.DesktopNetworkConstants
 import java.util.concurrent.TimeUnit
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import kotlinx.coroutines.sync.Mutex
@@ -53,7 +55,7 @@ interface DesktopVpnApiService {
     suspend fun getVpnInfo(
         @Header("Authorization") authorization: String,
         @Header("x-pm-uid") sessionId: String
-    ): Response<String>
+    ): Response<ResponseBody>
 
     @POST("vpn/v1/certificate")
     suspend fun createCertificate(
@@ -76,10 +78,10 @@ interface DesktopVpnApiService {
  */
 class DesktopVpnRepository(
     private val database: DesktopDatabase,
-    private val baseUrl: String = "https://vpn-api.proton.me/",
+    private val baseUrl: String = DesktopNetworkConstants.BASE_URL,
     private val applicationScope: CoroutineScope = CoroutineScope(Dispatchers.Default)
 ) {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
     private var autoUpdateJob: Job? = null
     private val fetchMutex = Mutex()
     private var activeFetch: Deferred<Result<List<LogicalServer>>>? = null
@@ -94,6 +96,7 @@ class DesktopVpnRepository(
     private val vpnApi: DesktopVpnApiService by lazy {
         val mediaType = "application/json".toMediaType()
         val client = OkHttpClient.Builder()
+            .addInterceptor(DesktopHeadersInterceptor())
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
@@ -103,7 +106,6 @@ class DesktopVpnRepository(
             .baseUrl(baseUrl)
             .client(client)
             .addConverterFactory(json.asConverterFactory(mediaType))
-            .addConverterFactory(ScalarsConverterFactory.create())
             .build()
             .create(DesktopVpnApiService::class.java)
     }
@@ -220,7 +222,7 @@ class DesktopVpnRepository(
                 sessionId = sessionId,
                 ifModifiedSince = ifModifiedSince,
                 protocols = "wireguard",
-                userTier = userTier
+                userTier = if (userTier == 0) null else userTier
             )
 
             val (serversList, newLastModified) = when (response.code()) {
@@ -240,7 +242,9 @@ class DesktopVpnRepository(
                     }
                 }
                 else -> {
-                    println("$TAG: Proton API: Unexpected response code ${response.code()}")
+                    val errorBody = response.errorBody()?.string()
+                    println("$TAG: Proton API Error: getLogicalServers returned ${response.code()}. Body: $errorBody")
+
                     val dbServers = database.getAllServers().map { DesktopServerEntity.toDomain(it) }
                     if (dbServers.isNotEmpty()) {
                         println("$TAG: Falling back to DB servers due to API error")
@@ -258,7 +262,7 @@ class DesktopVpnRepository(
             // Fetch server loads and merge with current list
             println("$TAG: Fetching server loads for ${serversList.size} servers...")
             val loadsResponse = try {
-                vpnApi.getLoads(bearer, sessionId, userTier)
+                vpnApi.getLoads(bearer, sessionId, if (userTier == 0) null else userTier)
             } catch (e: Exception) {
                 println("$TAG: Failed to initiate loads request: ${e.message}")
                 null
@@ -335,7 +339,7 @@ class DesktopVpnRepository(
         return try {
             val response = vpnApi.getVpnInfo("Bearer $accessToken", sessionId)
             if (response.isSuccessful) {
-                val body = response.body() ?: return Result.failure(Exception("Empty response"))
+                val body = response.body()?.string() ?: return Result.failure(Exception("Empty response"))
                 try {
                     val vpnInfo = json.decodeFromString<VpnInfoResponse>(body)
                     Result.success(vpnInfo)
@@ -344,6 +348,8 @@ class DesktopVpnRepository(
                     Result.failure(e)
                 }
             } else {
+                val errorBody = response.errorBody()?.string()
+                println("$TAG: Failed to get VPN info: ${response.code()}. Body: $errorBody")
                 Result.failure(Exception("Failed to get VPN info: ${response.code()}"))
             }
         } catch (e: Exception) {
@@ -360,9 +366,15 @@ class DesktopVpnRepository(
         publicKeyPem: String
     ): Result<CreateCertificateResponse> {
         return try {
+            val bearer = "Bearer $accessToken"
+            
+            // Proton API sometimes requires calling vpn/v2 info before registration to initialize session state
+            println("$TAG: Initializing VPN session info before registration...")
+            getVpnInfo(accessToken, sessionId)
+
             val request = CreateCertificateRequest(publicKeyPem)
             val response = vpnApi.createCertificate(
-                "Bearer $accessToken",
+                bearer,
                 sessionId,
                 request
             )
@@ -371,9 +383,12 @@ class DesktopVpnRepository(
                 if (body?.code == 1000) {
                     Result.success(body)
                 } else {
+                    println("$TAG: Certificate registration failed: Code ${body?.code}")
                     Result.failure(Exception("Certificate registration failed: Code ${body?.code}"))
                 }
             } else {
+                val errorBody = response.errorBody()?.string()
+                println("$TAG: Certificate registration failed with code ${response.code()}. Body: $errorBody")
                 Result.failure(Exception("Certificate registration failed: ${response.code()}"))
             }
         } catch (e: Exception) {

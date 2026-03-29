@@ -14,13 +14,12 @@ import retrofit2.http.POST
 import ru.protonmod.next.data.network.*
 import ru.protonmod.next.desktop.native.VpnNative
 import ru.protonmod.next.desktop.monitoring.DesktopSentryManager
+import ru.protonmod.next.desktop.network.DesktopHeadersInterceptor
+import ru.protonmod.next.desktop.network.DesktopNetworkConstants
 import java.util.*
 import kotlin.math.abs
 
-private const val BASE_URL = "https://vpn-api.proton.me/"
-private const val SPOOFED_APP_VERSION = "5.16.31.0"
-private const val SPOOFED_OS = "Android 14"
-private const val SPOOFED_DEVICE = "Google Pixel 7"
+private const val BASE_URL = DesktopNetworkConstants.BASE_URL
 private const val SPOOFED_DEVICE_HASH = 53319294142L
 
 interface DesktopAuthApi {
@@ -65,7 +64,7 @@ class DesktopAuthClient(private val sentryManager: DesktopSentryManager? = null)
     private val authApi: DesktopAuthApi by lazy {
         val mediaType = "application/json".toMediaType()
         val client = OkHttpClient.Builder()
-            .addInterceptor(HeadersInterceptor())
+            .addInterceptor(DesktopHeadersInterceptor())
             .build()
 
         Retrofit.Builder()
@@ -177,7 +176,7 @@ class DesktopAuthClient(private val sentryManager: DesktopSentryManager? = null)
             put("Payload", buildJsonObject {
                 put("vpn-android-v4-challenge-0", buildJsonObject {
                     put("type", JsonPrimitive("me.proton.core.challenge.data.frame.ChallengeFrame.Device"))
-                    put("v", JsonPrimitive(SPOOFED_APP_VERSION))
+                    put("v", JsonPrimitive(DesktopNetworkConstants.SPOOFED_APP_VERSION))
                     put("appLang", JsonPrimitive(locale.language))
                     put("timezone", JsonPrimitive(timezone.id))
                     put("deviceName", JsonPrimitive(SPOOFED_DEVICE_HASH))
@@ -222,16 +221,4 @@ class DesktopAuthClient(private val sentryManager: DesktopSentryManager? = null)
     }
 }
 
-internal class HeadersInterceptor : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): okhttp3.Response {
-        val original = chain.request()
-        val requestBuilder: Request.Builder = original.newBuilder()
-            .header("User-Agent", "ProtonVPN/$SPOOFED_APP_VERSION ($SPOOFED_OS; $SPOOFED_DEVICE)")
-            .header("x-pm-appversion", "android-vpn@$SPOOFED_APP_VERSION-dev+play")
-            .header("x-pm-apiversion", "4")
-            .header("Accept", "application/vnd.protonmail.v1+json")
-
-        val request = requestBuilder.build()
-        return chain.proceed(request)
-    }
-}
+// Deleted HeadersInterceptor, now using DesktopHeadersInterceptor from DesktopNetworkUtils

@@ -54,6 +54,12 @@ class DesktopLoginViewModel(
                 val accessToken = response.accessToken.orEmpty()
                 val sessionId = response.sessionId.orEmpty()
                 
+                println("DesktopLoginViewModel: Login successful. UID: $sessionId")
+                
+                if (sessionId.isEmpty()) {
+                    println("DesktopLoginViewModel: ERROR: Received empty UID from API!")
+                }
+
                 // Save session to database
                 database.saveSession(DesktopSessionEntity(
                     accessToken = accessToken,
@@ -67,7 +73,7 @@ class DesktopLoginViewModel(
                 
                 // Try perform one-time VPN setup (key registration) after login
                 // We proceed even if it fails, as CertificateManager will retry or user can manual refresh
-                vpnClient.setupVpn(accessToken, sessionId)
+                vpnClient.setupVpn()
                 
                 _uiState.value = DesktopLoginUiState.Success(accessToken, sessionId)
                 loadServers(accessToken, sessionId)
@@ -92,6 +98,12 @@ class DesktopLoginViewModel(
                 val accessToken = response.accessToken.orEmpty()
                 val sessionId = response.sessionId.orEmpty()
                 
+                println("DesktopLoginViewModel: Guest login successful. UID: $sessionId")
+
+                if (sessionId.isEmpty()) {
+                    println("DesktopLoginViewModel: ERROR: Received empty UID from API for guest!")
+                }
+
                 // Save anonymous session to database
                 database.saveSession(DesktopSessionEntity(
                     accessToken = accessToken,
@@ -104,7 +116,7 @@ class DesktopLoginViewModel(
                 sentryManager?.setUserContext("anonymous")
                 
                 // Try perform one-time VPN setup (key registration) after guest login
-                vpnClient.setupVpn(accessToken, sessionId)
+                vpnClient.setupVpn()
                 
                 _uiState.value = DesktopLoginUiState.Success(accessToken, sessionId)
                 loadServers(accessToken, sessionId)
@@ -157,11 +169,11 @@ class DesktopLoginViewModel(
     }
 
     fun connectToServer(server: ServerEntry) {
-        val state = _uiState.value as? DesktopLoginUiState.Success ?: return
+        if (_uiState.value !is DesktopLoginUiState.Success) return
         
         scope.launch {
             _isConnecting.value = true
-            val result = vpnClient.connect(state.accessToken, state.sessionId, server)
+            val result = vpnClient.connect(server)
             _isConnecting.value = false
             
             result.onSuccess {

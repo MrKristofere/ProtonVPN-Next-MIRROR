@@ -52,7 +52,7 @@ class DesktopVpnClient(
         }
     }
 
-    suspend fun setupVpn(accessToken: String, sessionId: String): Result<Unit> {
+    suspend fun setupVpn(): Result<Unit> {
         return try {
             val session = database.getSession()
             if (session != null && !session.wgCertificate.isNullOrEmpty() && !session.wgPrivateKey.isNullOrEmpty()) {
@@ -79,8 +79,19 @@ class DesktopVpnClient(
         }
     }
 
-    suspend fun connect(accessToken: String, sessionId: String, server: ServerEntry): Result<Unit> {
+    suspend fun connect(server: ServerEntry): Result<Unit> {
         val startTime = System.currentTimeMillis()
+        
+        // If already connected or connecting, disconnect first to ensure clean state
+        if (helperProcess != null) {
+            println("Already connected, disconnecting before reconnect...")
+            disconnect()
+            // Wait a bit for interface cleanup
+            withContext(Dispatchers.IO) {
+                Thread.sleep(1000)
+            }
+        }
+
         return try {
             // Track VPN connection attempt
             sentryManager?.trackVpnConnectionAttempt(
@@ -93,7 +104,7 @@ class DesktopVpnClient(
             // Check if certificate is missing or fully expired
             if (session.wgCertificate.isNullOrEmpty() || certificateManager.isEffectivelyExpired()) {
                 println("Certificate missing or expired, performing setup/refresh...")
-                val setupResult = setupVpn(accessToken, sessionId)
+                val setupResult = setupVpn()
                 if (setupResult.isFailure) {
                     // Fail if it's the very first time or it's hard-expired
                     sentryManager?.trackVpnConnectionError(
@@ -202,8 +213,35 @@ class DesktopVpnClient(
             val helperFile = paths.find { it.exists() } ?: return@withContext Result.failure(Exception("VPN Helper not found in any of: $paths"))
             val helperPath = helperFile.absolutePath
 
-            println("Starting VPN helper via pkexec from $helperPath...")
-            val process = ProcessBuilder("pkexec", helperPath, iface, localIp, serverIp)
+            // Ensure permissions
+            ensureHelperPermissions(helperFile)
+
+            // Check if setuid bit is set (simplistic check: is owner root and has 's' in permissions)
+            // If it's owned by root and has setuid, we don't need pkexec
+            val isSetUid = try {
+                val output = ProcessBuilder("ls", "-l", helperPath).start().inputStream.bufferedReader().readText()
+                output.startsWith("-rws") || output.startsWith("-r-s")
+            } catch (_: Exception) { false }
+
+            // Cleanup interface if it exists
+            println("Cleaning up interface $iface...")
+            try {
+                if (isSetUid) {
+                    ProcessBuilder(helperPath, "--cleanup", iface).start().waitFor()
+                } else {
+                    ProcessBuilder("pkexec", helperPath, "--cleanup", iface).start().waitFor()
+                }
+            } catch (_: Exception) {}
+
+            println("Starting VPN helper from $helperPath...")
+            
+            val cmd = if (isSetUid) {
+                listOf(helperPath, iface, localIp, serverIp)
+            } else {
+                listOf("pkexec", helperPath, iface, localIp, serverIp)
+            }
+
+            val process = ProcessBuilder(cmd)
                 .redirectErrorStream(true)
                 .start()
 
@@ -249,10 +287,40 @@ class DesktopVpnClient(
         }
     }
 
+    private fun ensureHelperPermissions(helperFile: File) {
+        try {
+            val path = helperFile.absolutePath
+            val output = ProcessBuilder("ls", "-l", path).start().inputStream.bufferedReader().readText()
+            val isSetUid = output.startsWith("-rws") || output.startsWith("-r-s")
+            
+            if (!isSetUid) {
+                println("Setting up persistent root permissions for vpn-helper (one-time elevation)...")
+                // Use pkexec to set setuid bit once
+                val pb = ProcessBuilder(
+                    "pkexec", "sh", "-c", 
+                    "chown root:root \"$path\" && chmod u+s \"$path\""
+                )
+                val proc = pb.start()
+                if (proc.waitFor() == 0) {
+                    println("Successfully enabled persistent root permissions for vpn-helper")
+                } else {
+                    println("Failed to set persistent permissions, will continue using pkexec for every connection")
+                }
+            }
+        } catch (e: Exception) {
+            println("Error checking/setting helper permissions: ${e.message}")
+        }
+    }
+
     fun disconnect(): Result<Unit> {
         helperProcess?.let {
             println("Disconnecting VPN...")
-            it.destroy()
+            
+            try {
+                // Closing stdin triggers cleanup in the helper
+                it.outputStream.close()
+            } catch (_: Exception) {}
+
             try {
                 if (!it.waitFor(5, TimeUnit.SECONDS)) {
                     it.destroyForcibly()

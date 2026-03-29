@@ -2,6 +2,8 @@
 
 package ru.protonmod.next.desktop
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,9 +11,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Logout
+import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.Map
-import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,8 +21,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import ru.protonmod.next.desktop.ui.MainTarget
@@ -32,6 +31,7 @@ import ru.protonmod.next.data.local.ServerLoadDisplayMode
 import ru.protonmod.next.desktop.data.*
 import ru.protonmod.next.desktop.ui.components.*
 import ru.protonmod.next.desktop.ui.utils.*
+import ru.protonmod.next.ui.utils.CommonCountryUtils
 import ru.protonmod.next.ui.theme.ProtonNextTheme as Theme
 import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
 
@@ -94,6 +94,15 @@ fun App() {
         }
     }
 
+    // Handle Captcha
+    LaunchedEffect(uiState) {
+        if (uiState is DesktopLoginUiState.RequiresCaptcha) {
+            val state = uiState as DesktopLoginUiState.RequiresCaptcha
+            captchaState = state
+            showCaptcha = true
+        }
+    }
+
     // Persist session on success
     LaunchedEffect(uiState) {
         if (uiState is DesktopLoginUiState.Success) {
@@ -110,9 +119,7 @@ fun App() {
         val windowWidth = maxWidth
         ProvideDeviceType(windowWidth) {
             Theme(appTheme = settings.appTheme) {
-                // Background gradient (moved to top level)
                 val colors = Theme.colors
-                // Force root Surface to be transparent on Desktop to allow gradient visibility
                 Surface(color = Color.Transparent) {
                     Box(
                         modifier = Modifier
@@ -127,13 +134,14 @@ fun App() {
                                 )
                             )
                     ) {
-                        when {
-                            uiState is DesktopLoginUiState.RequiresCaptcha -> {
-                                val state = uiState as DesktopLoginUiState.RequiresCaptcha
-                                captchaState = state
-                                showCaptcha = true
-                            }
-                            uiState is DesktopLoginUiState.Success && !settings.isFirstRun -> {
+                        AnimatedContent(
+                            targetState = if (uiState is DesktopLoginUiState.Success && !settings.isFirstRun) 1 else 0,
+                            transitionSpec = {
+                                fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
+                            },
+                            label = "root_auth_transition"
+                        ) { target ->
+                            if (target == 1) {
                                 DashboardScreen(
                                     servers = servers,
                                     recentConnections = recentConnections,
@@ -159,51 +167,64 @@ fun App() {
                                     countriesViewModel = countriesViewModel,
                                     dataManager = dataManager
                                 )
-                            }
-                            else -> {
-                                // Setup / Auth screens
-                                when (authTarget) {
-                                    MainTarget.SetupLanguage -> {
-                                        SetupLanguageScreen(
-                                            settingsManager = settingsManager,
-                                            onNext = { authTarget = MainTarget.SetupObfuscation }
-                                        )
-                                    }
-                                    MainTarget.SetupObfuscation -> {
-                                        SetupObfuscationScreen(
-                                            settingsManager = settingsManager,
-                                            onNext = { authTarget = MainTarget.Welcome },
-                                            onBack = { authTarget = MainTarget.SetupLanguage }
-                                        )
-                                    }
-                                    MainTarget.Welcome -> {
-                                        SetupAuthScreen(
-                                            uiState = uiState,
-                                            onLogin = { u, p -> viewModel.login(u, p) },
-                                            onGuest = { viewModel.loginAnonymous() },
-                                            onNavigateToLogin = { authTarget = MainTarget.Login },
-                                            onBack = { if (settings.isFirstRun) authTarget = MainTarget.SetupObfuscation else authTarget = MainTarget.Welcome }
-                                        )
-                                    }
-                                    MainTarget.Login -> {
-                                        LoginScreen(
-                                            uiState = uiState,
-                                            onBackClick = { authTarget = MainTarget.Welcome },
-                                            onLogin = { u, p -> viewModel.login(u, p) }
-                                        )
-                                    }
-                                    MainTarget.Onboarding -> {
-                                        OnboardingScreen(
-                                            onComplete = {
-                                                settingsManager.setFirstRunComplete()
-                                                authTarget = MainTarget.Home
+                            } else {
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    AnimatedContent(
+                                        targetState = authTarget,
+                                        transitionSpec = {
+                                            if (targetState.ordinal > initialState.ordinal) {
+                                                (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
+                                                    slideOutHorizontally { width -> -width } + fadeOut())
+                                            } else {
+                                                (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(
+                                                    slideOutHorizontally { width -> width } + fadeOut())
                                             }
-                                        )
+                                        },
+                                        label = "auth_flow_transition"
+                                    ) { currentAuthTarget ->
+                                        when (currentAuthTarget) {
+                                            MainTarget.SetupLanguage -> {
+                                                SetupLanguageScreen(
+                                                    settingsManager = settingsManager,
+                                                    onNext = { authTarget = MainTarget.SetupObfuscation }
+                                                )
+                                            }
+                                            MainTarget.SetupObfuscation -> {
+                                                SetupObfuscationScreen(
+                                                    settingsManager = settingsManager,
+                                                    onNext = { authTarget = MainTarget.Welcome },
+                                                    onBack = { authTarget = MainTarget.SetupLanguage }
+                                                )
+                                            }
+                                            MainTarget.Welcome -> {
+                                                SetupAuthScreen(
+                                                    uiState = uiState,
+                                                    onLogin = { u, p -> viewModel.login(u, p) },
+                                                    onGuest = { viewModel.loginAnonymous() },
+                                                    onNavigateToLogin = { authTarget = MainTarget.Login },
+                                                    onBack = { if (settings.isFirstRun) authTarget = MainTarget.SetupObfuscation else authTarget = MainTarget.Welcome }
+                                                )
+                                            }
+                                            MainTarget.Login -> {
+                                                LoginScreen(
+                                                    uiState = uiState,
+                                                    onBackClick = { authTarget = MainTarget.Welcome },
+                                                    onLogin = { u, p -> viewModel.login(u, p) }
+                                                )
+                                            }
+                                            MainTarget.Onboarding -> {
+                                                OnboardingScreen(
+                                                    onComplete = {
+                                                        settingsManager.setFirstRunComplete()
+                                                        authTarget = MainTarget.Home
+                                                    }
+                                                )
+                                            }
+                                            else -> {}
+                                        }
                                     }
-                                    else -> {}
                                 }
 
-                                // Trigger onboarding after success if it's still first run
                                 if (uiState is DesktopLoginUiState.Success && settings.isFirstRun) {
                                     authTarget = MainTarget.Onboarding
                                 }
@@ -232,17 +253,6 @@ fun App() {
 }
 
 @Composable
-private fun WelcomeContent(
-    uiState: DesktopLoginUiState,
-    onLogin: (String, String) -> Unit,
-    onGuest: () -> Unit,
-    onRetry: () -> Unit,
-    onClearError: () -> Unit
-) {
-    // Legacy component, unused but kept for reference
-}
-
-@Composable
 private fun DashboardScreen(
     servers: List<ServerEntry>,
     recentConnections: List<ServerEntry>,
@@ -258,87 +268,101 @@ private fun DashboardScreen(
     settingsManager: DesktopSettingsManager,
     loadDisplayMode: ServerLoadDisplayMode,
     countriesViewModel: DesktopCountriesViewModel,
-    dataManager: ru.protonmod.next.desktop.data.DesktopVpnDataManager
+    dataManager: DesktopVpnDataManager
 ) {
     val isTablet = isTablet()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        when (selectedTarget) {
-            MainTarget.Home -> {
-                HomeScreen(
-                    servers = servers,
-                    recentConnections = recentConnections,
-                    connectedServer = connectedServer,
-                    isConnecting = isConnecting,
-                    onLogout = onLogout,
-                    onConnect = onConnect,
-                    onDisconnect = onDisconnect,
-                    certificateState = certificateState,
-                    onRefreshCert = onRefreshCert,
-                    isTablet = isTablet,
-                    loadDisplayMode = loadDisplayMode
-                )
+        AnimatedContent(
+            targetState = selectedTarget,
+            transitionSpec = {
+                if (targetState == MainTarget.Home || initialState == MainTarget.Settings) {
+                    (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(
+                        slideOutHorizontally { width -> width } + fadeOut())
+                } else {
+                    (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
+                        slideOutHorizontally { width -> -width } + fadeOut())
+                }
+            },
+            label = "dashboard_nav_transition"
+        ) { target ->
+            when (target) {
+                MainTarget.Home -> {
+                    HomeScreen(
+                        servers = servers,
+                        recentConnections = recentConnections,
+                        connectedServer = connectedServer,
+                        isConnecting = isConnecting,
+                        onLogout = onLogout,
+                        onConnect = onConnect,
+                        onDisconnect = onDisconnect,
+                        certificateState = certificateState,
+                        onRefreshCert = onRefreshCert,
+                        isTablet = isTablet,
+                        loadDisplayMode = loadDisplayMode
+                    )
+                }
+                MainTarget.Countries -> {
+                    CountriesScreen(
+                        viewModel = countriesViewModel,
+                        onConnect = onConnect
+                    )
+                }
+                MainTarget.Settings -> {
+                    SettingsScreen(
+                        settingsManager = settingsManager,
+                        navigateTo = onTargetSelected
+                    )
+                }
+                MainTarget.ThemeSelection -> {
+                    ThemeSelectionScreen(
+                        onBack = { onTargetSelected(MainTarget.Settings) },
+                        settingsManager = settingsManager
+                    )
+                }
+                MainTarget.ProtocolSelection -> {
+                    ProtocolSelectionScreen(
+                        currentProtocol = "AmneziaWG",
+                        onBack = { onTargetSelected(MainTarget.Settings) },
+                        onProtocolSelected = { /* Already AmneziaWG */ },
+                        onNavigateToObfuscation = { onTargetSelected(MainTarget.ObfuscationSettings) }
+                    )
+                }
+                MainTarget.ObfuscationSettings -> {
+                    ObfuscationSettingsScreen(
+                        onBack = { onTargetSelected(MainTarget.Settings) },
+                        settingsManager = settingsManager
+                    )
+                }
+                MainTarget.ServerLoadSelection -> {
+                    ServerLoadDisplayModeScreen(
+                        onBack = { onTargetSelected(MainTarget.Settings) },
+                        settingsManager = settingsManager
+                    )
+                }
+                MainTarget.SplitTunneling -> {
+                    SplitTunnelingScreen(
+                        onBack = { onTargetSelected(MainTarget.Settings) },
+                        manager = dataManager.splitTunnelingManager
+                    )
+                }
+                MainTarget.CustomDns -> {
+                    CustomDnsScreen(
+                        onBack = { onTargetSelected(MainTarget.Settings) },
+                        manager = dataManager.dnsManager
+                    )
+                }
+                MainTarget.ErrorReporting -> {
+                    ErrorReportingScreen(
+                        onBack = { onTargetSelected(MainTarget.Settings) },
+                        settingsManager = settingsManager
+                    )
+                }
+                MainTarget.Profiles -> {
+                    ProfilesScreen()
+                }
+                else -> {}
             }
-            MainTarget.Countries -> {
-                CountriesScreen(
-                    viewModel = countriesViewModel,
-                    onConnect = onConnect
-                )
-            }
-            MainTarget.Settings -> {
-                SettingsScreen(
-                    settingsManager = settingsManager,
-                    navigateTo = onTargetSelected
-                )
-            }
-            MainTarget.ThemeSelection -> {
-                ThemeSelectionScreen(
-                    onBack = { onTargetSelected(MainTarget.Settings) },
-                    settingsManager = settingsManager
-                )
-            }
-            MainTarget.ProtocolSelection -> {
-                ProtocolSelectionScreen(
-                    currentProtocol = "AmneziaWG",
-                    onBack = { onTargetSelected(MainTarget.Settings) },
-                    onProtocolSelected = { /* Already AmneziaWG */ },
-                    onNavigateToObfuscation = { onTargetSelected(MainTarget.ObfuscationSettings) }
-                )
-            }
-            MainTarget.ObfuscationSettings -> {
-                ObfuscationSettingsScreen(
-                    onBack = { onTargetSelected(MainTarget.Settings) },
-                    settingsManager = settingsManager
-                )
-            }
-            MainTarget.ServerLoadSelection -> {
-                ServerLoadDisplayModeScreen(
-                    onBack = { onTargetSelected(MainTarget.Settings) },
-                    settingsManager = settingsManager
-                )
-            }
-            MainTarget.SplitTunneling -> {
-                SplitTunnelingScreen(
-                    onBack = { onTargetSelected(MainTarget.Settings) },
-                    manager = dataManager.splitTunnelingManager
-                )
-            }
-            MainTarget.CustomDns -> {
-                CustomDnsScreen(
-                    onBack = { onTargetSelected(MainTarget.Settings) },
-                    manager = dataManager.dnsManager
-                )
-            }
-            MainTarget.ErrorReporting -> {
-                ErrorReportingScreen(
-                    onBack = { onTargetSelected(MainTarget.Settings) },
-                    settingsManager = settingsManager
-                )
-            }
-            MainTarget.Profiles -> {
-                ProfilesScreen()
-            }
-            else -> {}
         }
 
         LiquidGlassBottomBar(
@@ -373,7 +397,7 @@ private fun HomeScreen(
             title = { Text(Strings.app_name(), fontWeight = FontWeight.Bold, color = colors.textNorm) },
             actions = {
                 IconButton(onClick = onLogout) {
-                    Icon(Icons.Rounded.Logout, "Logout", tint = colors.interactionNorm)
+                    Icon(Icons.AutoMirrored.Rounded.Logout, "Logout", tint = colors.interactionNorm)
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -421,7 +445,8 @@ private fun HomeScreen(
                         isConnected = connectedServer != null,
                         isConnecting = isConnecting,
                         serverName = connectedServer?.name ?: Strings.btn_quick_connect(),
-                        countryName = connectedServer?.country ?: "Select Location",
+                        countryCode = connectedServer?.country ?: "Select Location",
+                        cityName = connectedServer?.city ?: "",
                         ipAddress = if (connectedServer != null) "10.2.0.2" else "0.0.0.0",
                         onToggle = {
                             if (connectedServer != null) {
@@ -507,7 +532,8 @@ private fun HomeScreen(
                         isConnected = connectedServer != null,
                         isConnecting = isConnecting,
                         serverName = connectedServer?.name ?: Strings.btn_quick_connect(),
-                        countryName = connectedServer?.country ?: "Select Location",
+                        countryCode = connectedServer?.country ?: "Select Location",
+                        cityName = connectedServer?.city ?: "",
                         ipAddress = if (connectedServer != null) "10.2.0.2" else "0.0.0.0",
                         onToggle = {
                             if (connectedServer != null) {
@@ -572,7 +598,8 @@ private fun ServerCard(server: ServerEntry, onClick: () -> Unit, displayMode: Se
                 FlagIcon(countryCode = server.country, size = DpSize(36.dp, 24.dp))
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(server.country, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    val countryName = CommonCountryUtils.getCountryName(server.country).ifBlank { server.country }
+                    Text(countryName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(server.name, style = MaterialTheme.typography.bodyMedium, color = colors.textWeak)
                 }
                 LoadIndicator(load = load, displayMode = displayMode)

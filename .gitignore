@@ -20,9 +20,7 @@ sentry.properties
 
 # Go artifacts
 /go-bridge/bridge
-/desktop/libs/vpn-helper
-/desktop/libs/libgovpn.so
-/desktop/libs/libgovpn.h
+/desktop/libs/*
 **/bin/
 **/build/
 pkg/

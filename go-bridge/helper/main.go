@@ -19,8 +19,16 @@ import (
 )
 
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == "--cleanup" {
+		interfaceName := os.Args[2]
+		fmt.Printf("Cleaning up interface %s...\n", interfaceName)
+		exec.Command("ip", "link", "delete", interfaceName).Run()
+		os.Exit(0)
+	}
+
 	if len(os.Args) < 4 {
 		fmt.Fprintf(os.Stderr, "Usage: %s <interface-name> <local-ip> <server-ip>\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "       %s --cleanup <interface-name>\n", os.Args[0])
 		os.Exit(1)
 	}
 
