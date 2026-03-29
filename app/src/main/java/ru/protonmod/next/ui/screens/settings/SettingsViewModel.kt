@@ -39,6 +39,7 @@ import ru.protonmod.next.data.model.ObfuscationProfile
 import ru.protonmod.next.ui.theme.AppTheme
 import ru.protonmod.next.utils.crypto.QuicI1Generator
 import ru.protonmod.next.vpn.AmneziaVpnManager
+import ru.protonmod.next.vpn.VpnConstants
 import javax.inject.Inject
 
 data class SettingsUiState(
@@ -75,7 +76,7 @@ data class SettingsUiState(
     val awgH2: String = "2",
     val awgH3: String = "3",
     val awgH4: String = "4",
-    val awgI1: String = SettingsManager.DEFAULT_I1,
+    val awgI1: String = VpnConstants.DEFAULT_I1,
     val awgI2: String = "",
     val awgI3: String = "",
     val awgI4: String = "",

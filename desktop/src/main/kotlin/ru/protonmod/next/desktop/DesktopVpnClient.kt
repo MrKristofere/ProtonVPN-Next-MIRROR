@@ -46,6 +46,13 @@ interface DesktopVpnApi {
         @Header("x-pm-uid") sessionId: String,
         @Body request: CreateCertificateRequest
     ): Response<CreateCertificateResponse>
+
+    @GET("vpn/v1/loads")
+    suspend fun getLoads(
+        @Header("Authorization") authorization: String,
+        @Header("x-pm-uid") sessionId: String,
+        @Query("Tier") userTier: Int? = null
+    ): Response<LoadsResponse>
 }
 
 class DesktopVpnClient(private val settingsManager: DesktopSettingsManager? = null) {
@@ -81,14 +88,25 @@ class DesktopVpnClient(private val settingsManager: DesktopSettingsManager? = nu
             if (body == null || body.code != 1000) {
                 return Result.failure(Exception("Server list response invalid: code=${body?.code}"))
             }
-            val servers = body.logicalServers.map {
+
+            // Fetch loads separately
+            val loadsResponse = vpnApi.getLoads(bearer, sessionId, userTier = userTier)
+            val loadsMap = if (loadsResponse.isSuccessful) {
+                loadsResponse.body()?.loads?.associate { it.id to it.load } ?: emptyMap()
+            } else emptyMap()
+
+            val servers = body.logicalServers.map { logical ->
+                val logicalLoad = loadsMap[logical.id] ?: 0
+                val physical = logical.servers.firstOrNull()?.copy()?.apply {
+                    load = loadsMap[id] ?: logicalLoad
+                }
                 ServerEntry(
-                    id = it.id,
-                    name = it.name,
-                    city = it.city,
-                    country = it.entryCountry.ifBlank { it.exitCountry },
-                    tier = it.tier,
-                    physicalServer = it.servers.firstOrNull()
+                    id = logical.id,
+                    name = logical.name,
+                    city = logical.city,
+                    country = logical.entryCountry.ifBlank { logical.exitCountry },
+                    tier = logical.tier,
+                    physicalServer = physical
                 )
             }
             Result.success(servers)

@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import ru.protonmod.next.data.local.ServerLoadDisplayMode
+import ru.protonmod.next.ui.theme.AppTheme
 import ru.protonmod.next.desktop.data.DesktopSettingsManager
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.desktop.ui.utils.isTablet
@@ -154,10 +156,37 @@ fun SettingsScreen(
                                         subtitle = if (settings.vpnPort == 0) "Automatic" else settings.vpnPort.toString(),
                                         onClick = { /* Implement port selection dialog if needed */ }
                                     )
+                                    SettingRowWithIcon(
+                                        icon = Icons.Rounded.BarChart,
+                                        title = "Server Load Display",
+                                        subtitle = settings.serverLoadDisplayMode.name,
+                                        onClick = {
+                                            val nextMode = when (settings.serverLoadDisplayMode) {
+                                                ServerLoadDisplayMode.ALL -> ServerLoadDisplayMode.PERCENT
+                                                ServerLoadDisplayMode.PERCENT -> ServerLoadDisplayMode.LINE
+                                                ServerLoadDisplayMode.LINE -> ServerLoadDisplayMode.HIDDEN
+                                                ServerLoadDisplayMode.HIDDEN -> ServerLoadDisplayMode.ALL
+                                            }
+                                            settingsManager.setServerLoadDisplayMode(nextMode)
+                                        }
+                                    )
                                 }
                             }
 
                             Column(modifier = Modifier.weight(1f)) {
+                                Category(title = "Appearance") {
+                                    SettingRowWithIcon(
+                                        icon = Icons.Rounded.Palette,
+                                        title = "App Theme",
+                                        subtitle = settings.appTheme.name,
+                                        onClick = {
+                                            val themes = AppTheme.entries
+                                            val currentIndex = themes.indexOf(settings.appTheme)
+                                            val nextTheme = themes[(currentIndex + 1) % themes.size]
+                                            settingsManager.setAppTheme(nextTheme)
+                                        }
+                                    )
+                                }
                                 Category(title = "Privacy & Security") {
                                     SettingToggleRow(
                                         icon = Icons.Rounded.GppGood,

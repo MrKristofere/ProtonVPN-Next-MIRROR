@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import ru.protonmod.next.data.local.ServerLoadDisplayMode
+import ru.protonmod.next.ui.theme.AppTheme
 import ru.protonmod.next.vpn.ObfuscationParams
 import ru.protonmod.next.vpn.VpnConstants
 import java.io.File
@@ -30,7 +32,9 @@ data class DesktopSettings(
     val h2: String = "2",
     val h3: String = "3",
     val h4: String = "4",
-    val i1: String = VpnConstants.DEFAULT_I1
+    val i1: String = VpnConstants.DEFAULT_I1,
+    val appTheme: AppTheme = AppTheme.DARK,
+    val serverLoadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
 )
 
 class DesktopSettingsManager(private val settingsFile: File = File("settings.json")) {
@@ -83,6 +87,14 @@ class DesktopSettingsManager(private val settingsFile: File = File("settings.jso
             h1 = params.h1, h2 = params.h2, h3 = params.h3, h4 = params.h4,
             i1 = params.i1
         ))
+    }
+
+    fun setAppTheme(theme: AppTheme) {
+        saveSettings(_settings.value.copy(appTheme = theme))
+    }
+
+    fun setServerLoadDisplayMode(mode: ServerLoadDisplayMode) {
+        saveSettings(_settings.value.copy(serverLoadDisplayMode = mode))
     }
 
     fun getObfuscationParams(): ObfuscationParams {

@@ -28,46 +28,15 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.amnezia.awg.backend.Tunnel
 import ru.protonmod.next.R
 import ru.protonmod.next.data.repository.VpnRepository
-import ru.protonmod.next.data.local.ServerLoadDisplayMode
 import ru.protonmod.next.data.local.SessionDao
 import ru.protonmod.next.data.local.SettingsManager
 import ru.protonmod.next.data.network.LogicalServer
 import ru.protonmod.next.data.state.ConnectedServerState
 import ru.protonmod.next.vpn.AmneziaVpnManager
 import javax.inject.Inject
-
-data class CountryDisplayItem(val code: String, val averageLoad: Int)
-data class CityDisplayItem(val name: String, val averageLoad: Int)
-
-sealed class CountriesUiState {
-    data object Loading : CountriesUiState()
-    data class CountriesList(
-        val countries: List<CountryDisplayItem>,
-        val loadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
-    ) : CountriesUiState()
-    data class CitiesList(
-        val country: String,
-        val cities: List<CityDisplayItem>,
-        val loadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
-    ) : CountriesUiState()
-    data class ServersList(
-        val country: String,
-        val city: String,
-        val servers: List<LogicalServer>,
-        val loadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
-    ) : CountriesUiState()
-    data class Error(val message: String) : CountriesUiState()
-}
-
-sealed class NavigationState {
-    data object Countries : NavigationState()
-    data class Cities(val countryCode: String) : NavigationState()
-    data class Servers(val countryCode: String, val cityName: String) : NavigationState()
-}
 
 @HiltViewModel
 class CountriesViewModel @Inject constructor(

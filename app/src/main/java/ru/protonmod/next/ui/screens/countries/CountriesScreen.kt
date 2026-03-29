@@ -63,6 +63,7 @@ import ru.protonmod.next.ui.components.MainHeader
 import ru.protonmod.next.ui.components.NavigationHeader
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.ui.theme.liquidGlass
+import ru.protonmod.next.ui.utils.AndroidCountryUtils
 import ru.protonmod.next.ui.utils.CountryUtils
 import ru.protonmod.next.ui.utils.isTablet
 import ru.protonmod.next.utils.ProtonLogger
@@ -297,8 +298,8 @@ fun CountryCard(
 ) {
     val colors = ProtonNextTheme.colors
     val context = LocalContext.current
-    val flagResId = CountryUtils.getFlagResource(context, country.code)
-    val localizedName = CountryUtils.getCountryName(context, country.code)
+    val flagResId = AndroidCountryUtils.getFlagResource(context, country.code)
+    val localizedName = AndroidCountryUtils.getCountryName(context, country.code)
     val interactionSource = remember { MutableInteractionSource() }
 
     Box(

@@ -18,6 +18,7 @@
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
+    id("org.jetbrains.kotlin.plugin.compose") version "2.3.20"
     `java-library`
 }
 
@@ -31,9 +32,17 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     implementation(libs.kotlinx.serialization.json)
     
+    // Compose for shared UI logic
+    val composeVersion = "1.7.8"
+    implementation("androidx.compose.ui:ui-graphics:$composeVersion")
+    implementation("androidx.compose.runtime:runtime:$composeVersion")
+    implementation("androidx.compose.ui:ui:$composeVersion")
+    implementation("androidx.compose.foundation:foundation:$composeVersion")
+    implementation("androidx.compose.material3:material3:1.3.1")
+
     // Retrofit & OkHttp for shared API interfaces
     api(libs.retrofit)
-    api(libs.okhttp.dnsoverhttps) // Using the one from catalog which includes okhttp
+    api(libs.okhttp.dnsoverhttps)
 
     // javax.inject for @Inject and @Singleton in shared interfaces
     implementation("javax.inject:javax.inject:1")

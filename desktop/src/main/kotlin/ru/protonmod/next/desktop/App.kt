@@ -22,16 +22,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import ru.protonmod.next.desktop.ui.MainTarget
 import ru.protonmod.next.desktop.ui.components.DesktopConnectionCard
 import ru.protonmod.next.desktop.ui.components.LiquidGlassBottomBar
 import ru.protonmod.next.desktop.ui.screens.CountriesScreen
+import ru.protonmod.next.desktop.ui.screens.DesktopCountriesViewModel
 import ru.protonmod.next.desktop.ui.screens.ProfilesScreen
 import ru.protonmod.next.desktop.ui.screens.SettingsScreen
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import ru.protonmod.next.data.local.ServerLoadDisplayMode
 import ru.protonmod.next.desktop.data.DesktopSettingsManager
+import ru.protonmod.next.desktop.ui.components.FlagIcon
+import ru.protonmod.next.desktop.ui.components.LoadIndicator
+import ru.protonmod.next.desktop.ui.components.LoadProgressBar
 import ru.protonmod.next.desktop.ui.utils.ProvideDeviceType
 import ru.protonmod.next.desktop.ui.utils.isTablet
 import ru.protonmod.next.ui.theme.ProtonNextTheme as Theme
@@ -53,10 +59,15 @@ fun App() {
     var captchaState by remember { mutableStateOf<DesktopLoginUiState.RequiresCaptcha?>(null) }
     var selectedTarget by remember { mutableStateOf(MainTarget.Home) }
 
+    val countriesViewModel = remember(servers, connectedServer) {
+        DesktopCountriesViewModel(vpnClient, settingsManager, viewModel.servers, viewModel.connectedServer)
+    }
+
     BoxWithConstraints {
         val windowWidth = maxWidth
         ProvideDeviceType(windowWidth) {
-            Theme {
+            val settings by settingsManager.settings.collectAsState()
+            Theme(appTheme = settings.appTheme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     when (uiState) {
                         is DesktopLoginUiState.Idle, is DesktopLoginUiState.Loading, is DesktopLoginUiState.Error -> {
@@ -88,7 +99,9 @@ fun App() {
                                 onDisconnect = {
                                     viewModel.disconnect()
                                 },
-                                settingsManager = settingsManager
+                                settingsManager = settingsManager,
+                                loadDisplayMode = settings.serverLoadDisplayMode,
+                                countriesViewModel = countriesViewModel
                             )
                         }
                     }
@@ -256,7 +269,9 @@ private fun DashboardScreen(
     onLogout: () -> Unit,
     onConnect: (ServerEntry) -> Unit,
     onDisconnect: () -> Unit,
-    settingsManager: DesktopSettingsManager
+    settingsManager: DesktopSettingsManager,
+    loadDisplayMode: ServerLoadDisplayMode,
+    countriesViewModel: DesktopCountriesViewModel
 ) {
     val colors = Theme.colors
     val isTablet = isTablet()
@@ -272,13 +287,13 @@ private fun DashboardScreen(
                     onLogout = onLogout,
                     onConnect = onConnect,
                     onDisconnect = onDisconnect,
-                    isTablet = isTablet
+                    isTablet = isTablet,
+                    loadDisplayMode = loadDisplayMode
                 )
             }
             MainTarget.Countries -> {
                 CountriesScreen(
-                    servers = servers,
-                    connectedServer = connectedServer,
+                    viewModel = countriesViewModel,
                     onBack = { onTargetSelected(MainTarget.Home) },
                     onConnect = onConnect
                 )
@@ -315,7 +330,8 @@ private fun HomeScreen(
     onLogout: () -> Unit,
     onConnect: (ServerEntry) -> Unit,
     onDisconnect: () -> Unit,
-    isTablet: Boolean
+    isTablet: Boolean,
+    loadDisplayMode: ServerLoadDisplayMode
 ) {
     val colors = Theme.colors
     
@@ -391,7 +407,7 @@ private fun HomeScreen(
                             )
                         }
                         items(recentConnections) { server ->
-                            ServerCard(server, onClick = { onConnect(server) })
+                            ServerCard(server, onClick = { onConnect(server) }, displayMode = loadDisplayMode)
                         }
                     } else if (servers.isNotEmpty()) {
                         item {
@@ -404,7 +420,7 @@ private fun HomeScreen(
                             )
                         }
                         items(servers.take(10)) { server ->
-                            ServerCard(server, onClick = { onConnect(server) })
+                            ServerCard(server, onClick = { onConnect(server) }, displayMode = loadDisplayMode)
                         }
                     }
                 }
@@ -464,7 +480,7 @@ private fun HomeScreen(
                         )
                     }
                     items(recentConnections) { server ->
-                        ServerCard(server, onClick = { onConnect(server) })
+                        ServerCard(server, onClick = { onConnect(server) }, displayMode = loadDisplayMode)
                     }
                 } else if (servers.isNotEmpty()) {
                     item {
@@ -477,7 +493,7 @@ private fun HomeScreen(
                         )
                     }
                     items(servers.take(3)) { server ->
-                        ServerCard(server, onClick = { onConnect(server) })
+                        ServerCard(server, onClick = { onConnect(server) }, displayMode = loadDisplayMode)
                     }
                 }
             }
@@ -486,8 +502,9 @@ private fun HomeScreen(
 }
 
 @Composable
-private fun ServerCard(server: ServerEntry, onClick: () -> Unit) {
+private fun ServerCard(server: ServerEntry, onClick: () -> Unit, displayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL) {
     val colors = Theme.colors
+    val load = server.physicalServer?.load ?: 0
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -497,23 +514,20 @@ private fun ServerCard(server: ServerEntry, onClick: () -> Unit) {
         colors = CardDefaults.cardColors(containerColor = colors.backgroundSecondary.copy(alpha = 0.8f)),
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.shade100.copy(alpha = 0.05f))
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier.size(36.dp, 24.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(colors.backgroundNorm),
-                contentAlignment = Alignment.Center
+        Column {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Rounded.Public, null, modifier = Modifier.size(20.dp), tint = colors.iconNorm)
+                FlagIcon(countryCode = server.country, size = DpSize(36.dp, 24.dp))
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(server.country, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(server.name, style = MaterialTheme.typography.bodyMedium, color = colors.textWeak)
+                }
+                LoadIndicator(load = load, displayMode = displayMode)
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(server.country, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(server.name, style = MaterialTheme.typography.bodyMedium, color = colors.textWeak)
-            }
+            LoadProgressBar(load = load, displayMode = displayMode)
         }
     }
 }
