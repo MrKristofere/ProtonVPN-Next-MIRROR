@@ -29,12 +29,18 @@ import ru.protonmod.next.desktop.ui.components.LiquidGlassBottomBar
 import ru.protonmod.next.desktop.ui.screens.CountriesScreen
 import ru.protonmod.next.desktop.ui.screens.ProfilesScreen
 import ru.protonmod.next.desktop.ui.screens.SettingsScreen
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import ru.protonmod.next.desktop.data.DesktopSettingsManager
+import ru.protonmod.next.desktop.ui.utils.ProvideDeviceType
+import ru.protonmod.next.desktop.ui.utils.isTablet
 import ru.protonmod.next.ui.theme.ProtonNextTheme as Theme
 
 @Composable
 fun App() {
+    val settingsManager = remember { DesktopSettingsManager() }
     val authClient = remember { DesktopAuthClient() }
-    val vpnClient = remember { DesktopVpnClient() }
+    val vpnClient = remember { DesktopVpnClient(settingsManager) }
     val viewModel = remember { DesktopLoginViewModel(authClient, vpnClient) }
 
     val uiState by viewModel.uiState.collectAsState()
@@ -47,55 +53,61 @@ fun App() {
     var captchaState by remember { mutableStateOf<DesktopLoginUiState.RequiresCaptcha?>(null) }
     var selectedTarget by remember { mutableStateOf(MainTarget.Home) }
 
-    Theme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            when (uiState) {
-                is DesktopLoginUiState.Idle, is DesktopLoginUiState.Loading, is DesktopLoginUiState.Error -> {
-                    WelcomeContent(
-                        uiState = uiState,
-                        onLogin = { u, p -> viewModel.login(u, p) },
-                        onGuest = { viewModel.loginAnonymous() },
-                        onRetry = { viewModel.loginAnonymous() },
-                        onClearError = { viewModel.clearError() }
-                    )
-                }
-                is DesktopLoginUiState.RequiresCaptcha -> {
-                    val state = uiState as DesktopLoginUiState.RequiresCaptcha
-                    captchaState = state
-                    showCaptcha = true
-                }
-                is DesktopLoginUiState.Success -> {
-                    DashboardScreen(
-                        servers = servers,
-                        recentConnections = recentConnections,
-                        connectedServer = connectedServer,
-                        isConnecting = isConnecting,
-                        selectedTarget = selectedTarget,
-                        onTargetSelected = { selectedTarget = it },
-                        onLogout = { viewModel.clearError() },
-                        onConnect = { server ->
-                            viewModel.connectToServer(server)
-                        },
-                        onDisconnect = {
-                            viewModel.disconnect()
+    BoxWithConstraints {
+        val windowWidth = maxWidth
+        ProvideDeviceType(windowWidth) {
+            Theme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    when (uiState) {
+                        is DesktopLoginUiState.Idle, is DesktopLoginUiState.Loading, is DesktopLoginUiState.Error -> {
+                            WelcomeContent(
+                                uiState = uiState,
+                                onLogin = { u, p -> viewModel.login(u, p) },
+                                onGuest = { viewModel.loginAnonymous() },
+                                onRetry = { viewModel.loginAnonymous() },
+                                onClearError = { viewModel.clearError() }
+                            )
                         }
-                    )
-                }
-            }
-
-            if (showCaptcha && captchaState != null) {
-                CaptchaDialog(
-                    webUrl = captchaState!!.webUrl,
-                    onDismiss = {
-                        showCaptcha = false
-                        viewModel.clearError()
-                    },
-                    onCaptchaSolved = { token ->
-                        showCaptcha = false
-                        captchaState = null
-                        viewModel.retryWithCaptcha(token)
+                        is DesktopLoginUiState.RequiresCaptcha -> {
+                            val state = uiState as DesktopLoginUiState.RequiresCaptcha
+                            captchaState = state
+                            showCaptcha = true
+                        }
+                        is DesktopLoginUiState.Success -> {
+                            DashboardScreen(
+                                servers = servers,
+                                recentConnections = recentConnections,
+                                connectedServer = connectedServer,
+                                isConnecting = isConnecting,
+                                selectedTarget = selectedTarget,
+                                onTargetSelected = { selectedTarget = it },
+                                onLogout = { viewModel.clearError() },
+                                onConnect = { server ->
+                                    viewModel.connectToServer(server)
+                                },
+                                onDisconnect = {
+                                    viewModel.disconnect()
+                                },
+                                settingsManager = settingsManager
+                            )
+                        }
                     }
-                )
+
+                    if (showCaptcha && captchaState != null) {
+                        CaptchaDialog(
+                            webUrl = captchaState!!.webUrl,
+                            onDismiss = {
+                                showCaptcha = false
+                                viewModel.clearError()
+                            },
+                            onCaptchaSolved = { token ->
+                                showCaptcha = false
+                                captchaState = null
+                                viewModel.retryWithCaptcha(token)
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -243,9 +255,11 @@ private fun DashboardScreen(
     onTargetSelected: (MainTarget) -> Unit,
     onLogout: () -> Unit,
     onConnect: (ServerEntry) -> Unit,
-    onDisconnect: () -> Unit
+    onDisconnect: () -> Unit,
+    settingsManager: DesktopSettingsManager
 ) {
     val colors = Theme.colors
+    val isTablet = isTablet()
 
     Box(modifier = Modifier.fillMaxSize().background(colors.backgroundNorm)) {
         when (selectedTarget) {
@@ -257,7 +271,8 @@ private fun DashboardScreen(
                     isConnecting = isConnecting,
                     onLogout = onLogout,
                     onConnect = onConnect,
-                    onDisconnect = onDisconnect
+                    onDisconnect = onDisconnect,
+                    isTablet = isTablet
                 )
             }
             MainTarget.Countries -> {
@@ -270,7 +285,8 @@ private fun DashboardScreen(
             }
             MainTarget.Settings -> {
                 SettingsScreen(
-                    onBack = { onTargetSelected(MainTarget.Home) }
+                    onBack = { onTargetSelected(MainTarget.Home) },
+                    settingsManager = settingsManager
                 )
             }
             MainTarget.Profiles -> {
@@ -283,7 +299,9 @@ private fun DashboardScreen(
         LiquidGlassBottomBar(
             selectedTarget = selectedTarget,
             navigateTo = onTargetSelected,
-            modifier = Modifier.align(Alignment.BottomCenter)
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .widthIn(max = if (isTablet) 400.dp else 600.dp)
         )
     }
 }
@@ -296,7 +314,8 @@ private fun HomeScreen(
     isConnecting: Boolean,
     onLogout: () -> Unit,
     onConnect: (ServerEntry) -> Unit,
-    onDisconnect: () -> Unit
+    onDisconnect: () -> Unit,
+    isTablet: Boolean
 ) {
     val colors = Theme.colors
     
@@ -311,78 +330,155 @@ private fun HomeScreen(
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
         )
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 80.dp, bottom = 120.dp)
-        ) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .padding(horizontal = 24.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(colors.backgroundSecondary.copy(alpha = 0.3f)),
-                    contentAlignment = Alignment.Center
+        if (isTablet) {
+            // Tablet Layout: Split connection (Left) and recent connections (Right)
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 80.dp, bottom = 120.dp, start = 24.dp, end = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(32.dp)
+            ) {
+                // Left Column: Status and Connection
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
-                    Icon(
-                        Icons.Rounded.Map,
-                        null,
-                        modifier = Modifier.size(120.dp),
-                        tint = colors.brandNorm.copy(alpha = 0.2f)
-                    )
-                    Text(
-                        "Map View Placeholder",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = colors.textWeak.copy(alpha = 0.5f)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(240.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(colors.backgroundSecondary.copy(alpha = 0.3f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Rounded.Map,
+                            null,
+                            modifier = Modifier.size(160.dp),
+                            tint = colors.brandNorm.copy(alpha = 0.2f)
+                        )
+                    }
+
+                    DesktopConnectionCard(
+                        isConnected = connectedServer != null,
+                        isConnecting = isConnecting,
+                        serverName = connectedServer?.name ?: "Quick Connect",
+                        countryName = connectedServer?.country ?: "Select Location",
+                        ipAddress = if (connectedServer != null) "10.2.0.2" else "0.0.0.0",
+                        onToggle = {
+                            if (connectedServer != null) {
+                                onDisconnect()
+                            } else if (servers.isNotEmpty()) {
+                                onConnect(servers.first())
+                            }
+                        }
                     )
                 }
-            }
 
-            item { Spacer(modifier = Modifier.height(24.dp)) }
-
-            item {
-                DesktopConnectionCard(
-                    isConnected = connectedServer != null,
-                    isConnecting = isConnecting,
-                    serverName = connectedServer?.name ?: "Quick Connect",
-                    countryName = connectedServer?.country ?: "Select Location",
-                    ipAddress = if (connectedServer != null) "10.2.0.2" else "0.0.0.0",
-                    onToggle = {
-                        if (connectedServer != null) {
-                            onDisconnect()
-                        } else if (servers.isNotEmpty()) {
-                            onConnect(servers.first())
+                // Right Column: Lists
+                LazyColumn(
+                    modifier = Modifier.weight(1.2f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (recentConnections.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Recent Connections",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textNorm,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+                        items(recentConnections) { server ->
+                            ServerCard(server, onClick = { onConnect(server) })
+                        }
+                    } else if (servers.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Recommended",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textNorm,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+                        items(servers.take(10)) { server ->
+                            ServerCard(server, onClick = { onConnect(server) })
                         }
                     }
-                )
+                }
             }
+        } else {
+            // Phone Layout
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(top = 80.dp, bottom = 120.dp)
+            ) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .padding(horizontal = 24.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(colors.backgroundSecondary.copy(alpha = 0.3f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Rounded.Map,
+                            null,
+                            modifier = Modifier.size(120.dp),
+                            tint = colors.brandNorm.copy(alpha = 0.2f)
+                        )
+                    }
+                }
 
-            if (recentConnections.isNotEmpty()) {
+                item { Spacer(modifier = Modifier.height(24.dp)) }
+
                 item {
-                    Text(
-                        "Recent Connections",
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.textNorm
+                    DesktopConnectionCard(
+                        isConnected = connectedServer != null,
+                        isConnecting = isConnecting,
+                        serverName = connectedServer?.name ?: "Quick Connect",
+                        countryName = connectedServer?.country ?: "Select Location",
+                        ipAddress = if (connectedServer != null) "10.2.0.2" else "0.0.0.0",
+                        onToggle = {
+                            if (connectedServer != null) {
+                                onDisconnect()
+                            } else if (servers.isNotEmpty()) {
+                                onConnect(servers.first())
+                            }
+                        }
                     )
                 }
-                items(recentConnections) { server ->
-                    ServerCard(server, onClick = { onConnect(server) })
-                }
-            } else if (servers.isNotEmpty()) {
-                item {
-                    Text(
-                        "Recommended",
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.textNorm
-                    )
-                }
-                items(servers.take(3)) { server ->
-                    ServerCard(server, onClick = { onConnect(server) })
+
+                if (recentConnections.isNotEmpty()) {
+                    item {
+                        Text(
+                            "Recent Connections",
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textNorm
+                        )
+                    }
+                    items(recentConnections) { server ->
+                        ServerCard(server, onClick = { onConnect(server) })
+                    }
+                } else if (servers.isNotEmpty()) {
+                    item {
+                        Text(
+                            "Recommended",
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textNorm
+                        )
+                    }
+                    items(servers.take(3)) { server ->
+                        ServerCard(server, onClick = { onConnect(server) })
+                    }
                 }
             }
         }

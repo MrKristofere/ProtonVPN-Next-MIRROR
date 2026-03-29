@@ -9,6 +9,7 @@ import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.http.*
 import ru.protonmod.next.data.network.*
+import ru.protonmod.next.desktop.data.DesktopSettingsManager
 import ru.protonmod.next.desktop.native.VpnNative
 import ru.protonmod.next.desktop.vpn.AmneziaUapiGenerator
 import ru.protonmod.next.vpn.ObfuscationParams
@@ -47,7 +48,7 @@ interface DesktopVpnApi {
     ): Response<CreateCertificateResponse>
 }
 
-class DesktopVpnClient {
+class DesktopVpnClient(private val settingsManager: DesktopSettingsManager? = null) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     private val configGenerator = AmneziaUapiGenerator()
 
@@ -151,18 +152,21 @@ class DesktopVpnClient {
             val targetIp = physicalServer.exitIp ?: throw Exception("Server has no exit IP")
 
             // 4. Generate config
-            val obfuscationParams = ObfuscationParams(
+            val obfuscationParams = settingsManager?.getObfuscationParams() ?: ObfuscationParams(
                 jc = 3, jmin = 1, jmax = 3, s1 = 0, s2 = 0,
                 h1 = "1", h2 = "2", h3 = "3", h4 = "4",
                 i1 = VpnConstants.DEFAULT_I1
             )
             
+            val port = settingsManager?.settings?.value?.vpnPort ?: 1194
+
             val uapiConfig = configGenerator.buildConfig(
                 serverPublicKey = serverPublicKey,
                 privateKey = privateKey!!,
                 localIp = VpnConstants.PROTON_CLIENT_IP,
                 dnsServer = VpnConstants.PROTON_DNS_IP,
                 targetIp = targetIp,
+                port = port,
                 obfuscationParams = obfuscationParams
             )
 
