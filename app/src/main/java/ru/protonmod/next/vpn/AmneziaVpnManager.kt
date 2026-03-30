@@ -103,8 +103,6 @@ class AmneziaVpnManager @Inject constructor(
     private val _certState = MutableStateFlow<CertificateState>(CertificateState.Valid)
     val certState: StateFlow<CertificateState> = _certState.asStateFlow()
 
-
-
     private val _isConnecting = MutableStateFlow(false)
     val isConnecting: StateFlow<Boolean> = _isConnecting
 
@@ -130,7 +128,7 @@ class AmneziaVpnManager @Inject constructor(
                         val newState = Tunnel.State.valueOf(it)
                         _rawTunnelState.value = newState
                         _isConnecting.value = false
-                        
+
                         _tunnelState.value = newState
                         if (newState == Tunnel.State.UP) {
                             checkAndRefreshCertificateProactively()
@@ -144,10 +142,10 @@ class AmneziaVpnManager @Inject constructor(
         }, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
 
         // Monitor settings changes and update the service accordingly.
-        // We use a single coroutine with a small initial delay to avoid competing 
+        // We use a single coroutine with a small initial delay to avoid competing
         // with the main thread during critical app boot/injection window.
         applicationScope.launch {
-            delay(1000) 
+            delay(1000)
             combine(
                 settingsManager.notificationsEnabled,
                 settingsManager.killSwitchEnabled,
@@ -222,10 +220,10 @@ class AmneziaVpnManager @Inject constructor(
             val newCert = result.getOrNull()?.certificate
             if (newCert != null) {
                 ProtonLogger.i(TAG, "Successfully registered new WireGuard key and received certificate")
-                
+
                 // Metrics
                 Sentry.metrics().count("cert_refresh_success", 1.0)
-                
+
                 sessionDao.updateVpnKeys(
                     privateKey = keyPair.privateKeyX25519,
                     publicKeyPem = keyPair.publicKeyPem,
@@ -241,7 +239,7 @@ class AmneziaVpnManager @Inject constructor(
         } else {
             val error = result.exceptionOrNull()?.message ?: "Unknown error"
             ProtonLogger.e(TAG, "Failed to register WireGuard key with Proton API: $error", result.exceptionOrNull())
-            
+
             // Metrics
             Sentry.metrics().count("cert_refresh_error", 1.0)
 
@@ -269,7 +267,7 @@ class AmneziaVpnManager @Inject constructor(
 
                 ProtonLogger.d(TAG, "Proactive refresh starting (cert state: ${_certState.value})")
                 val result = performCertificateRefresh(force = false)
-                
+
                 if (result.isSuccess) {
                     currentRetryDelay = 5000L
                     delay(PERIODIC_REFRESH_MS)
@@ -315,11 +313,11 @@ class AmneziaVpnManager @Inject constructor(
             ProtonLogger.d(TAG, "Already connected to $logicalServerId")
             return
         }
-        
+
         connectionJob?.cancel()
         connectionJob = applicationScope.launch(dispatcherProvider.io()) {
             currentServerId = logicalServerId
-            
+
             // Resolve logical server if not provided to ensure UI can show location info
             if (logicalServer != null) {
                 connectedServerState.setConnectedServer(logicalServer)
@@ -329,7 +327,7 @@ class AmneziaVpnManager @Inject constructor(
             }
 
             connectInternal(logicalServerId, server, session, overridePort, overrideObfuscation, obfuscationParams)
-            
+
             // Track connection attempt via Sentry Metrics
             Sentry.metrics().count("vpn_connection_attempt", 1.0)
         }
@@ -357,7 +355,7 @@ class AmneziaVpnManager @Inject constructor(
                 if (isEffectivelyExpired()) {
                     ProtonLogger.w(TAG, "Certificate is still effectively expired after refresh attempt. Proceeding anyway as Proton API might allow grace period.")
                 }
-                
+
                 // Refresh session from DB to get the new certificate and any other potential updates
                 currentSession = sessionDao.getSession() ?: currentSession
             }
@@ -366,7 +364,7 @@ class AmneziaVpnManager @Inject constructor(
                 ProtonLogger.e(TAG, "Critical: VPN Private Key is null in session data")
             }
             var targetIp: String? = null
-            
+
             // DNS resolution with improved retry and logging
             ProtonLogger.d(TAG, "Resolving domain ${server.domain} (Max retries: $DNS_RETRY_COUNT)")
             for (i in 1..DNS_RETRY_COUNT) {
@@ -393,7 +391,7 @@ class AmneziaVpnManager @Inject constructor(
             val serverPubKey = server.wgPublicKey ?: throw Exception("Missing WG Public Key for Server").also {
                 ProtonLogger.e(TAG, "Critical: Server ${server.id} has no WireGuard Public Key")
             }
-            
+
             val splitTunnelingEnabled = settingsManager.splitTunnelingEnabled.first()
             val stMode = settingsManager.splitTunnelingMode.first()
             val isIncludeMode = stMode == "include"
@@ -447,7 +445,14 @@ class AmneziaVpnManager @Inject constructor(
 
             // Retrieve Custom DNS IP or fallback to Proton Default
             val userDns = settingsManager.customDns.first().trim()
-            val activeDns = if (userDns.isNotEmpty()) userDns else VpnConstants.PROTON_DNS_IP
+            val isValidDns = userDns.isNotEmpty() && try {
+                InetAddress.getByName(userDns)
+                true
+            } catch (e: Exception) {
+                ProtonLogger.w(TAG, "Invalid custom DNS value '$userDns', falling back to default: ${e.message}")
+                false
+            }
+            val activeDns = if (isValidDns) userDns else VpnConstants.PROTON_DNS_IP
             ProtonLogger.i(TAG, "Using DNS Server: $activeDns")
 
             val configStr = amneziaConfigGenerator.buildConfig(
@@ -463,7 +468,7 @@ class AmneziaVpnManager @Inject constructor(
                 certificate = currentSession.wgCertificate,
                 obfuscationParams = params
             )
-            
+
             ProtonLogger.v(TAG, "Generated AWG Config Length: ${configStr.length}")
 
             systemContextWrapper.startVpnService(
@@ -475,14 +480,14 @@ class AmneziaVpnManager @Inject constructor(
             )
 
             ProtonLogger.i(TAG, "VPN start command issued successfully")
-            
+
             // Track connection success
             Sentry.metrics().count("vpn_connection_success", 1.0)
-            
+
             Result.success(Unit)
         } catch (e: Exception) {
             ProtonLogger.e(TAG, "Failed to connect to VPN", e)
-            
+
             // Track connection failure
             Sentry.metrics().count("vpn_connection_failure", 1.0)
 
@@ -576,7 +581,7 @@ class AmneziaVpnManager @Inject constructor(
                         ProtonLogger.d(TAG, "Connect & Go: VPN is connecting, waiting...")
                         _isConnecting.first { !it }
                     }
-                    
+
                     // 2. Then wait for the tunnel state to be UP
                     ProtonLogger.d(TAG, "Connect & Go: VPN attempt finished, waiting for UP state...")
                     _tunnelState.first { it == Tunnel.State.UP }
