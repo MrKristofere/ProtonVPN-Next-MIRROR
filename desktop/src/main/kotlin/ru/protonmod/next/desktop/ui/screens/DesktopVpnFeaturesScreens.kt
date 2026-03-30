@@ -227,10 +227,10 @@ fun CustomDnsScreen(
                 item { CategoryHeader(title = Strings.dns_presets_header()) }
                 item {
                     Column(modifier = contentModifier.liquidGlass(shape = RoundedCornerShape(24.dp), alpha = 0.4f)) {
-                        PresetDnsRow("Proton (Default)", manager.getActiveDns() == DesktopDnsManager.PROTON_DNS_IPv4) { manager.resetToDefault() }
-                        PresetDnsRow("Cloudflare (1.1.1.1)", manager.getActiveDns() == DesktopDnsManager.CLOUDFLARE_IPv4) { manager.setToCloudflare() }
-                        PresetDnsRow("Google (8.8.8.8)", manager.getActiveDns() == DesktopDnsManager.GOOGLE_IPv4) { manager.setToGoogle() }
-                        PresetDnsRow("Quad9 (9.9.9.9)", manager.getActiveDns() == DesktopDnsManager.QUAD9_IPv4) { manager.setToQuad9() }
+                        PresetDnsRow(Strings.dns_preset_proton(), manager.getActiveDns() == DesktopDnsManager.PROTON_DNS_IPv4) { manager.resetToDefault() }
+                        PresetDnsRow(Strings.dns_preset_cloudflare(), manager.getActiveDns() == DesktopDnsManager.CLOUDFLARE_IPv4) { manager.setToCloudflare() }
+                        PresetDnsRow(Strings.dns_preset_google(), manager.getActiveDns() == DesktopDnsManager.GOOGLE_IPv4) { manager.setToGoogle() }
+                        PresetDnsRow(Strings.dns_preset_quad9(), manager.getActiveDns() == DesktopDnsManager.QUAD9_IPv4) { manager.setToQuad9() }
                     }
                 }
 
@@ -501,10 +501,10 @@ private fun InputDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(value) }) { Text("OK") }
+            TextButton(onClick = { onConfirm(value) }) { Text(Strings.btn_ok()) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(Strings.btn_cancel()) }
         }
     )
 }

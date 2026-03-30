@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import ru.protonmod.next.data.model.ObfuscationProfile
 import ru.protonmod.next.desktop.data.DesktopSettingsManager
 import ru.protonmod.next.desktop.ui.utils.isTablet
+import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
 import ru.protonmod.next.ui.theme.AppTheme
 import ru.protonmod.next.ui.theme.LocalColors
 import ru.protonmod.next.ui.theme.ProtonColors
@@ -83,10 +84,10 @@ fun ServerLoadDisplayModeScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = { Text("Server Load Display", fontWeight = FontWeight.Bold, color = colors.textNorm) },
+                title = { Text(Strings.settings_load_display_mode(), fontWeight = FontWeight.Bold, color = colors.textNorm) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.textNorm)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Strings.desc_back(), tint = colors.textNorm)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -223,10 +224,10 @@ fun ThemeSelectionScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = { Text("App Theme", fontWeight = FontWeight.Bold, color = colors.textNorm) },
+                title = { Text(Strings.settings_app_theme(), fontWeight = FontWeight.Bold, color = colors.textNorm) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.textNorm)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Strings.desc_back(), tint = colors.textNorm)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -412,10 +413,10 @@ fun ProtocolSelectionScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = { Text("Select Protocol", fontWeight = FontWeight.Bold, color = colors.textNorm) },
+                title = { Text(Strings.title_select_protocol(), fontWeight = FontWeight.Bold, color = colors.textNorm) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.textNorm)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Strings.desc_back(), tint = colors.textNorm)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -456,7 +457,7 @@ fun ProtocolSelectionScreen(
                                     color = if (isSelected) colors.brandNorm else colors.textNorm
                                 )
                                 Text(
-                                    text = if (protocol == "AmneziaWG") "High-performance protocol with advanced obfuscation." else "",
+                                    text = if (protocol == "AmneziaWG") Strings.obfuscation_protocol_desc() else "",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = colors.textWeak
                                 )
@@ -469,7 +470,7 @@ fun ProtocolSelectionScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Rounded.Settings,
-                                        contentDescription = "Obfuscation Settings",
+                                        contentDescription = Strings.desc_obfuscation_settings(),
                                         tint = colors.brandNorm
                                     )
                                 }
@@ -507,15 +508,15 @@ fun ObfuscationSettingsScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = { Text("Obfuscation", fontWeight = FontWeight.Bold, color = colors.textNorm) },
+                title = { Text(Strings.obfuscation_title(), fontWeight = FontWeight.Bold, color = colors.textNorm) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.textNorm)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Strings.desc_back(), tint = colors.textNorm)
                     }
                 },
                 actions = {
                     IconButton(onClick = { settingsManager.setObfuscationParams(ru.protonmod.next.vpn.VpnConstants.DEFAULT_OBFUSCATION_PARAMS) }) {
-                        Icon(imageVector = Icons.Rounded.Refresh, contentDescription = "Reset", tint = colors.brandNorm)
+                        Icon(imageVector = Icons.Rounded.Refresh, contentDescription = Strings.btn_reset(), tint = colors.brandNorm)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -551,12 +552,12 @@ fun ObfuscationSettingsScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Enable Obfuscation",
+                                    text = Strings.obfuscation_enable(),
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                     color = colors.textNorm
                                 )
                                 Text(
-                                    text = "Hide VPN traffic using AmneziaWG parameters.",
+                                    text = Strings.obfuscation_enable_desc(),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = colors.textWeak
                                 )
@@ -577,33 +578,33 @@ fun ObfuscationSettingsScreen(
                     item {
                         Column(modifier = contentModifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             
-                            CategoryHeader(title = "Packet Magic (H1-H4)")
+                            CategoryHeader(title = Strings.obfuscation_category_magic())
                             SettingsCard {
                                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     ObfuscationParamField(
                                         modifier = Modifier.weight(1f),
-                                        label = "H1",
+                                        label = Strings.h1_label(),
                                         value = settings.h1,
                                         isNumeric = false,
                                         onValueChange = { settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(h1 = it)) }
                                     )
                                     ObfuscationParamField(
                                         modifier = Modifier.weight(1f),
-                                        label = "H2",
+                                        label = Strings.h2_label(),
                                         value = settings.h2,
                                         isNumeric = false,
                                         onValueChange = { settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(h2 = it)) }
                                     )
                                     ObfuscationParamField(
                                         modifier = Modifier.weight(1f),
-                                        label = "H3",
+                                        label = Strings.h3_label(),
                                         value = settings.h3,
                                         isNumeric = false,
                                         onValueChange = { settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(h3 = it)) }
                                     )
                                     ObfuscationParamField(
                                         modifier = Modifier.weight(1f),
-                                        label = "H4",
+                                        label = Strings.h4_label(),
                                         value = settings.h4,
                                         isNumeric = false,
                                         onValueChange = { settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(h4 = it)) }
@@ -611,52 +612,52 @@ fun ObfuscationSettingsScreen(
                                 }
                             }
 
-                            CategoryHeader(title = "Junk Packets")
+                            CategoryHeader(title = Strings.obfuscation_category_junk())
                             SettingsCard {
                                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     ObfuscationParamField(
                                         modifier = Modifier.weight(1f),
-                                        label = "Count (Jc)",
+                                        label = Strings.jc_label(),
                                         value = settings.jc.toString(),
                                         onValueChange = { val v = it.toIntOrNull() ?: 0; settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(jc = v)) }
                                     )
                                     ObfuscationParamField(
                                         modifier = Modifier.weight(1f),
-                                        label = "Min Size (Jmin)",
+                                        label = Strings.jmin_label(),
                                         value = settings.jmin.toString(),
                                         onValueChange = { val v = it.toIntOrNull() ?: 0; settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(jmin = v)) }
                                     )
                                     ObfuscationParamField(
                                         modifier = Modifier.weight(1f),
-                                        label = "Max Size (Jmax)",
+                                        label = Strings.jmax_label(),
                                         value = settings.jmax.toString(),
                                         onValueChange = { val v = it.toIntOrNull() ?: 0; settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(jmax = v)) }
                                     )
                                 }
                             }
 
-                            CategoryHeader(title = "Scrambling (S1-S2)")
+                            CategoryHeader(title = Strings.obfuscation_category_scrambling())
                             SettingsCard {
                                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     ObfuscationParamField(
                                         modifier = Modifier.weight(1f),
-                                        label = "S1",
+                                        label = Strings.s1_label(),
                                         value = settings.s1.toString(),
                                         onValueChange = { val v = it.toIntOrNull() ?: 0; settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(s1 = v)) }
                                     )
                                     ObfuscationParamField(
                                         modifier = Modifier.weight(1f),
-                                        label = "S2",
+                                        label = Strings.s2_label(),
                                         value = settings.s2.toString(),
                                         onValueChange = { val v = it.toIntOrNull() ?: 0; settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(s2 = v)) }
                                     )
                                 }
                             }
 
-                            CategoryHeader(title = "Advanced Scrambling (I1)")
+                            CategoryHeader(title = Strings.obfuscation_category_scrambling_advanced())
                             SettingsCard {
                                 ObfuscationParamField(
-                                    label = "Init Magic (I1)",
+                                    label = Strings.i1_label(),
                                     value = settings.i1,
                                     isNumeric = false,
                                     onValueChange = { settingsManager.setObfuscationParams(settingsManager.getObfuscationParams().copy(i1 = it)) }
@@ -668,7 +669,7 @@ fun ObfuscationSettingsScreen(
                                         modifier = Modifier.weight(1f),
                                         colors = ButtonDefaults.buttonColors(containerColor = colors.brandNorm)
                                     ) {
-                                        Text("Randomize")
+                                        Text(Strings.btn_randomize())
                                     }
                                 }
                             }

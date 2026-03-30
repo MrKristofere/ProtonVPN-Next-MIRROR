@@ -233,6 +233,32 @@
     <string name="obfuscation_category_advanced">Дополнительно</string>
     <string name="custom_config">Пользовательский конфиг</string>
 
+    <!-- Setup Flow -->
+    <string name="setup_choose_language">Выберите язык</string>
+    <string name="setup_choose_language_subtitle">Выберите предпочтительный язык для продолжения.</string>
+    <string name="btn_continue">Продолжить</string>
+    <string name="setup_vpn_obfuscation">Обфускация VPN</string>
+    <string name="setup_vpn_obfuscation_subtitle">Защитите свое соединение от цензуры и глубокого анализа пакетов.</string>
+    <string name="setup_secure_access">Безопасный доступ</string>
+    <string name="setup_secure_access_subtitle">Войдите в свою учетную запись или продолжите как гость.</string>
+    <string name="btn_next">Далее</string>
+    <string name="obfuscation_protocol_desc">Высокопроизводительный протокол с продвинутой обфускацией.</string>
+    <string name="desc_obfuscation_settings">Настройки обфускации</string>
+    <string name="obfuscation_category_scrambling">Скремблирование (S1-S2)</string>
+    <string name="obfuscation_category_scrambling_advanced">Продвинутое скремблирование (I1)</string>
+    <string name="btn_randomize">Случайно</string>
+    <string name="btn_reset">Сбросить</string>
+    <string name="h1_label">H1</string>
+    <string name="h2_label">H2</string>
+    <string name="h3_label">H3</string>
+    <string name="h4_label">H4</string>
+    <string name="s1_label">S1</string>
+    <string name="s2_label">S2</string>
+    <string name="i1_label">I1</string>
+    <string name="jc_label">Количество (Jc)</string>
+    <string name="jmin_label">Мин. размер (Jmin)</string>
+    <string name="jmax_label">Макс. размер (Jmax)</string>
+
     <!-- About App Screen -->
     <string name="about_community">Сообщество</string>
     <string name="about_github">GitHub</string>
@@ -473,6 +499,12 @@
     <string name="captcha_message">Для обеспечения безопасности аккаунта, пожалуйста, пройдите проверку ниже.</string>
     <string name="captcha_proxy_active">Антиблокировочный прокси активен</string>
     <string name="desc_close">Закрыть</string>
+    <string name="captcha_msg_open_browser">Окно браузера откроется, чтобы вы могли пройти проверку.</string>
+    <string name="captcha_msg_copy_token">После прохождения проверки скопируйте токен со страницы и вставьте его ниже.</string>
+    <string name="captcha_hint_token">Токен капчи</string>
+    <string name="btn_reopen_captcha">Открыть капчу заново</string>
+    <string name="btn_open_captcha">Открыть капчу в браузере</string>
+    <string name="btn_submit_token">Отправить токен</string>
     <string name="qc_title">Настройка быстрого подключения</string>
     <string name="qc_fastest">Самый быстрый сервер</string>
     <string name="qc_fastest_desc">Всегда подключаться к самому быстрому серверу</string>

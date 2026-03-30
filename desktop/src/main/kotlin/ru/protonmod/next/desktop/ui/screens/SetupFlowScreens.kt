@@ -50,10 +50,10 @@ fun SetupLanguageScreen(
     var showLanguagePicker by remember { mutableStateOf(false) }
 
     SetupStepContainer(
-        title = "Choose Language",
-        subtitle = "Select your preferred language to continue.",
+        title = Strings.setup_choose_language(),
+        subtitle = Strings.setup_choose_language_subtitle(),
         onNext = onNext,
-        nextButtonText = "Continue"
+        nextButtonText = Strings.btn_continue()
     ) {
         Box(
             modifier = Modifier
@@ -66,7 +66,7 @@ fun SetupLanguageScreen(
                 Icon(Icons.Rounded.Language, null, tint = colors.brandNorm, modifier = Modifier.size(32.dp))
                 Spacer(modifier = Modifier.width(20.dp))
                 Column {
-                    Text("Current Language", style = MaterialTheme.typography.labelSmall, color = colors.textWeak)
+                    Text(Strings.settings_language(), style = MaterialTheme.typography.labelSmall, color = colors.textWeak)
                     Text(getLanguageName(settings.language), style = MaterialTheme.typography.headlineSmall, color = colors.textNorm)
                 }
             }
@@ -95,11 +95,11 @@ fun SetupObfuscationScreen(
     val colors = ProtonNextTheme.colors
 
     SetupStepContainer(
-        title = "VPN Obfuscation",
-        subtitle = "Protect your connection from censorship and deep packet inspection.",
+        title = Strings.setup_vpn_obfuscation(),
+        subtitle = Strings.setup_vpn_obfuscation_subtitle(),
         onNext = onNext,
         onBack = onBack,
-        nextButtonText = "Continue"
+        nextButtonText = Strings.btn_continue()
     ) {
         Box(
             modifier = Modifier
@@ -115,8 +115,8 @@ fun SetupObfuscationScreen(
                 Icon(Icons.Rounded.Security, null, tint = colors.brandNorm, modifier = Modifier.size(32.dp))
                 Spacer(modifier = Modifier.width(20.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Enable AmneziaWG", style = MaterialTheme.typography.headlineSmall, color = colors.textNorm)
-                    Text("Advanced obfuscation to bypass firewalls.", style = MaterialTheme.typography.bodyMedium, color = colors.textWeak)
+                    Text(Strings.obfuscation_enable(), style = MaterialTheme.typography.headlineSmall, color = colors.textNorm)
+                    Text(Strings.obfuscation_enable_desc(), style = MaterialTheme.typography.bodyMedium, color = colors.textWeak)
                 }
                 Switch(
                     checked = settings.obfuscationEnabled,
@@ -137,8 +137,8 @@ fun SetupAuthScreen(
     onBack: () -> Unit
 ) {
     SetupStepContainer(
-        title = "Secure Access",
-        subtitle = "Sign in to your account or continue as a guest.",
+        title = Strings.setup_secure_access(),
+        subtitle = Strings.setup_secure_access_subtitle(),
         onNext = null, // No "Next" button, use WelcomeButtons
         onBack = onBack
     ) {
@@ -156,7 +156,7 @@ private fun SetupStepContainer(
     subtitle: String,
     onNext: (() -> Unit)?,
     onBack: (() -> Unit)? = null,
-    nextButtonText: String = "Next",
+    nextButtonText: String = Strings.btn_next(),
     content: @Composable ColumnScope.() -> Unit
 ) {
     val colors = ProtonNextTheme.colors
@@ -213,7 +213,7 @@ private fun SetupStepContainer(
                                 shape = RoundedCornerShape(16.dp),
                                 border = androidx.compose.foundation.BorderStroke(1.dp, colors.separatorNorm)
                             ) {
-                                Text("Back", fontWeight = FontWeight.Bold)
+                                Text(Strings.desc_back(), fontWeight = FontWeight.Bold)
                             }
                         }
                         if (onNext != null) {
@@ -288,7 +288,7 @@ fun LanguagePickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Select Language", color = colors.textNorm) },
+        title = { Text(Strings.countries_title(), color = colors.textNorm) },
         text = {
             Column {
                 languages.forEach { (code, name) ->
@@ -312,7 +312,7 @@ fun LanguagePickerDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close", color = colors.brandNorm)
+                Text(Strings.desc_close(), color = colors.brandNorm)
             }
         },
         containerColor = colors.backgroundSecondary

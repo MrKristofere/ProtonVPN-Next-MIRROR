@@ -470,4 +470,30 @@
     <string name="qc_recent">آخرین اتصال</string>
     <string name="qc_recent_desc">به سرور آخرین نشست خود متصل شوید</string>
     <string name="qc_header_recent">سرورهای اخیر</string>
+
+    <!-- Setup Flow -->
+    <string name="setup_choose_language">انتخاب زبان</string>
+    <string name="setup_choose_language_subtitle">زبان مورد نظر خود را برای ادامه انتخاب کنید.</string>
+    <string name="btn_continue">ادامه</string>
+    <string name="setup_vpn_obfuscation">مبدل‌سازی VPN</string>
+    <string name="setup_vpn_obfuscation_subtitle">از اتصال خود در برابر سانسور و بازرسی عمیق بسته‌ها محافظت کنید.</string>
+    <string name="setup_secure_access">دسترسی امن</string>
+    <string name="setup_secure_access_subtitle">وارد حساب خود شوید یا به عنوان مهمان ادامه دهید.</string>
+    <string name="btn_next">بعدی</string>
+    <string name="obfuscation_protocol_desc">پروتکل با کارایی بالا همراه با مبدل‌سازی پیشرفته.</string>
+    <string name="desc_obfuscation_settings">تنظیمات مبدل‌سازی</string>
+    <string name="obfuscation_category_scrambling">درهم‌سازی (S1-S2)</string>
+    <string name="obfuscation_category_scrambling_advanced">درهم‌سازی پیشرفته (I1)</string>
+    <string name="btn_randomize">تصادفی</string>
+    <string name="btn_reset">بازنشانی</string>
+    <string name="h1_label">H1</string>
+    <string name="h2_label">H2</string>
+    <string name="h3_label">H3</string>
+    <string name="h4_label">H4</string>
+    <string name="s1_label">S1</string>
+    <string name="s2_label">S2</string>
+    <string name="i1_label">I1</string>
+    <string name="jc_label">تعداد (Jc)</string>
+    <string name="jmin_label">حداقل اندازه (Jmin)</string>
+    <string name="jmax_label">حداکثر اندازه (Jmax)</string>
 </resources>

@@ -24,6 +24,19 @@
     <string name="btn_create_account">Create Account</string>
     <string name="btn_login">Log In</string>
     <string name="btn_continue_guest">Continue as Guest</string>
+    <string name="btn_ok">OK</string>
+    <string name="btn_get_started">Get Started</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_ready">Ready to go!</string>
+    <string name="onboarding_encryption_title">Strong Encryption</string>
+    <string name="onboarding_encryption_desc">Your data is protected by military-grade AES-256 or ChaCha20 encryption.</string>
+    <string name="onboarding_network_title">Global Network</string>
+    <string name="onboarding_network_desc">Access high-speed servers in over 60 countries around the world.</string>
+    <string name="onboarding_accelerator_title">VPN Accelerator</string>
+    <string name="onboarding_accelerator_desc">Increase VPN speeds by over 400% with our unique technology.</string>
+    <string name="onboarding_amnezia_title">AmneziaWG</string>
+    <string name="onboarding_amnezia_desc">Advanced obfuscation protocol to bypass censorship and restrictive firewalls.</string>
 
     <!-- Login Screen -->
     <string name="login_title">Welcome Back</string>
@@ -134,6 +147,11 @@
     <string name="dns_custom_header">Custom</string>
     <string name="dns_manual_ip">Configure manual IP</string>
     <string name="dns_input_label">IP address (IPv4 or IPv6)</string>
+    <string name="dns_preset_proton">Proton (Default)</string>
+    <string name="dns_preset_cloudflare">Cloudflare (1.1.1.1)</string>
+    <string name="dns_preset_google">Google (8.8.8.8)</string>
+    <string name="dns_preset_quad9">Quad9 (9.9.9.9)</string>
+
 
     <!-- Customization -->
     <string name="settings_customization">Customization</string>
@@ -232,6 +250,32 @@
     <string name="obfuscation_category_headers">Headers</string>
     <string name="obfuscation_category_advanced">Advanced</string>
     <string name="custom_config">Custom Config</string>
+
+    <!-- Setup Flow -->
+    <string name="setup_choose_language">Choose Language</string>
+    <string name="setup_choose_language_subtitle">Select your preferred language to continue.</string>
+    <string name="btn_continue">Continue</string>
+    <string name="setup_vpn_obfuscation">VPN Obfuscation</string>
+    <string name="setup_vpn_obfuscation_subtitle">Protect your connection from censorship and deep packet inspection.</string>
+    <string name="setup_secure_access">Secure Access</string>
+    <string name="setup_secure_access_subtitle">Sign in to your account or continue as a guest.</string>
+    <string name="btn_next">Next</string>
+    <string name="obfuscation_protocol_desc">High-performance protocol with advanced obfuscation.</string>
+    <string name="desc_obfuscation_settings">Obfuscation Settings</string>
+    <string name="obfuscation_category_scrambling">Scrambling (S1-S2)</string>
+    <string name="obfuscation_category_scrambling_advanced">Advanced Scrambling (I1)</string>
+    <string name="btn_randomize">Randomize</string>
+    <string name="btn_reset">Reset</string>
+    <string name="h1_label">H1</string>
+    <string name="h2_label">H2</string>
+    <string name="h3_label">H3</string>
+    <string name="h4_label">H4</string>
+    <string name="s1_label">S1</string>
+    <string name="s2_label">S2</string>
+    <string name="i1_label">I1</string>
+    <string name="jc_label">Count (Jc)</string>
+    <string name="jmin_label">Min Size (Jmin)</string>
+    <string name="jmax_label">Max Size (Jmax)</string>
 
     <!-- About App Screen -->
     <string name="about_community">Community</string>
@@ -463,6 +507,12 @@
     <string name="captcha_message">To keep your account secure, please complete the verification below.</string>
     <string name="captcha_proxy_active">Anti-blocking proxy is active</string>
     <string name="desc_close">Close</string>
+    <string name="captcha_msg_open_browser">A browser window will open so you can complete the captcha.</string>
+    <string name="captcha_msg_copy_token">After completing the verification, copy the token from the page and paste it below.</string>
+    <string name="captcha_hint_token">Captcha token</string>
+    <string name="btn_reopen_captcha">Re-open captcha</string>
+    <string name="btn_open_captcha">Open captcha in browser</string>
+    <string name="btn_submit_token">Submit token</string>
     <string name="qc_title">Quick Connect Configuration</string>
     <string name="qc_fastest">Fastest Server</string>
     <string name="qc_fastest_desc">Always connect to the fastest available server</string>

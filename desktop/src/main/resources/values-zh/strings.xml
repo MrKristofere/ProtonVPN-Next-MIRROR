@@ -465,4 +465,30 @@
     <string name="qc_recent">最近连接</string>
     <string name="qc_recent_desc">连接到上次会话的服务器</string>
     <string name="qc_header_recent">最近使用的服务器</string>
+
+    <!-- Setup Flow -->
+    <string name="setup_choose_language">选择语言</string>
+    <string name="setup_choose_language_subtitle">选择您的首选语言以继续。</string>
+    <string name="btn_continue">继续</string>
+    <string name="setup_vpn_obfuscation">VPN 混淆</string>
+    <string name="setup_vpn_obfuscation_subtitle">保护您的连接免受审查和深度数据包检测。</string>
+    <string name="setup_secure_access">安全访问</string>
+    <string name="setup_secure_access_subtitle">登录您的账户或以访客身份继续。</string>
+    <string name="btn_next">下一步</string>
+    <string name="obfuscation_protocol_desc">具有先进混淆功能的高性能协议。</string>
+    <string name="desc_obfuscation_settings">混淆设置</string>
+    <string name="obfuscation_category_scrambling">加扰 (S1-S2)</string>
+    <string name="obfuscation_category_scrambling_advanced">高级加扰 (I1)</string>
+    <string name="btn_randomize">随机</string>
+    <string name="btn_reset">重置</string>
+    <string name="h1_label">H1</string>
+    <string name="h2_label">H2</string>
+    <string name="h3_label">H3</string>
+    <string name="h4_label">H4</string>
+    <string name="s1_label">S1</string>
+    <string name="s2_label">S2</string>
+    <string name="i1_label">I1</string>
+    <string name="jc_label">计数 (Jc)</string>
+    <string name="jmin_label">最小尺寸 (Jmin)</string>
+    <string name="jmax_label">最大尺寸 (Jmax)</string>
 </resources>

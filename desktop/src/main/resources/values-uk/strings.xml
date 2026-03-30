@@ -474,10 +474,42 @@
     <string name="captcha_message">Для забезпечення безпеки акаунта, будь ласка, пройдіть перевірку нижче.</string>
     <string name="captcha_proxy_active">Антиблокувальний проксі активний</string>
     <string name="desc_close">Закрити</string>
+    <string name="captcha_msg_open_browser">Вікно браузера відкриється, щоб ви могли пройти перевірку.</string>
+    <string name="captcha_msg_copy_token">Після проходження перевірки скопіюйте токен зі сторінки та вставте його нижче.</string>
+    <string name="captcha_hint_token">Токен капчі</string>
+    <string name="btn_reopen_captcha">Відкрити капчу заново</string>
+    <string name="btn_open_captcha">Відкрити капчу в браузері</string>
+    <string name="btn_submit_token">Відправити токен</string>
     <string name="qc_title">Налаштування швидкого підключення</string>
     <string name="qc_fastest">Найшвидший сервер</string>
     <string name="qc_fastest_desc">Завжди підключатися до найшвидшого доступного сервера</string>
     <string name="qc_recent">Останній використаний</string>
     <string name="qc_recent_desc">Підключитися до сервера з вашої останньої сесії</string>
     <string name="qc_header_recent">НЕДАВНІ СЕРВЕРИ</string>
+
+    <!-- Setup Flow -->
+    <string name="setup_choose_language">Виберіть мову</string>
+    <string name="setup_choose_language_subtitle">Виберіть бажану мову для продовження.</string>
+    <string name="btn_continue">Продовжити</string>
+    <string name="setup_vpn_obfuscation">Обфускація VPN</string>
+    <string name="setup_vpn_obfuscation_subtitle">Захистіть своє з’єднання від цензури та глибокого аналізу пакетів.</string>
+    <string name="setup_secure_access">Безпечний доступ</string>
+    <string name="setup_secure_access_subtitle">Увійдіть у свій обліковий запис або продовжіть як гість.</string>
+    <string name="btn_next">Далі</string>
+    <string name="obfuscation_protocol_desc">Високопродуктивний протокол із розширеною обфускацією.</string>
+    <string name="desc_obfuscation_settings">Налаштування обфускації</string>
+    <string name="obfuscation_category_scrambling">Скремблювання (S1-S2)</string>
+    <string name="obfuscation_category_scrambling_advanced">Розширене скремблювання (I1)</string>
+    <string name="btn_randomize">Випадково</string>
+    <string name="btn_reset">Скинути</string>
+    <string name="h1_label">H1</string>
+    <string name="h2_label">H2</string>
+    <string name="h3_label">H3</string>
+    <string name="h4_label">H4</string>
+    <string name="s1_label">S1</string>
+    <string name="s2_label">S2</string>
+    <string name="i1_label">I1</string>
+    <string name="jc_label">Кількість (Jc)</string>
+    <string name="jmin_label">Мін. розмір (Jmin)</string>
+    <string name="jmax_label">Макс. розмір (Jmax)</string>
 </resources>

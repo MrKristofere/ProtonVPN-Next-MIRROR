@@ -355,7 +355,7 @@ fun ObfuscationSettingsScreen(
                                                         OutlinedTextField(
                                                             value = domainInput,
                                                             onValueChange = { domainInput = it },
-                                                            placeholder = { Text("google.com", color = colors.textWeak.copy(alpha = 0.5f)) },
+                                                            placeholder = { Text(stringResource(R.string.placeholder_google), color = colors.textWeak.copy(alpha = 0.5f)) },
                                                             singleLine = true,
                                                             modifier = Modifier.fillMaxWidth(),
                                                             colors = OutlinedTextFieldDefaults.colors(

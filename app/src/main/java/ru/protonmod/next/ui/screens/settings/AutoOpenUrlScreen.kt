@@ -102,7 +102,7 @@ fun AutoOpenUrlScreen(
                             value = url,
                             onValueChange = { url = it },
                             label = { Text(stringResource(R.string.label_enter_url)) },
-                            placeholder = { Text("https://example.com") },
+                            placeholder = { Text(stringResource(R.string.placeholder_example_url)) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
                             colors = OutlinedTextFieldDefaults.colors(

@@ -27,6 +27,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
 import ru.protonmod.next.ui.theme.ProtonNextTheme as Theme
 import java.awt.Desktop
 import java.net.URI
@@ -43,13 +44,13 @@ fun CaptchaDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Human verification", color = colors.textNorm) },
+        title = { Text(Strings.captcha_title(), color = colors.textNorm) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
-                Text("A browser window will open so you can complete the captcha.", color = colors.textNorm)
+                Text(Strings.captcha_msg_open_browser(), color = colors.textNorm)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "After completing the verification, copy the token from the page and paste it below.",
+                    Strings.captcha_msg_copy_token(),
                     modifier = Modifier.fillMaxWidth(),
                     color = colors.textNorm
                 )
@@ -57,7 +58,7 @@ fun CaptchaDialog(
                 OutlinedTextField(
                     value = token,
                     onValueChange = { token = it },
-                    label = { Text("Captcha token") },
+                    label = { Text(Strings.captcha_hint_token()) },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -73,7 +74,7 @@ fun CaptchaDialog(
                         contentColor = colors.textInverted
                     )
                 ) {
-                    Text(if (openedBrowser) "Re-open captcha" else "Open captcha in browser")
+                    Text(if (openedBrowser) Strings.btn_reopen_captcha() else Strings.btn_open_captcha())
                 }
             }
         },
@@ -89,12 +90,12 @@ fun CaptchaDialog(
                     contentColor = colors.textInverted
                 )
             ) {
-                Text("Submit token")
+                Text(Strings.btn_submit_token())
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(Strings.btn_cancel())
             }
         }
     )

@@ -70,7 +70,7 @@ fun LoginScreen(
                 title = { },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.textNorm)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Strings.desc_back(), tint = colors.textNorm)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = androidx.compose.ui.graphics.Color.Transparent),

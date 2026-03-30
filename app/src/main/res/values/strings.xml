@@ -444,4 +444,6 @@
     <string name="captcha_message">To keep your account secure, please complete the verification below.</string>
     <string name="captcha_proxy_active">Anti-blocking proxy is active</string>
     <string name="desc_close">Close</string>
+    <string name="placeholder_google">google.com</string>
+    <string name="placeholder_example_url">https://example.com</string>
 </resources>

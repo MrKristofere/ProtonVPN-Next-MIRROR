@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.ui.theme.liquidGlass
 
@@ -55,7 +56,7 @@ fun OnboardingScreen(
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = colors.brandNorm)
                 ) {
-                    Text("Get Started", fontWeight = FontWeight.Bold)
+                    Text(Strings.btn_get_started(), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -69,7 +70,7 @@ fun OnboardingScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "Ready to go!",
+                text = Strings.onboarding_ready(),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 color = colors.textNorm,
@@ -82,15 +83,15 @@ fun OnboardingScreen(
                 OnboardingItem(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Rounded.Security,
-                    title = "Strong Encryption",
-                    description = "Your data is protected by military-grade AES-256 or ChaCha20 encryption."
+                    title = Strings.onboarding_encryption_title(),
+                    description = Strings.onboarding_encryption_desc()
                 )
                 Spacer(modifier = Modifier.width(24.dp))
                 OnboardingItem(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Rounded.Public,
-                    title = "Global Network",
-                    description = "Access high-speed servers in over 60 countries around the world."
+                    title = Strings.onboarding_network_title(),
+                    description = Strings.onboarding_network_desc()
                 )
             }
             
@@ -100,15 +101,15 @@ fun OnboardingScreen(
                 OnboardingItem(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Rounded.FlashOn,
-                    title = "VPN Accelerator",
-                    description = "Increase VPN speeds by over 400% with our unique technology."
+                    title = Strings.onboarding_accelerator_title(),
+                    description = Strings.onboarding_accelerator_desc()
                 )
                 Spacer(modifier = Modifier.width(24.dp))
                 OnboardingItem(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Rounded.Shield,
-                    title = "AmneziaWG",
-                    description = "Advanced obfuscation protocol to bypass censorship and restrictive firewalls."
+                    title = Strings.onboarding_amnezia_title(),
+                    description = Strings.onboarding_amnezia_desc()
                 )
             }
         }

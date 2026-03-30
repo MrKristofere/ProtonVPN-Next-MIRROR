@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.ui.theme.liquidGlass
 
@@ -49,7 +50,7 @@ fun ProfilesScreen() {
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = { Text("Profiles", fontWeight = FontWeight.Bold, color = colors.textNorm) },
+                title = { Text(Strings.profiles_title(), fontWeight = FontWeight.Bold, color = colors.textNorm) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
                     scrolledContainerColor = Color.Transparent
@@ -65,7 +66,7 @@ fun ProfilesScreen() {
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.padding(bottom = 100.dp)
             ) {
-                Icon(Icons.Rounded.Add, contentDescription = "Add Profile")
+                Icon(Icons.Rounded.Add, contentDescription = Strings.desc_create_profile())
             }
         }
     ) { paddingValues ->
@@ -87,14 +88,14 @@ fun ProfilesScreen() {
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "No profiles yet",
+                    text = Strings.profiles_empty_title(),
                     style = MaterialTheme.typography.headlineSmall,
                     color = colors.textNorm,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Create a profile for quick access to your favorite servers.",
+                    text = Strings.profiles_empty_desc(),
                     style = MaterialTheme.typography.bodyLarge,
                     color = colors.textWeak,
                     modifier = Modifier.padding(horizontal = 48.dp),
