@@ -261,9 +261,10 @@
     <string name="st_mode_include">حالت گنجاندن (Include)</string>
     <string name="st_mode_include_desc">فقط برنامه‌ها و IPهای انتخاب شده از VPN استفاده می‌کنند</string>
     <string name="st_enabled_subtitle">اتصال VPN از قوانین تونل‌زنی تقسیم‌شده پیروی می‌کند</string>
-    <string name="settings_included_apps">برنامه‌های اختصاصی VPN</string>
-    <string name="settings_included_ips">آدرس‌های IP اختصاصی VPN</string>
     <string name="st_disabled_subtitle">تمام ترافیک از طریق VPN عبور می‌کند</string>
+    <string name="st_input_app_label">مسیر فایل اجرایی را وارد کنید (مثلاً /usr/bin/browser)</string>
+    <string name="st_input_ip_label">IP یا CIDR را وارد کنید (مثلاً 1.1.1.1/32)</string>
+    <string name="st_input_domain_label">دامنه را وارد کنید (مثلاً google.com)</string>
     <plurals name="st_apps_selected">
         <item quantity="one">%1$d برنامه انتخاب شد</item>
         <item quantity="other">%1$d برنامه انتخاب شدند</item>

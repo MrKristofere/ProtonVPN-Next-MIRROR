@@ -264,6 +264,9 @@
     <string name="st_mode_include_desc">Только выбранные приложения и IP будут использовать VPN</string>
     <string name="st_enabled_subtitle">VPN соединение будет следовать правилам раздельного туннелирования</string>
     <string name="st_disabled_subtitle">Весь трафик идет через VPN</string>
+    <string name="st_input_app_label">Введите путь к исполняемому файлу (напр. /usr/bin/browser)</string>
+    <string name="st_input_ip_label">Введите IP или CIDR (напр. 1.1.1.1/32)</string>
+    <string name="st_input_domain_label">Введите домен (напр. google.com)</string>
     <plurals name="st_apps_selected">
         <item quantity="one">%1$d приложение выбрано</item>
         <item quantity="few">%1$d приложения выбрано</item>

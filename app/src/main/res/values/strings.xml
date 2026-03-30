@@ -264,6 +264,9 @@
     <string name="st_mode_include_desc">Only selected apps and IPs will use the VPN</string>
     <string name="st_enabled_subtitle">VPN connection will follow split tunneling rules</string>
     <string name="st_disabled_subtitle">All traffic goes through VPN</string>
+    <string name="st_input_app_label">Enter executable path (e.g. /usr/bin/browser)</string>
+    <string name="st_input_ip_label">Enter IP or CIDR (e.g. 1.1.1.1/32)</string>
+    <string name="st_input_domain_label">Enter domain (e.g. google.com)</string>
     <plurals name="st_apps_selected">
         <item quantity="one">%1$d app selected</item>
         <item quantity="other">%1$d apps selected</item>

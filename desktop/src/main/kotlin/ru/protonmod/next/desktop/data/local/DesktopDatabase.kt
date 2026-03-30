@@ -19,6 +19,7 @@ package ru.protonmod.next.desktop.data.local
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import ru.protonmod.next.desktop.data.security.DesktopCryptoManager
 import java.io.File
 import java.sql.Connection
 import java.sql.DriverManager
@@ -28,6 +29,8 @@ import java.sql.DriverManager
  * Handles database initialization and operations for servers, sessions, and cache metadata
  */
 class DesktopDatabase(private val dbPath: String = getDefaultDatabasePath()) {
+
+    private val cryptoManager = DesktopCryptoManager()
 
     companion object {
         private fun getDefaultDatabasePath(): String {
@@ -143,8 +146,8 @@ class DesktopDatabase(private val dbPath: String = getDefaultDatabasePath()) {
                     if (resultSet.next()) {
                         DesktopSessionEntity(
                             id = resultSet.getInt("id"),
-                            accessToken = resultSet.getString("access_token"),
-                            refreshToken = resultSet.getString("refresh_token"),
+                            accessToken = cryptoManager.decrypt(resultSet.getString("access_token")),
+                            refreshToken = cryptoManager.decrypt(resultSet.getString("refresh_token")),
                             sessionId = resultSet.getString("session_id"),
                             userId = resultSet.getString("user_id"),
                             userTier = resultSet.getInt("user_tier"),
@@ -170,8 +173,8 @@ class DesktopDatabase(private val dbPath: String = getDefaultDatabasePath()) {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
             ).use { statement ->
                 statement.setInt(1, session.id)
-                statement.setString(2, session.accessToken)
-                statement.setString(3, session.refreshToken)
+                statement.setString(2, cryptoManager.encrypt(session.accessToken))
+                statement.setString(3, cryptoManager.encrypt(session.refreshToken))
                 statement.setString(4, session.sessionId)
                 statement.setString(5, session.userId)
                 statement.setInt(6, session.userTier)

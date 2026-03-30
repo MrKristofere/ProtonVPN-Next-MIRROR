@@ -64,14 +64,28 @@ class DesktopLoginViewModel(
     private fun loadRecentConnections() {
         scope.launch {
             val entities = vpnRepository.getRecentConnections()
-            // We need the full ServerEntry list to map these, but for now we can just use the entities
-            // Actually, we should probably wait until servers are loaded or map them when they arrive
-            combine(_servers, flowOf(entities)) { serverList, recent ->
-                recent.mapNotNull { r ->
-                    serverList.find { it.id == r.serverId }
+            
+            // Immediately map entities to ServerEntry even if servers list is not yet loaded
+            // This provides immediate visual feedback on recent servers
+            val initialRecent = entities.map { r ->
+                ServerEntry(
+                    id = r.serverId,
+                    name = r.serverName,
+                    city = r.city,
+                    country = r.country,
+                    tier = 0 // Default, will be updated when full list arrives
+                )
+            }
+            _recentConnections.value = initialRecent
+
+            // Refine with full ServerEntry (including physical server/load) once servers arrive
+            _servers.collect { serverList ->
+                if (serverList.isNotEmpty()) {
+                    val refined = entities.mapNotNull { r ->
+                        serverList.find { it.id == r.serverId }
+                    }
+                    _recentConnections.value = refined
                 }
-            }.collect { list ->
-                _recentConnections.value = list
             }
         }
     }
@@ -213,6 +227,13 @@ class DesktopLoginViewModel(
             _isConnecting.value = false
             
             result.onSuccess {
+                // Trigger background server list refresh after connection
+                // This follows the 10-second delay logic specified in requirements
+                val session = database.getSession()
+                if (session != null) {
+                    vpnRepository.refreshServersAfterConnection(session.accessToken, session.sessionId, session.userTier)
+                }
+
                 _connectedServer.value = server
                 // Add to recent connections
                 vpnRepository.addRecentConnection(

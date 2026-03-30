@@ -186,7 +186,8 @@ fun App() {
                                     settingsManager = settingsManager,
                                     loadDisplayMode = settings.serverLoadDisplayMode,
                                     countriesViewModel = countriesViewModel,
-                                    dataManager = dataManager
+                                    dataManager = dataManager,
+                                    viewModel = viewModel
                                 )
                             } else {
                                 Box(modifier = Modifier.fillMaxSize()) {
@@ -290,7 +291,8 @@ private fun DashboardScreen(
     settingsManager: DesktopSettingsManager,
     loadDisplayMode: ServerLoadDisplayMode,
     countriesViewModel: DesktopCountriesViewModel,
-    dataManager: DesktopVpnDataManager
+    dataManager: DesktopVpnDataManager,
+    viewModel: DesktopLoginViewModel
 ) {
     val isTablet = isTablet()
     val settings by settingsManager.settings.collectAsState()
@@ -386,6 +388,13 @@ private fun DashboardScreen(
                     ErrorReportingScreen(
                         onBack = { onTargetSelected(MainTarget.Settings) },
                         settingsManager = settingsManager
+                    )
+                }
+                MainTarget.Debug -> {
+                    DebugSettingsScreen(
+                        onBack = { onTargetSelected(MainTarget.Settings) },
+                        viewModel = viewModel,
+                        dataManager = dataManager
                     )
                 }
                 MainTarget.Profiles -> {

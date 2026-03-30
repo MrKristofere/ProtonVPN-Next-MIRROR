@@ -187,6 +187,18 @@ class DesktopVpnRepository(
     }
 
     /**
+     * Trigger background server refresh after a successful VPN connection
+     * This delays for 10 seconds to allow VPN to establish and then refreshes servers.
+     */
+    fun refreshServersAfterConnection(accessToken: String, sessionId: String, userTier: Int) {
+        applicationScope.launch {
+            println("$TAG: Delayed server update scheduled in 10 seconds")
+            delay(10000)
+            getServers(accessToken, sessionId, userTier, forceRefresh = true)
+        }
+    }
+
+    /**
      * Trigger background server refresh without waiting
      */
     fun refreshServersBackground(accessToken: String, sessionId: String, userTier: Int) {

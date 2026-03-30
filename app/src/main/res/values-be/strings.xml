@@ -261,9 +261,10 @@
     <string name="st_mode_include">Рэжым уключэння</string>
     <string name="st_mode_include_desc">Толькі выбраныя прыкладанні і IP будуць выкарыстоўваць VPN</string>
     <string name="st_enabled_subtitle">VPN-падключэнне будзе прытрымлівацца правілаў раздзельнага тунэлявання</string>
-    <string name="settings_included_apps">Прыкладанні праз VPN</string>
-    <string name="settings_included_ips">IP-адрасы праз VPN</string>
     <string name="st_disabled_subtitle">Увесь трафік ідзе праз VPN</string>
+    <string name="st_input_app_label">Увядзіце шлях да выканальнага файла (напр. /usr/bin/browser)</string>
+    <string name="st_input_ip_label">Увядзіце IP або CIDR (напр. 1.1.1.1/32)</string>
+    <string name="st_input_domain_label">Увядзіце дамен (напр. google.com)</string>
     <plurals name="st_apps_selected">
         <item quantity="one">Выбрана %1$d прыкладанне</item>
         <item quantity="few">Выбрана %1$d прыкладанні</item>

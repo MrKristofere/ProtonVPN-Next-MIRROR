@@ -21,12 +21,10 @@
 
 package ru.protonmod.next.desktop.ui.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -46,136 +44,6 @@ import ru.protonmod.next.ui.theme.liquidGlass
 import ru.protonmod.next.desktop.ui.utils.isTablet
 import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SplitTunnelingScreen(
-    onBack: () -> Unit,
-    manager: DesktopSplitTunnelingManager
-) {
-    val config by manager.config.collectAsState()
-    val colors = ProtonNextTheme.colors
-    val isTablet = isTablet()
-
-    var showAddAppDialog by remember { mutableStateOf(false) }
-    var showAddIpDialog by remember { mutableStateOf(false) }
-    var showAddDomainDialog by remember { mutableStateOf(false) }
-
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Transparent,
-        topBar = {
-            TopAppBar(
-                title = { Text(Strings.settings_split_tunneling(), fontWeight = FontWeight.Bold, color = colors.textNorm) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, Strings.desc_back(), tint = colors.textNorm)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                windowInsets = WindowInsets(0, 0, 0, 0)
-            )
-        }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = if (isTablet) Alignment.CenterHorizontally else Alignment.Start
-        ) {
-            val contentModifier = if (isTablet) Modifier.widthIn(max = 600.dp) else Modifier.fillMaxWidth()
-
-            item {
-                ToggleCard(
-                    modifier = contentModifier,
-                    title = Strings.st_enable(),
-                    subtitle = Strings.st_enable_desc(),
-                    checked = config.enabled,
-                    onCheckedChange = { manager.setEnabled(it) }
-                )
-            }
-
-            if (config.enabled) {
-                item {
-                    ModeSelectionCard(
-                        modifier = contentModifier,
-                        currentMode = config.mode,
-                        onModeSelected = { manager.setMode(it) }
-                    )
-                }
-
-                item { CategoryHeader(title = Strings.st_apps_header()) }
-                items(config.excludedApps.toList()) { app ->
-                    ItemRow(
-                        modifier = contentModifier,
-                        title = app,
-                        onRemove = { manager.removeExcludedApp(app) }
-                    )
-                }
-                item {
-                    AddButton(modifier = contentModifier, label = Strings.st_add_app(), onClick = { showAddAppDialog = true })
-                }
-
-                item { CategoryHeader(title = Strings.st_ips_header()) }
-                items(config.excludedIps.toList()) { ip ->
-                    ItemRow(
-                        modifier = contentModifier,
-                        title = ip,
-                        onRemove = { manager.removeExcludedIp(ip) }
-                    )
-                }
-                item {
-                    AddButton(modifier = contentModifier, label = Strings.st_add_ip(), onClick = { showAddIpDialog = true })
-                }
-
-                item { CategoryHeader(title = Strings.st_domains_header()) }
-                items(config.excludedDomains.toList()) { domain ->
-                    ItemRow(
-                        modifier = contentModifier,
-                        title = domain,
-                        onRemove = { manager.removeExcludedDomain(domain) }
-                    )
-                }
-                item {
-                    AddButton(modifier = contentModifier, label = Strings.st_add_domain(), onClick = { showAddDomainDialog = true })
-                }
-            }
-        }
-    }
-
-    if (showAddAppDialog) {
-        InputDialog(
-            title = Strings.st_add_app(),
-            label = Strings.st_input_app_label(),
-            onDismiss = { showAddAppDialog = false },
-            onConfirm = { 
-                manager.addExcludedApp(it)
-                showAddAppDialog = false
-            }
-        )
-    }
-
-    if (showAddIpDialog) {
-        InputDialog(
-            title = Strings.st_add_ip(),
-            label = Strings.st_input_ip_label(),
-            onDismiss = { showAddIpDialog = false },
-            onConfirm = { 
-                if (manager.addExcludedIp(it)) showAddIpDialog = false
-            }
-        )
-    }
-
-    if (showAddDomainDialog) {
-        InputDialog(
-            title = Strings.st_add_domain(),
-            label = Strings.st_input_domain_label(),
-            onDismiss = { showAddDomainDialog = false },
-            onConfirm = { 
-                if (manager.addExcludedDomain(it)) showAddDomainDialog = false
-            }
-        )
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -239,7 +107,6 @@ fun CustomDnsScreen(
                     ItemRow(
                         modifier = contentModifier,
                         title = if (manager.getPresetName().startsWith("Custom")) config.customDns else Strings.dns_manual_ip(),
-                        onRemove = null,
                         onClick = { showCustomDnsDialog = true }
                     )
                 }
@@ -361,67 +228,11 @@ private fun ToggleCard(
     }
 }
 
-@Composable
-private fun ModeSelectionCard(
-    modifier: Modifier = Modifier,
-    currentMode: String,
-    onModeSelected: (String) -> Unit
-) {
-    val colors = ProtonNextTheme.colors
-    Column(modifier = modifier) {
-        CategoryHeader(title = Strings.settings_st_mode())
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .liquidGlass(shape = RoundedCornerShape(24.dp), alpha = 0.4f),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            ModeOption(
-                modifier = Modifier.weight(1f),
-                title = Strings.st_mode_exclude(),
-                isSelected = currentMode == "exclude",
-                onClick = { onModeSelected("exclude") }
-            )
-            ModeOption(
-                modifier = Modifier.weight(1f),
-                title = Strings.st_mode_include(),
-                isSelected = currentMode == "include",
-                onClick = { onModeSelected("include") }
-            )
-        }
-    }
-}
-
-@Composable
-private fun ModeOption(
-    modifier: Modifier = Modifier,
-    title: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    val colors = ProtonNextTheme.colors
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
-            .clickable(onClick = onClick)
-            .background(if (isSelected) colors.brandNorm.copy(alpha = 0.2f) else Color.Transparent)
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = if (isSelected) colors.brandNorm else colors.textNorm
-        )
-    }
-}
 
 @Composable
 private fun ItemRow(
     modifier: Modifier = Modifier,
     title: String,
-    onRemove: (() -> Unit)?,
     onClick: (() -> Unit)? = null
 ) {
     val colors = ProtonNextTheme.colors
@@ -435,32 +246,13 @@ private fun ItemRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(title, modifier = Modifier.weight(1f), color = colors.textNorm)
-            if (onRemove != null) {
-                IconButton(onClick = onRemove) {
-                    Icon(Icons.Rounded.Delete, Strings.st_remove_ip_desc(), tint = colors.notificationError)
-                }
-            } else if (onClick != null) {
+            if (onClick != null) {
                 Icon(Icons.Rounded.ChevronRight, null, tint = colors.iconWeak)
             }
         }
     }
 }
 
-@Composable
-private fun AddButton(modifier: Modifier = Modifier, label: String, onClick: () -> Unit) {
-    val colors = ProtonNextTheme.colors
-    OutlinedButton(
-        onClick = onClick,
-        modifier = modifier.height(56.dp),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, colors.brandNorm.copy(alpha = 0.3f)),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.brandNorm)
-    ) {
-        Icon(Icons.Rounded.Add, null)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(label)
-    }
-}
 
 @Composable
 private fun PresetDnsRow(title: String, isSelected: Boolean, onClick: () -> Unit) {

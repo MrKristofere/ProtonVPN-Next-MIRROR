@@ -115,7 +115,7 @@ fun SettingsScreen(
                                 navigateTo = navigateTo
                             )
 
-                            AboutSettingsSection()
+                            AboutSettingsSection(navigateTo = navigateTo)
                         }
                     }
                 }
@@ -153,7 +153,7 @@ fun SettingsScreen(
                 }
 
                 item {
-                    AboutSettingsSection()
+                    AboutSettingsSection(navigateTo = navigateTo)
                 }
             }
         }
@@ -295,7 +295,7 @@ private fun PrivacySettingsSection(
 }
 
 @Composable
-private fun AboutSettingsSection() {
+private fun AboutSettingsSection(navigateTo: (MainTarget) -> Unit) {
     Category(title = Strings.settings_about()) {
         SettingRowWithIcon(
             icon = Icons.Rounded.Info,
@@ -308,7 +308,7 @@ private fun AboutSettingsSection() {
             icon = Icons.Rounded.BugReport,
             title = Strings.settings_debug(),
             subtitle = Strings.debug_title(),
-            onClick = { /* Coming soon */ }
+            onClick = { navigateTo(MainTarget.Debug) }
         )
     }
 }

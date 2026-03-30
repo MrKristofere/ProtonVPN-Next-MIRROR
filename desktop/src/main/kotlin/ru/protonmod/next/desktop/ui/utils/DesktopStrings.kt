@@ -127,7 +127,11 @@ object DesktopStrings {
     @Composable fun settings_error_reporting_desc() = get("settings_error_reporting_desc")
     @Composable fun settings_st_mode() = get("settings_st_mode")
     @Composable fun st_mode_exclude() = get("st_mode_exclude")
+    @Composable fun st_mode_exclude_desc() = get("st_mode_exclude_desc")
     @Composable fun st_mode_include() = get("st_mode_include")
+    @Composable fun st_mode_include_desc() = get("st_mode_include_desc")
+    @Composable fun st_enabled_subtitle() = get("st_enabled_subtitle")
+    @Composable fun st_disabled_subtitle() = get("st_disabled_subtitle")
     @Composable fun st_remove_ip_desc() = get("st_remove_ip_desc")
     @Composable fun desc_back() = get("desc_back")
     @Composable fun desc_close() = get("desc_close")
@@ -151,6 +155,20 @@ object DesktopStrings {
     @Composable fun settings_version(v: String) = get("settings_version", v)
     @Composable fun settings_debug() = get("settings_debug")
     @Composable fun debug_title() = get("debug_title")
+    @Composable fun debug_session_header() = get("debug_session_header")
+    @Composable fun debug_cert_id() = get("debug_cert_id")
+    @Composable fun debug_cert_issued() = get("debug_cert_issued")
+    @Composable fun debug_cert_expires() = get("debug_cert_expires")
+    @Composable fun debug_btn_refresh_cert() = get("debug_btn_refresh_cert")
+    @Composable fun debug_exports_header() = get("debug_exports_header")
+    @Composable fun debug_btn_export_logs() = get("debug_btn_export_logs")
+    @Composable fun debug_btn_export_config() = get("debug_btn_export_config")
+    @Composable fun debug_danger_header() = get("debug_danger_header")
+    @Composable fun debug_btn_nuke() = get("debug_btn_nuke")
+    @Composable fun debug_nuke_confirm() = get("debug_nuke_confirm")
+    @Composable fun debug_device_header() = get("debug_device_header")
+    @Composable fun debug_select_server() = get("debug_select_server")
+    @Composable fun btn_close() = get("desc_close") // Map to desc_close if btn_close is not in xml
 
     // Setup Flow
     @Composable fun setup_choose_language() = get("setup_choose_language")
@@ -194,6 +212,13 @@ object DesktopStrings {
     @Composable fun st_input_app_label() = get("st_input_app_label")
     @Composable fun st_input_ip_label() = get("st_input_ip_label")
     @Composable fun st_input_domain_label() = get("st_input_domain_label")
+    
+    @Composable fun settings_excluded_apps() = get("settings_excluded_apps")
+    @Composable fun settings_included_apps() = get("settings_included_apps")
+    @Composable fun settings_excluded_ips() = get("settings_excluded_ips")
+    @Composable fun settings_included_ips() = get("settings_included_ips")
+    @Composable fun settings_excluded_domains() = get("settings_excluded_domains")
+    @Composable fun settings_included_domains() = get("settings_included_domains")
     
     // Custom DNS
     @Composable fun dns_use_custom() = get("dns_use_custom")

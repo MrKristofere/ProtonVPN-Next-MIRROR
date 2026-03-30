@@ -262,6 +262,9 @@
     <string name="st_mode_include_desc">Тільки вибрані додатки та IP будуть використовувати VPN</string>
     <string name="st_enabled_subtitle">VPN з\'єднання буде слідувати правилам роздільного тунелювання</string>
     <string name="st_disabled_subtitle">Ввесь трафік іде через VPN</string>
+    <string name="st_input_app_label">Введіть шлях до виконуваного файлу (напр. /usr/bin/browser)</string>
+    <string name="st_input_ip_label">Введіть IP або CIDR (напр. 1.1.1.1/32)</string>
+    <string name="st_input_domain_label">Введіть домен (напр. google.com)</string>
     <string name="settings_included_apps">Додатки через VPN</string>
     <string name="settings_included_ips">IP-адреси через VPN</string>
     <plurals name="st_apps_selected">
