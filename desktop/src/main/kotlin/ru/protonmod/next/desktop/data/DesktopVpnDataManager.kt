@@ -19,6 +19,7 @@ package ru.protonmod.next.desktop.data
 
 import kotlinx.coroutines.*
 import ru.protonmod.next.desktop.data.local.DesktopDatabase
+import ru.protonmod.next.desktop.data.local.DesktopSessionEntity
 import ru.protonmod.next.desktop.data.repository.DesktopVpnRepository
 import ru.protonmod.next.desktop.data.repository.DesktopCertificateManager
 import ru.protonmod.next.desktop.monitoring.DesktopSentryManager
@@ -97,6 +98,24 @@ class DesktopVpnDataManager {
 
             // Connect to database
             database.connect()
+
+            // Migration: Move accessToken/sessionId from settings.json to secure database if they exist
+            val s = settingsManager.settings.value
+            if (s.accessToken != null && s.sessionId != null) {
+                println("$TAG: Found old session in settings.json, migrating to secure database...")
+                val existingSession = database.getSession()
+                if (existingSession == null) {
+                    database.saveSession(DesktopSessionEntity(
+                        accessToken = s.accessToken,
+                        sessionId = s.sessionId,
+                        refreshToken = "", // Not available in old settings
+                        userId = "" // Not available in old settings
+                    ))
+                }
+                // Clear old insecure session fields and set login flag
+                settingsManager.saveSession("", "")
+                println("$TAG: Session migration completed")
+            }
 
             // Start background server updates
             vpnRepository.startAutoUpdate()

@@ -284,6 +284,21 @@ class DesktopLoginViewModel(
         }
     }
 
+    fun logout() {
+        scope.launch {
+            // Disconnect VPN first
+            vpnClient.disconnect()
+            _connectedServer.value = null
+            
+            // Clear secure session from database
+            database.clearSession()
+            
+            // Reset UI state
+            _uiState.value = DesktopLoginUiState.Idle
+            _servers.value = emptyList()
+        }
+    }
+
     fun refreshCertificate() {
         scope.launch {
             certificateManager.forceRefreshCertificate()

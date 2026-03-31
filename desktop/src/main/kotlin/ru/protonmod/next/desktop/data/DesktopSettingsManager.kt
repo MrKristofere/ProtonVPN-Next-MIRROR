@@ -54,8 +54,13 @@ data class DesktopSettings(
     val serverLoadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL,
     val language: String = "en",
     val isFirstRun: Boolean = true,
+    val isLoggedIn: Boolean = false,
+    
+    @Deprecated("Use DesktopDatabase for secure session storage")
     val accessToken: String? = null,
+    @Deprecated("Use DesktopDatabase for secure session storage")
     val sessionId: String? = null,
+
     // Sentry & Analytics
     val sentryMetricsEnabled: Boolean = true,
     val sentryCrashReportingEnabled: Boolean = true,
@@ -72,7 +77,11 @@ data class DesktopSettings(
 )
 
 class DesktopSettingsManager(private val settingsFile: File = File("settings.json")) {
-    private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+    private val json = Json { 
+        ignoreUnknownKeys = true 
+        prettyPrint = true
+        explicitNulls = false
+    }
     private val _settings = MutableStateFlow(loadSettings())
     val settings: StateFlow<DesktopSettings> = _settings.asStateFlow()
 
@@ -155,12 +164,19 @@ class DesktopSettingsManager(private val settingsFile: File = File("settings.jso
         saveSettings(_settings.value.copy(isFirstRun = false))
     }
 
+    @Deprecated("Use DesktopDatabase.saveSession")
     fun saveSession(accessToken: String, sessionId: String) {
-        saveSettings(_settings.value.copy(accessToken = accessToken, sessionId = sessionId))
+        // We only set the isLoggedIn flag in settings.json
+        // The actual tokens are saved to the secure database by the ViewModel
+        saveSettings(_settings.value.copy(isLoggedIn = true))
     }
 
     fun clearSession() {
-        saveSettings(_settings.value.copy(accessToken = null, sessionId = null))
+        saveSettings(_settings.value.copy(
+            isLoggedIn = false,
+            accessToken = null, 
+            sessionId = null
+        ))
     }
 
     // ===== Sentry & Analytics =====

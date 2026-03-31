@@ -100,15 +100,20 @@ fun App() {
     var authTarget by remember { 
         mutableStateOf(
             if (settings.isFirstRun) MainTarget.SetupLanguage 
-            else if (settings.accessToken == null) MainTarget.Welcome 
-            else MainTarget.Home 
+            else if (settings.isLoggedIn || settings.accessToken != null) MainTarget.Home
+            else MainTarget.Welcome 
         ) 
     }
 
-    // Auto-login if session exists
-    LaunchedEffect(settings.accessToken) {
-        if (settings.accessToken != null && uiState is DesktopLoginUiState.Idle) {
-            viewModel.restoreSession(settings.accessToken!!, settings.sessionId!!)
+    // Initialize data layer and restore session on start
+    LaunchedEffect(Unit) {
+        dataManager.initialize()
+        
+        // Restore session from secure database if it exists
+        val session = dataManager.database.getSession()
+        if (session != null && uiState is DesktopLoginUiState.Idle) {
+            viewModel.restoreSession(session.accessToken, session.sessionId)
+            authTarget = MainTarget.Home
         }
     }
 
@@ -121,10 +126,11 @@ fun App() {
         }
     }
 
-    // Persist session on success
+    // Restore session on success
     LaunchedEffect(uiState) {
         if (uiState is DesktopLoginUiState.Success) {
             val state = uiState as DesktopLoginUiState.Success
+            // Update the login flag in settings (tokens are already in database)
             settingsManager.saveSession(state.accessToken, state.sessionId)
         }
     }
@@ -169,6 +175,7 @@ fun App() {
                                     onTargetSelected = { selectedTarget = it },
                                     onLogout = { 
                                         viewModel.clearError() 
+                                        viewModel.logout()
                                         settingsManager.clearSession()
                                         authTarget = MainTarget.Welcome
                                     },
