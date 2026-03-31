@@ -35,10 +35,12 @@ object FlavorInitializer {
         val isSessionReplayEnabled = settingsManager.isSessionReplayEnabledSync()
         val isAnrEnabled = settingsManager.isAnrEnabledSync()
         val isMetricsEnabled = settingsManager.isMetricsEnabledSync()
+        val isLogsEnabled = settingsManager.isLogsEnabledSync()
 
         // Sentry initialization
         SentryAndroid.init(context) { options ->
             options.dsn = "https://7b74cef88678ecb3e6047ac6b4abf139@o4510986952310784.ingest.de.sentry.io/4510986956374096"
+            options.isDebug = BuildConfig.DEBUG // Helpful for local development
             
             // Allow all errors if crash reporting is enabled
             options.setBeforeSend { event, _ ->
@@ -63,7 +65,7 @@ object FlavorInitializer {
 
             // Enable structured Logs (v8.12.0+)
             // All ProtonLogger calls will be forwarded to Sentry Logs for real-time querying
-            options.logs.isEnabled = true
+            options.logs.isEnabled = isLogsEnabled
             
             // Advanced Debugging (Attachments & Screenshots, 10 GB quota)
             options.isAttachScreenshot = isAnalyticsEnabled

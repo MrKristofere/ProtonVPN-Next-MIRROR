@@ -20,6 +20,7 @@ package ru.protonmod.next.ui.screens
 import android.annotation.SuppressLint
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -157,6 +158,8 @@ fun CaptchaScreen(
                         WebView(context).apply {
                             setBackgroundColor(android.graphics.Color.TRANSPARENT)
 
+                            val proxyBaseUrl = "https://shimmering-stroopwafel-51675e.netlify.app"
+
                             settings.javaScriptEnabled = true
                             settings.domStorageEnabled = true
 
@@ -202,7 +205,17 @@ fun CaptchaScreen(
 
                             webViewClient = object : WebViewClient() {
                                 private val okHttpClient = OkHttpClient.Builder().build()
-                                private val proxyBaseUrl = "https://shimmering-stroopwafel-51675e.netlify.app"
+
+                                override fun onRenderProcessGone(
+                                    view: WebView?,
+                                    detail: RenderProcessGoneDetail?
+                                ): Boolean {
+                                    ProtonLogger.e("CaptchaScreen", "WebView renderer process gone (crashed: ${detail?.didCrash()})")
+                                    // Handle the renderer crash gracefully by dismissing the captcha screen
+                                    // Returning true prevents the entire app from being killed by the system
+                                    onDismiss()
+                                    return true
+                                }
 
                                 override fun shouldInterceptRequest(
                                     view: WebView,
@@ -302,9 +315,25 @@ fun CaptchaScreen(
                                 }
                             }
 
+                            // When API bypass is enabled, proxy the captcha URL through the
+                            // netlify proxy so that captcha requests are not blocked by regional
+                            // restrictions. The interceptor handles subsequent resource requests,
+                            // but the initial page load URL must also be rewritten here.
+                            val effectiveWebUrl = if (isApiBypassEnabled) {
+                                when {
+                                    webUrl.startsWith("https://verify-api.proton.me") ->
+                                        webUrl.replace("https://verify-api.proton.me", "$proxyBaseUrl/verify-api")
+                                    webUrl.startsWith("https://verify.proton.me") ->
+                                        webUrl.replace("https://verify.proton.me", "$proxyBaseUrl/verify")
+                                    else -> webUrl
+                                }
+                            } else {
+                                webUrl
+                            }
+
                             val optimizedUrl = buildString {
-                                append(webUrl)
-                                if (!webUrl.contains("?")) append("?") else append("&")
+                                append(effectiveWebUrl)
+                                if (!effectiveWebUrl.contains("?")) append("?") else append("&")
                                 append("embed=true&theme=1&vpn=true")
                             }
 
