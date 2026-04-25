@@ -44,17 +44,17 @@ class DesktopLoginViewModel(
     private val _uiState = MutableStateFlow<DesktopLoginUiState>(DesktopLoginUiState.Idle)
     val uiState: StateFlow<DesktopLoginUiState> = _uiState.asStateFlow()
 
-    private val _servers = MutableStateFlow<List<ServerEntry>>(emptyList())
-    val servers: StateFlow<List<ServerEntry>> = _servers.asStateFlow()
+    private val _servers = MutableStateFlow<List<LogicalServer>>(emptyList())
+    val servers: StateFlow<List<LogicalServer>> = _servers.asStateFlow()
 
-    private val _recentConnections = MutableStateFlow<List<ServerEntry>>(emptyList())
-    val recentConnections: StateFlow<List<ServerEntry>> = _recentConnections.asStateFlow()
+    private val _recentConnections = MutableStateFlow<List<LogicalServer>>(emptyList())
+    val recentConnections: StateFlow<List<LogicalServer>> = _recentConnections.asStateFlow()
 
     private val _isConnecting = MutableStateFlow(false)
     val isConnecting: StateFlow<Boolean> = _isConnecting.asStateFlow()
 
-    private val _connectedServer = MutableStateFlow<ServerEntry?>(null)
-    val connectedServer: StateFlow<ServerEntry?> = _connectedServer.asStateFlow()
+    private val _connectedServer = MutableStateFlow<LogicalServer?>(null)
+    val connectedServer: StateFlow<LogicalServer?> = _connectedServer.asStateFlow()
 
     init {
         // Load recent connections on init
@@ -65,20 +65,24 @@ class DesktopLoginViewModel(
         scope.launch {
             val entities = vpnRepository.getRecentConnections()
             
-            // Immediately map entities to ServerEntry even if servers list is not yet loaded
+            // Immediately map entities to LogicalServer even if servers list is not yet loaded
             // This provides immediate visual feedback on recent servers
             val initialRecent = entities.map { r ->
-                ServerEntry(
+                LogicalServer(
                     id = r.serverId,
                     name = r.serverName,
                     city = r.city,
-                    country = r.country,
-                    tier = 0 // Default, will be updated when full list arrives
+                    entryCountry = "",
+                    exitCountry = r.country,
+                    tier = 0,
+                    features = 0,
+                    servers = emptyList(),
+                    averageLoad = 0
                 )
             }
             _recentConnections.value = initialRecent
 
-            // Refine with full ServerEntry (including physical server/load) once servers arrive
+            // Refine with full LogicalServer (including physical server/load) once servers arrive
             _servers.collect { serverList ->
                 if (serverList.isNotEmpty()) {
                     val refined = entities.mapNotNull { r ->
@@ -218,7 +222,7 @@ class DesktopLoginViewModel(
         }
     }
 
-    fun connectToServer(server: ServerEntry) {
+    fun connectToServer(server: LogicalServer) {
         if (_uiState.value !is DesktopLoginUiState.Success) return
         
         scope.launch {
@@ -241,7 +245,7 @@ class DesktopLoginViewModel(
                         serverId = server.id,
                         serverName = server.name,
                         city = server.city,
-                        country = server.country,
+                        country = server.exitCountry,
                         lastConnectedAt = System.currentTimeMillis()
                     )
                 )
@@ -262,14 +266,14 @@ class DesktopLoginViewModel(
 
             val targetServer = when (strategy) {
                 "recent" -> {
-                    _recentConnections.value.firstOrNull() ?: serverList.minByOrNull { it.physicalServer?.load ?: 100 }
+                    _recentConnections.value.firstOrNull() ?: serverList.minByOrNull { it.averageLoad }
                 }
                 "server" -> {
-                    serverList.find { it.id == targetId } ?: serverList.minByOrNull { it.physicalServer?.load ?: 100 }
+                    serverList.find { it.id == targetId } ?: serverList.minByOrNull { it.averageLoad }
                 }
                 else -> {
                     // Default: "fastest"
-                    serverList.minByOrNull { it.physicalServer?.load ?: 100 }
+                    serverList.minByOrNull { it.averageLoad }
                 }
             }
 

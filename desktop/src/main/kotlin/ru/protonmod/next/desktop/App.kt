@@ -45,11 +45,13 @@ import ru.protonmod.next.desktop.ui.components.DesktopConnectionCard
 import ru.protonmod.next.desktop.ui.components.LiquidGlassBottomBar
 import ru.protonmod.next.desktop.ui.screens.*
 import ru.protonmod.next.data.local.ServerLoadDisplayMode
+import ru.protonmod.next.data.network.LogicalServer
 import ru.protonmod.next.desktop.data.*
 import ru.protonmod.next.desktop.ui.components.*
 import ru.protonmod.next.desktop.ui.utils.*
 import ru.protonmod.next.ui.utils.CommonCountryUtils
 import ru.protonmod.next.ui.theme.ProtonNextTheme as Theme
+import ru.protonmod.next.ui.theme.liquidGlass
 import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
 
 @Composable
@@ -139,25 +141,32 @@ fun App() {
         DesktopCountriesViewModel(vpnClient, settingsManager, viewModel.servers, viewModel.connectedServer)
     }
 
+    val profilesViewModel = remember(servers, connectedServer) {
+        DesktopProfilesViewModel(vpnClient, settingsManager, viewModel.servers, viewModel.connectedServer)
+    }
+
     BoxWithConstraints {
         val windowWidth = maxWidth
         ProvideDeviceType(windowWidth) {
             Theme(appTheme = settings.appTheme) {
                 val colors = Theme.colors
-                Surface(color = Color.Transparent) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(
-                                        colors.brandNorm.copy(alpha = 0.25f),
-                                        colors.backgroundNorm.copy(alpha = 0.1f),
-                                        colors.backgroundNorm
+                Surface(color = colors.backgroundNorm) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        // Immersive gradient background
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            colors.brandNorm.copy(alpha = 0.25f),
+                                            colors.backgroundNorm.copy(alpha = 0.1f),
+                                            colors.backgroundNorm
+                                        )
                                     )
                                 )
-                            )
-                    ) {
+                        )
+
                         AnimatedContent(
                             targetState = if (uiState is DesktopLoginUiState.Success && !settings.isFirstRun) 1 else 0,
                             transitionSpec = {
@@ -193,6 +202,7 @@ fun App() {
                                     settingsManager = settingsManager,
                                     loadDisplayMode = settings.serverLoadDisplayMode,
                                     countriesViewModel = countriesViewModel,
+                                    profilesViewModel = profilesViewModel,
                                     dataManager = dataManager,
                                     viewModel = viewModel
                                 )
@@ -283,14 +293,14 @@ fun App() {
 
 @Composable
 private fun DashboardScreen(
-    servers: List<ServerEntry>,
-    recentConnections: List<ServerEntry>,
-    connectedServer: ServerEntry?,
+    servers: List<LogicalServer>,
+    recentConnections: List<LogicalServer>,
+    connectedServer: LogicalServer?,
     isConnecting: Boolean,
     selectedTarget: MainTarget,
     onTargetSelected: (MainTarget) -> Unit,
     onLogout: () -> Unit,
-    onConnect: (ServerEntry) -> Unit,
+    onConnect: (LogicalServer) -> Unit,
     onQuickConnect: (String, String?) -> Unit,
     onDisconnect: () -> Unit,
     certificateState: ru.protonmod.next.desktop.data.local.CertificateState,
@@ -298,6 +308,7 @@ private fun DashboardScreen(
     settingsManager: DesktopSettingsManager,
     loadDisplayMode: ServerLoadDisplayMode,
     countriesViewModel: DesktopCountriesViewModel,
+    profilesViewModel: DesktopProfilesViewModel,
     dataManager: DesktopVpnDataManager,
     viewModel: DesktopLoginViewModel
 ) {
@@ -405,7 +416,10 @@ private fun DashboardScreen(
                     )
                 }
                 MainTarget.Profiles -> {
-                    ProfilesScreen()
+                    ProfilesScreen(
+                        viewModel = profilesViewModel,
+                        onConnect = onConnect
+                    )
                 }
                 else -> {}
             }
@@ -436,12 +450,12 @@ private fun DashboardScreen(
 
 @Composable
 private fun HomeScreen(
-    servers: List<ServerEntry>,
-    recentConnections: List<ServerEntry>,
-    connectedServer: ServerEntry?,
+    servers: List<LogicalServer>,
+    recentConnections: List<LogicalServer>,
+    connectedServer: LogicalServer?,
     isConnecting: Boolean,
     onLogout: () -> Unit,
-    onConnect: (ServerEntry) -> Unit,
+    onConnect: (LogicalServer) -> Unit,
     onQuickConnect: () -> Unit,
     onChangeQuickConnect: () -> Unit,
     onDisconnect: () -> Unit,
@@ -469,173 +483,89 @@ private fun HomeScreen(
             windowInsets = WindowInsets(0, 0, 0, 0)
         )
 
-        if (isTablet) {
-            // Tablet Layout: Split connection (Left) and recent connections (Right)
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 80.dp, start = 24.dp, end = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(32.dp)
+        // Desktop always uses split layout (tablet-like)
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 80.dp, start = 24.dp, end = 24.dp, bottom = 100.dp),
+            horizontalArrangement = Arrangement.spacedBy(32.dp)
+        ) {
+            // Left Column: Status and Connection
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // Left Column: Status and Connection
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                CertificateBanner(
+                    state = certificateState,
+                    onRefresh = onRefreshCert
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(240.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(colors.backgroundSecondary.copy(alpha = 0.3f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    CertificateBanner(
-                        state = certificateState,
-                        onRefresh = onRefreshCert
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(240.dp)
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(colors.backgroundSecondary.copy(alpha = 0.3f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Rounded.Map,
-                            null,
-                            modifier = Modifier.size(160.dp),
-                            tint = colors.brandNorm.copy(alpha = 0.2f)
-                        )
-                    }
-
-                    DesktopConnectionCard(
-                        isConnected = connectedServer != null,
-                        isConnecting = isConnecting,
-                        serverName = connectedServer?.name ?: getQuickConnectName(quickConnectStrategy, quickConnectTargetId, servers),
-                        countryCode = connectedServer?.country ?: getQuickConnectCountry(quickConnectStrategy, quickConnectTargetId, servers),
-                        cityName = connectedServer?.city ?: "",
-                        ipAddress = if (connectedServer != null) "10.2.0.2" else "0.0.0.0",
-                        onToggle = {
-                            if (connectedServer != null) {
-                                onDisconnect()
-                            } else {
-                                onQuickConnect()
-                            }
-                        },
-                        onChangeStrategy = onChangeQuickConnect,
-                        quickConnectStrategy = quickConnectStrategy
+                    Icon(
+                        Icons.Rounded.Map,
+                        null,
+                        modifier = Modifier.size(160.dp),
+                        tint = colors.brandNorm.copy(alpha = 0.2f)
                     )
                 }
 
-                // Right Column: Lists
-                LazyColumn(
-                    modifier = Modifier.weight(1.2f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (recentConnections.isNotEmpty()) {
-                        item {
-                            Text(
-                                "Recent Connections",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = colors.textNorm,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
+                DesktopConnectionCard(
+                    isConnected = connectedServer != null,
+                    isConnecting = isConnecting,
+                    serverName = connectedServer?.name ?: getQuickConnectName(quickConnectStrategy, quickConnectTargetId, servers),
+                    countryCode = connectedServer?.exitCountry ?: getQuickConnectCountry(quickConnectStrategy, quickConnectTargetId, servers),
+                    cityName = connectedServer?.city ?: "",
+                    ipAddress = if (connectedServer != null) "10.2.0.2" else "0.0.0.0",
+                    onToggle = {
+                        if (connectedServer != null) {
+                            onDisconnect()
+                        } else {
+                            onQuickConnect()
                         }
-                        items(recentConnections) { server ->
-                            ServerCard(server, onClick = { onConnect(server) }, displayMode = loadDisplayMode)
-                        }
-                    } else if (servers.isNotEmpty()) {
-                        item {
-                            Text(
-                                "Recommended",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = colors.textNorm,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                        }
-                        items(servers.take(10)) { server ->
-                            ServerCard(server, onClick = { onConnect(server) }, displayMode = loadDisplayMode)
-                        }
-                    }
-                }
+                    },
+                    onChangeStrategy = onChangeQuickConnect,
+                    quickConnectStrategy = quickConnectStrategy
+                )
             }
-        } else {
-            // Phone Layout
+
+            // Right Column: Lists
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 80.dp)
+                modifier = Modifier.weight(1.2f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 24.dp)
             ) {
-                item {
-                    CertificateBanner(
-                        state = certificateState,
-                        onRefresh = onRefreshCert,
-                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp)
-                    )
-                }
-
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp)
-                            .padding(horizontal = 24.dp)
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(colors.backgroundSecondary.copy(alpha = 0.3f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Rounded.Map,
-                            null,
-                            modifier = Modifier.size(120.dp),
-                            tint = colors.brandNorm.copy(alpha = 0.2f)
-                        )
-                    }
-                }
-
-                item { Spacer(modifier = Modifier.height(24.dp)) }
-
-                item {
-                    DesktopConnectionCard(
-                        isConnected = connectedServer != null,
-                        isConnecting = isConnecting,
-                        serverName = connectedServer?.name ?: getQuickConnectName(quickConnectStrategy, quickConnectTargetId, servers),
-                        countryCode = connectedServer?.country ?: getQuickConnectCountry(quickConnectStrategy, quickConnectTargetId, servers),
-                        cityName = connectedServer?.city ?: "",
-                        ipAddress = if (connectedServer != null) "10.2.0.2" else "0.0.0.0",
-                        onToggle = {
-                            if (connectedServer != null) {
-                                onDisconnect()
-                            } else {
-                                onQuickConnect()
-                            }
-                        },
-                        onChangeStrategy = onChangeQuickConnect,
-                        quickConnectStrategy = quickConnectStrategy
-                    )
-                }
-
                 if (recentConnections.isNotEmpty()) {
                     item {
                         Text(
-                            "Recent Connections",
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                            Strings.get("title_recent_connections"),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = colors.textNorm
+                            color = colors.textNorm,
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
                     }
                     items(recentConnections) { server ->
-                        ServerCard(server, onClick = { onConnect(server) }, displayMode = loadDisplayMode)
+                        ServerCard(server, isConnected = connectedServer?.id == server.id, isConnecting = isConnecting && connectedServer?.id == server.id, onClick = { onConnect(server) }, displayMode = loadDisplayMode)
                     }
                 } else if (servers.isNotEmpty()) {
                     item {
                         Text(
                             "Recommended",
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = colors.textNorm
+                            color = colors.textNorm,
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
                     }
-                    items(servers.take(3)) { server ->
-                        ServerCard(server, onClick = { onConnect(server) }, displayMode = loadDisplayMode)
+                    items(servers.take(10)) { server ->
+                        ServerCard(server, isConnected = connectedServer?.id == server.id, isConnecting = isConnecting && connectedServer?.id == server.id, onClick = { onConnect(server) }, displayMode = loadDisplayMode)
                     }
                 }
             }
@@ -644,7 +574,7 @@ private fun HomeScreen(
 }
 
 @Composable
-private fun getQuickConnectName(strategy: String, targetId: String?, servers: List<ServerEntry>): String {
+private fun getQuickConnectName(strategy: String, targetId: String?, servers: List<LogicalServer>): String {
     return when (strategy) {
         "fastest" -> Strings.qc_fastest()
         "recent" -> Strings.qc_recent()
@@ -653,38 +583,59 @@ private fun getQuickConnectName(strategy: String, targetId: String?, servers: Li
     }
 }
 
-@Composable
-private fun getQuickConnectCountry(strategy: String, targetId: String?, servers: List<ServerEntry>): String {
+private fun getQuickConnectCountry(strategy: String, targetId: String?, servers: List<LogicalServer>): String {
     return when (strategy) {
-        "server" -> servers.find { it.id == targetId }?.country ?: ""
+        "server" -> servers.find { it.id == targetId }?.exitCountry ?: ""
         "fastest", "recent" -> "fastest"
         else -> ""
     }
 }
 
 @Composable
-private fun ServerCard(server: ServerEntry, onClick: () -> Unit, displayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL) {
+private fun ServerCard(
+    server: LogicalServer, 
+    isConnected: Boolean,
+    isConnecting: Boolean,
+    onClick: () -> Unit, 
+    displayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
+) {
     val colors = Theme.colors
-    val load = server.physicalServer?.load ?: 0
-    Card(
+    val load = server.averageLoad
+    
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.backgroundSecondary.copy(alpha = 0.8f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, colors.shade100.copy(alpha = 0.05f))
+            .padding(vertical = 4.dp)
+            .liquidGlass(
+                shape = RoundedCornerShape(24.dp),
+                alpha = if (isConnected) 0.3f else 0.4f,
+                shadowElevation = 0.dp
+            )
+            .clickable(enabled = !isConnecting) { onClick() }
     ) {
         Column {
             Row(
                 modifier = Modifier.padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                FlagIcon(countryCode = server.country, size = DpSize(36.dp, 24.dp))
+                Box(
+                    modifier = Modifier.size(36.dp, 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isConnecting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = colors.brandNorm,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        FlagIcon(countryCode = server.exitCountry, size = DpSize(36.dp, 24.dp))
+                    }
+                }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    val countryName = CommonCountryUtils.getCountryName(server.country).ifBlank { server.country }
-                    Text(countryName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    val countryName = CommonCountryUtils.getCountryName(server.exitCountry).ifBlank { server.exitCountry }
+                    Text(countryName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = colors.textNorm)
                     Text(server.name, style = MaterialTheme.typography.bodyMedium, color = colors.textWeak)
                 }
                 LoadIndicator(load = load, displayMode = displayMode)

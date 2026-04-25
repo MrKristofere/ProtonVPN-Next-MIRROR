@@ -120,7 +120,8 @@ class DesktopDatabase(private val dbPath: String = getDefaultDatabasePath()) {
                     id INTEGER PRIMARY KEY,
                     cached_at INTEGER NOT NULL,
                     expires_at INTEGER NOT NULL,
-                    last_modified TEXT
+                    last_modified TEXT,
+                    status_id TEXT
                 )"""
             )
 
@@ -305,7 +306,8 @@ class DesktopDatabase(private val dbPath: String = getDefaultDatabasePath()) {
                             id = resultSet.getInt("id"),
                             cachedAt = resultSet.getLong("cached_at"),
                             expiresAt = resultSet.getLong("expires_at"),
-                            lastModified = resultSet.getString("last_modified")
+                            lastModified = resultSet.getString("last_modified"),
+                            statusId = resultSet.getString("status_id")
                         )
                     } else null
                 }
@@ -321,13 +323,14 @@ class DesktopDatabase(private val dbPath: String = getDefaultDatabasePath()) {
         try {
             connection.prepareStatement(
                 """INSERT OR REPLACE INTO servers_cache 
-                (id, cached_at, expires_at, last_modified)
-                VALUES (?, ?, ?, ?)"""
+                (id, cached_at, expires_at, last_modified, status_id)
+                VALUES (?, ?, ?, ?, ?)"""
             ).use { statement ->
                 statement.setInt(1, cache.id)
                 statement.setLong(2, cache.cachedAt)
                 statement.setLong(3, cache.expiresAt)
                 statement.setString(4, cache.lastModified)
+                statement.setString(5, cache.statusId)
                 statement.executeUpdate()
             }
         } catch (e: Exception) {

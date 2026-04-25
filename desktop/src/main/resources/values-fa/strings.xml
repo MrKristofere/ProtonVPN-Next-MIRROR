@@ -396,6 +396,8 @@
     <string name="custom_config_name">پیکربندی سفارشی %1$d</string>
     <string name="title_edit_obfuscation_config">ویرایش پیکربندی مبهم‌سازی</string>
     <string name="error_empty_profile_name">نام پروفایل نمی‌تواند خالی باشد</string>
+    <string name="placeholder_example_url">https://example.com</string>
+    <string name="placeholder_google">google.com</string>
 
     <!-- Debug Tools -->
     <string name="settings_debug">ابزارهای عیب‌یابی</string>

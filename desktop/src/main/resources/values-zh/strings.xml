@@ -391,6 +391,8 @@
     <string name="custom_config_name">自定义配置 %1$d</string>
     <string name="title_edit_obfuscation_config">编辑混淆配置</string>
     <string name="error_empty_profile_name">配置方案名称不能为空</string>
+    <string name="placeholder_example_url">https://example.com</string>
+    <string name="placeholder_google">google.com</string>
 
     <!-- Debug Tools -->
     <string name="settings_debug">调试工具</string>

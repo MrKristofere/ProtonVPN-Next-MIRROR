@@ -50,23 +50,9 @@ class DesktopVpnClient(
 
     private var helperProcess: Process? = null
 
-    suspend fun getServers(accessToken: String, sessionId: String, userTier: Int? = null): Result<List<ServerEntry>> {
+    suspend fun getServers(accessToken: String, sessionId: String, userTier: Int? = null): Result<List<LogicalServer>> {
         // Use repository which has caching and silent fallback
-        val result = vpnRepository.getServers(accessToken, sessionId, userTier ?: 0)
-        
-        return result.map { list ->
-            list.map { logical ->
-                val physical = logical.servers.firstOrNull()?.copy()
-                ServerEntry(
-                    id = logical.id,
-                    name = logical.name,
-                    city = logical.city,
-                    country = logical.entryCountry.ifBlank { logical.exitCountry },
-                    tier = logical.tier,
-                    physicalServer = physical
-                )
-            }
-        }
+        return vpnRepository.getServers(accessToken, sessionId, userTier ?: 0)
     }
 
     suspend fun setupVpn(): Result<Unit> {
@@ -96,7 +82,7 @@ class DesktopVpnClient(
         }
     }
 
-    suspend fun connect(server: ServerEntry): Result<Unit> {
+    suspend fun connect(server: LogicalServer): Result<Unit> {
         val startTime = System.currentTimeMillis()
         
         // If already connected or connecting, disconnect first to ensure clean state
@@ -113,7 +99,7 @@ class DesktopVpnClient(
             // Track VPN connection attempt
             sentryManager?.trackVpnConnectionAttempt(
                 server = server.name,
-                country = server.country
+                country = server.exitCountry
             )
             
             val session = database.getSession() ?: throw Exception("No active session")
@@ -134,7 +120,14 @@ class DesktopVpnClient(
 
             val privKey = database.getSession()?.wgPrivateKey ?: throw Exception("No VPN private key available")
 
-            val physicalServer = server.physicalServer ?: throw Exception("No physical server for this logical server")
+            // Reliable server selection: Fallback to any server with min load if status == 1 is absent.
+            val physicalServer = server.servers.filter { it.status == 1 }.minByOrNull { it.load }
+                ?: server.servers.minByOrNull { it.load }
+
+            if (physicalServer == null) {
+                throw Exception("No physical server for this logical server")
+            }
+
             val serverPublicKey = physicalServer.wgPublicKey ?: throw Exception("Server has no WG public key")
             val targetIp = physicalServer.exitIp ?: throw Exception("Server has no exit IP")
 

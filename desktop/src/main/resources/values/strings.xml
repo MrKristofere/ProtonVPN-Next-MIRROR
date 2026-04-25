@@ -447,6 +447,8 @@
     <string name="custom_config_name">Custom Config %1$d</string>
     <string name="title_edit_obfuscation_config">Edit Obfuscation Config</string>
     <string name="error_empty_profile_name">Profile name cannot be empty</string>
+    <string name="placeholder_example_url">https://example.com</string>
+    <string name="placeholder_google">google.com</string>
 
     <!-- Debug Tools -->
     <string name="settings_debug">Debug Tools</string>

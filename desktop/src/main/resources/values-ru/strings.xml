@@ -439,6 +439,8 @@
     <string name="custom_config_name">Свой конфиг %1$d</string>
     <string name="title_edit_obfuscation_config">Редактировать конфиг обфускации</string>
     <string name="error_empty_profile_name">Название профиля не может быть пустым</string>
+    <string name="placeholder_example_url">https://example.com</string>
+    <string name="placeholder_google">google.com</string>
 
     <!-- Debug Tools -->
     <string name="settings_debug">Инструменты отладки</string>

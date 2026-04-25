@@ -25,7 +25,7 @@ import ru.protonmod.next.data.local.ServerLoadDisplayMode
 import ru.protonmod.next.data.network.LogicalServer
 
 data class CountryDisplayItem(val code: String, val averageLoad: Int)
-data class CityDisplayItem(val name: String, val averageLoad: Int)
+data class CityDisplayItem(val name: String, val localizedName: String, val averageLoad: Int)
 
 sealed class CountriesUiState {
     data object Loading : CountriesUiState()

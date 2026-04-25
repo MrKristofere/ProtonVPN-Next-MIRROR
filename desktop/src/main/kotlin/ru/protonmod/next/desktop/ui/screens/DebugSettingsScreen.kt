@@ -38,8 +38,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import ru.protonmod.next.data.network.LogicalServer
 import ru.protonmod.next.desktop.DesktopLoginViewModel
-import ru.protonmod.next.desktop.ServerEntry
 import ru.protonmod.next.desktop.data.DesktopVpnDataManager
 import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
 import ru.protonmod.next.ui.theme.ProtonNextTheme
@@ -221,7 +221,7 @@ fun DebugSettingsScreen(
                     items(servers) { server ->
                         ListItem(
                             headlineContent = { Text(server.name) },
-                            supportingContent = { Text(server.country) },
+                            supportingContent = { Text(server.exitCountry) },
                             modifier = Modifier.clickable {
                                 // Logic to export config
                                 showServerSelect = false

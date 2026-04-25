@@ -35,8 +35,8 @@ import ru.protonmod.next.ui.screens.countries.*
 class DesktopCountriesViewModel(
     private val vpnClient: DesktopVpnClient,
     private val settingsManager: DesktopSettingsManager,
-    private val serversFlow: StateFlow<List<ServerEntry>>,
-    private val connectedServerFlow: StateFlow<ServerEntry?>
+    private val serversFlow: StateFlow<List<LogicalServer>>,
+    private val connectedServerFlow: StateFlow<LogicalServer?>
 ) {
     private val job = Job()
     private val scope = CoroutineScope(Dispatchers.Main + job)
@@ -54,26 +54,9 @@ class DesktopCountriesViewModel(
             return@combine CountriesUiState.Error(error)
         }
 
-        // Convert ServerEntry to a lightweight LogicalServer representation for navigation logic
-        val logicalServers = servers.groupBy { it.id }.map { (id, entries) ->
-            val entry = entries.first()
-            LogicalServer(
-                id = id,
-                name = entry.name,
-                tier = entry.tier,
-                features = 0,
-                entryCountry = entry.country,
-                exitCountry = entry.country,
-                city = entry.city,
-                servers = emptyList()
-            ).apply {
-                averageLoad = entry.physicalServer?.load ?: 0
-            }
-        }
-
         when (nav) {
             is NavigationState.Countries -> {
-                val countries = logicalServers.groupBy { it.exitCountry }
+                val countries = servers.groupBy { it.exitCountry }
                     .map { (code, countryServers) ->
                         val avg = if (countryServers.isEmpty()) 0 else countryServers.map { it.averageLoad }.average().toInt()
                         CountryDisplayItem(code, avg)
@@ -82,45 +65,46 @@ class DesktopCountriesViewModel(
                 CountriesUiState.CountriesList(countries, settings.serverLoadDisplayMode)
             }
             is NavigationState.Cities -> {
-                val cities = logicalServers.filter { it.exitCountry == nav.countryCode }
+                val cities = servers.filter { it.exitCountry == nav.countryCode }
                     .groupBy { it.city }
                     .map { (name, cityServers) ->
                         val avg = if (cityServers.isEmpty()) 0 else cityServers.map { it.averageLoad }.average().toInt()
-                        CityDisplayItem(name, avg)
+                        val localizedName = cityServers.firstOrNull()?.localizedCity ?: name
+                        CityDisplayItem(name, localizedName, avg)
                     }
                     .sortedBy { it.name }
                 CountriesUiState.CitiesList(nav.countryCode, cities, settings.serverLoadDisplayMode)
             }
             is NavigationState.Servers -> {
-                val cityServers = logicalServers.filter { it.exitCountry == nav.countryCode && it.city == nav.cityName }
+                val cityServers = servers.filter { it.exitCountry == nav.countryCode && it.city == nav.cityName }
                     .sortedBy { it.name }
                 CountriesUiState.ServersList(nav.countryCode, nav.cityName, cityServers, settings.serverLoadDisplayMode)
             }
         }
     }.stateIn(scope, SharingStarted.WhileSubscribed(5000), CountriesUiState.Loading)
 
-    val connectedServer: StateFlow<ServerEntry?> = connectedServerFlow
+    val connectedServer: StateFlow<LogicalServer?> = connectedServerFlow
 
-    fun selectCountry(countryCode: String, onConnect: (ServerEntry) -> Unit) {
-        val servers = serversFlow.value.filter { it.country == countryCode }
+    fun selectCountry(countryCode: String, onConnect: (LogicalServer) -> Unit) {
+        val servers = serversFlow.value.filter { it.exitCountry == countryCode }
         if (servers.isNotEmpty()) {
-            val bestServer = servers.minByOrNull { it.physicalServer?.load ?: 100 }
+            val bestServer = servers.minByOrNull { it.averageLoad }
             bestServer?.let { onConnect(it) }
         }
     }
 
-    fun selectCity(cityName: String, onConnect: (ServerEntry) -> Unit) {
+    fun selectCity(cityName: String, onConnect: (LogicalServer) -> Unit) {
         val nav = _navState.value
         if (nav is NavigationState.Cities) {
-            val servers = serversFlow.value.filter { it.country == nav.countryCode && it.city == cityName }
+            val servers = serversFlow.value.filter { it.exitCountry == nav.countryCode && it.city == cityName }
             if (servers.isNotEmpty()) {
-                val bestServer = servers.minByOrNull { it.physicalServer?.load ?: 100 }
+                val bestServer = servers.minByOrNull { it.averageLoad }
                 bestServer?.let { onConnect(it) }
             }
         }
     }
 
-    fun selectServer(serverId: String, onConnect: (ServerEntry) -> Unit) {
+    fun selectServer(serverId: String, onConnect: (LogicalServer) -> Unit) {
         val server = serversFlow.value.find { it.id == serverId }
         server?.let { onConnect(it) }
     }

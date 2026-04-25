@@ -40,35 +40,6 @@ import ru.protonmod.next.data.state.ConnectedServerState
 import ru.protonmod.next.vpn.AmneziaVpnManager
 import javax.inject.Inject
 
-data class CountryDisplayItem(val code: String, val averageLoad: Int)
-data class CityDisplayItem(val name: String, val localizedName: String, val averageLoad: Int)
-
-sealed class CountriesUiState {
-    data object Loading : CountriesUiState()
-    data class CountriesList(
-        val countries: List<CountryDisplayItem>,
-        val loadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
-    ) : CountriesUiState()
-    data class CitiesList(
-        val country: String,
-        val cities: List<CityDisplayItem>,
-        val loadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
-    ) : CountriesUiState()
-    data class ServersList(
-        val country: String,
-        val city: String,
-        val servers: List<LogicalServer>,
-        val loadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
-    ) : CountriesUiState()
-    data class Error(val message: String) : CountriesUiState()
-}
-
-sealed class NavigationState {
-    data object Countries : NavigationState()
-    data class Cities(val countryCode: String) : NavigationState()
-    data class Servers(val countryCode: String, val cityName: String) : NavigationState()
-}
-
 @HiltViewModel
 class CountriesViewModel @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,

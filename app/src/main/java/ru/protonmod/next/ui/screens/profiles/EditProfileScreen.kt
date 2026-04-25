@@ -60,6 +60,7 @@ import kotlinx.coroutines.launch
 import ru.protonmod.next.R
 import ru.protonmod.next.data.local.ServerLoadDisplayMode
 import ru.protonmod.next.data.model.ObfuscationProfile
+import ru.protonmod.next.data.model.VpnProfileUiModel
 import ru.protonmod.next.data.network.LogicalServer
 import ru.protonmod.next.ui.components.FlagIcon
 import ru.protonmod.next.ui.components.LoadIndicator

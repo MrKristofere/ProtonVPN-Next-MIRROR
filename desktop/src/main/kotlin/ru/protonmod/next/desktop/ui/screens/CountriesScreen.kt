@@ -66,7 +66,7 @@ import ru.protonmod.next.ui.theme.liquidGlass
 @Composable
 fun CountriesScreen(
     viewModel: DesktopCountriesViewModel,
-    onConnect: (ServerEntry) -> Unit
+    onConnect: (LogicalServer) -> Unit
 ) {
     val colors = ProtonNextTheme.colors
     val uiState by viewModel.uiState.collectAsState()
@@ -162,7 +162,7 @@ fun CountriesScreen(
 @Composable
 private fun CountriesListContent(
     countries: List<CountryDisplayItem>,
-    connectedServer: ServerEntry?,
+    connectedServer: LogicalServer?,
     isTablet: Boolean,
     loadDisplayMode: ServerLoadDisplayMode,
     onCountryClick: (CountryDisplayItem) -> Unit,
@@ -179,7 +179,7 @@ private fun CountriesListContent(
             items(countries) { country ->
                 CountryCard(
                     country = country,
-                    isConnected = connectedServer?.country == country.code,
+                    isConnected = connectedServer?.exitCountry == country.code,
                     displayMode = loadDisplayMode,
                     onClick = { onCountryClick(country) },
                     onMoreClick = { onCountryMore(country) }
@@ -195,7 +195,7 @@ private fun CountriesListContent(
             items(countries) { country ->
                 CountryCard(
                     country = country,
-                    isConnected = connectedServer?.country == country.code,
+                    isConnected = connectedServer?.exitCountry == country.code,
                     displayMode = loadDisplayMode,
                     onClick = { onCountryClick(country) },
                     onMoreClick = { onCountryMore(country) }
@@ -208,7 +208,7 @@ private fun CountriesListContent(
 @Composable
 private fun CitiesListContent(
     cities: List<CityDisplayItem>,
-    connectedServer: ServerEntry?,
+    connectedServer: LogicalServer?,
     countryCode: String,
     isTablet: Boolean,
     loadDisplayMode: ServerLoadDisplayMode,
@@ -226,7 +226,7 @@ private fun CitiesListContent(
             items(cities) { city ->
                 CityCard(
                     city = city,
-                    isConnected = connectedServer?.city == city.name && connectedServer.country == countryCode,
+                    isConnected = connectedServer?.city == city.name && connectedServer.exitCountry == countryCode,
                     displayMode = loadDisplayMode,
                     onClick = { onCityClick(city) },
                     onMoreClick = { onCityMore(city) }
@@ -242,7 +242,7 @@ private fun CitiesListContent(
             items(cities) { city ->
                 CityCard(
                     city = city,
-                    isConnected = connectedServer?.city == city.name && connectedServer.country == countryCode,
+                    isConnected = connectedServer?.city == city.name && connectedServer.exitCountry == countryCode,
                     displayMode = loadDisplayMode,
                     onClick = { onCityClick(city) },
                     onMoreClick = { onCityMore(city) }
@@ -255,7 +255,7 @@ private fun CitiesListContent(
 @Composable
 private fun ServersListContent(
     servers: List<LogicalServer>,
-    connectedServer: ServerEntry?,
+    connectedServer: LogicalServer?,
     isTablet: Boolean,
     loadDisplayMode: ServerLoadDisplayMode,
     onServerClick: (LogicalServer) -> Unit

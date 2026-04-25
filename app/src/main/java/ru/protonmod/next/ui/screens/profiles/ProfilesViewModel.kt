@@ -48,6 +48,7 @@ import ru.protonmod.next.ui.screens.countries.CityDisplayItem
 import ru.protonmod.next.ui.screens.countries.CountryDisplayItem
 import ru.protonmod.next.vpn.AmneziaVpnManager
 import ru.protonmod.next.vpn.ObfuscationParams
+import ru.protonmod.next.data.model.VpnProfileUiModel
 import javax.inject.Inject
 
 @HiltViewModel
@@ -233,8 +234,9 @@ class ProfilesViewModel @Inject constructor(
                 )
             }
 
-            if (!profile.autoOpenUrl.isNullOrEmpty()) {
-                amneziaVpnManager.awaitTunnelAndOpenUrl(profile.autoOpenUrl)
+            val autoOpenUrl = profile.autoOpenUrl
+            if (!autoOpenUrl.isNullOrEmpty()) {
+                amneziaVpnManager.awaitTunnelAndOpenUrl(autoOpenUrl)
             }
         }
     }

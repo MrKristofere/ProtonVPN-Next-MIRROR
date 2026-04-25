@@ -49,7 +49,8 @@ interface DesktopVpnApiService {
         @Header("If-Modified-Since") ifModifiedSince: String? = null,
         @Query("WithEntriesForProtocols") protocols: String = "wireguard",
         @Query("WithState") withState: Boolean = true,
-        @Query("Tier") userTier: Int? = null
+        @Query("Tier") userTier: Int? = null,
+        @Header("x-pm-status-id") statusId: String? = null
     ): Response<LogicalServersResponse>
 
     @GET("vpn/v2")
@@ -57,6 +58,19 @@ interface DesktopVpnApiService {
         @Header("Authorization") authorization: String,
         @Header("x-pm-uid") sessionId: String
     ): Response<ResponseBody>
+
+    @GET("vpn/v1/user/location")
+    suspend fun getUserLocation(
+        @Header("Authorization") authorization: String,
+        @Header("x-pm-uid") sessionId: String
+    ): Response<ResponseBody>
+
+    @GET("vpn/v1/servers/{id}/domain")
+    suspend fun getServerDomain(
+        @Header("Authorization") authorization: String,
+        @Header("x-pm-uid") sessionId: String,
+        @Path("id") serverId: String
+    ): ConnectingDomainResponse
 
     @POST("vpn/v1/certificate")
     suspend fun createCertificate(
@@ -239,26 +253,35 @@ class DesktopVpnRepository(
             val bearer = "Bearer $accessToken"
             val ifModifiedSince = if (!forceRefresh) cacheInfo?.lastModified else null
 
-            println("$TAG: Fetching servers from Proton API... (If-Modified-Since: $ifModifiedSince)")
+            println("$TAG: Fetching servers from Proton API... (If-Modified-Since: $ifModifiedSince, StatusID: ${cacheInfo?.statusId})")
             val response = vpnApi.getLogicalServers(
                 authorization = bearer,
                 sessionId = sessionId,
                 ifModifiedSince = ifModifiedSince,
                 protocols = "wireguard",
-                userTier = if (userTier == 0) null else userTier
+                userTier = if (userTier == 0) null else userTier,
+                statusId = cacheInfo?.statusId
             )
 
-            val (serversList, newLastModified) = when (response.code()) {
+            val (serversList, newLastModified, newStatusId) = when (response.code()) {
                 304 -> {
                     println("$TAG: Proton API: Servers not modified (304). Re-using existing DB entries.")
                     val dbServers = database.getAllServers().map { DesktopServerEntity.toDomain(it) }
-                    dbServers to cacheInfo?.lastModified
+                    Triple(dbServers, cacheInfo?.lastModified, cacheInfo?.statusId)
                 }
                 200 -> {
                     val body = response.body()
                     if (body?.code == 1000) {
-                        println("$TAG: Proton API: Received ${body.logicalServers.size} logical servers")
-                        body.logicalServers to response.headers()["Last-Modified"]
+                        println("$TAG: Proton API: Received ${body.logicalServers.size} logical servers (StatusID: ${body.statusId})")
+                        
+                        val isSameStatus = body.statusId != null && body.statusId == cacheInfo?.statusId
+                        if (isSameStatus && !forceRefresh) {
+                            println("$TAG: StatusID matches. Skipping full server list processing.")
+                            val dbServers = database.getAllServers().map { DesktopServerEntity.toDomain(it) }
+                            Triple(dbServers, (response.headers()["Last-Modified"] ?: cacheInfo?.lastModified) ?: "", body.statusId)
+                        } else {
+                            Triple(body.logicalServers, response.headers()["Last-Modified"], body.statusId)
+                        }
                     } else {
                         println("$TAG: Proton API Error: Code ${body?.code}")
                         return@withContext Result.failure(Exception("API error: ${body?.code}"))
@@ -330,7 +353,8 @@ class DesktopVpnRepository(
             val newCacheInfo = DesktopServersCacheEntity(
                 cachedAt = now,
                 expiresAt = now + CACHE_DURATION_MILLIS,
-                lastModified = newLastModified
+                lastModified = newLastModified,
+                statusId = newStatusId
             )
             database.saveCacheInfo(newCacheInfo)
 
@@ -352,6 +376,40 @@ class DesktopVpnRepository(
             val dbServers = database.getAllServers().map { DesktopServerEntity.toDomain(it) }
             if (dbServers.isNotEmpty()) Result.success(dbServers.filter { it.tier <= userTier })
             else Result.failure(e)
+        }
+    }
+
+    /**
+     * Get user's current location and IP as seen by the API.
+     */
+    suspend fun getUserLocation(accessToken: String, sessionId: String): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val response = vpnApi.getUserLocation("Bearer $accessToken", sessionId)
+            val body = response.body()?.string()
+            if (response.isSuccessful && body != null) {
+                Result.success(body)
+            } else {
+                Result.failure(Exception("Failed to get location: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Get server domain for connection
+     */
+    suspend fun getServerDomain(accessToken: String, sessionId: String, serverId: String): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val response = vpnApi.getServerDomain("Bearer $accessToken", sessionId, serverId)
+            val domain = response.domain
+            if (response.code == 1000 && domain != null) {
+                Result.success(domain)
+            } else {
+                Result.failure(Exception("Failed to get server domain: Code ${response.code}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 

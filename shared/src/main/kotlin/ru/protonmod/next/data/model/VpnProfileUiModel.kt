@@ -15,7 +15,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package ru.protonmod.next.ui.screens.profiles
+package ru.protonmod.next.data.model
 
 import java.util.UUID
 

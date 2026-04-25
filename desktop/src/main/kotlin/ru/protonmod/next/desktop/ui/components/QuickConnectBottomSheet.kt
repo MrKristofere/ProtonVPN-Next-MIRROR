@@ -40,7 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import ru.protonmod.next.desktop.ServerEntry
+import ru.protonmod.next.data.network.LogicalServer
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.ui.theme.liquidGlass
 import ru.protonmod.next.desktop.ui.utils.DesktopStrings as Strings
@@ -50,7 +50,7 @@ fun QuickConnectBottomSheet(
     onDismiss: () -> Unit,
     currentStrategy: String,
     currentTargetId: String?,
-    recentServers: List<ServerEntry>,
+    recentServers: List<LogicalServer>,
     onStrategySelect: (String, String?) -> Unit
 ) {
     val colors = ProtonNextTheme.colors
@@ -135,11 +135,11 @@ fun QuickConnectBottomSheet(
                             
                             items(recentServers) { server ->
                                 StrategyRow(
-                                    title = server.country,
+                                    title = server.exitCountry,
                                     subtitle = server.name,
                                     icon = Icons.Rounded.Place,
                                     isSelected = currentStrategy == "server" && currentTargetId == server.id,
-                                    countryCode = server.country,
+                                    countryCode = server.exitCountry,
                                     onClick = {
                                         onStrategySelect("server", server.id)
                                         onDismiss()

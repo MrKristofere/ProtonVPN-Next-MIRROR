@@ -103,7 +103,8 @@ data class DesktopServersCacheEntity(
     val id: Int = 1,
     val cachedAt: Long,
     val expiresAt: Long,
-    val lastModified: String? = null
+    val lastModified: String? = null,
+    val statusId: String? = null
 )
 
 /**

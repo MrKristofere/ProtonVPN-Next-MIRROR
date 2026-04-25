@@ -56,6 +56,7 @@ import ru.protonmod.next.ui.components.FlagIcon
 import ru.protonmod.next.ui.components.MainHeader
 import ru.protonmod.next.ui.components.NavigationHeader
 import ru.protonmod.next.ui.nav.MainTarget
+import ru.protonmod.next.data.model.VpnProfileUiModel
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.ui.theme.liquidGlass
 import ru.protonmod.next.ui.utils.CountryUtils
@@ -333,14 +334,14 @@ fun ProfileCardItem(
                 // Subtitle with protocol, port, and target info
                 val portStr = if (profile.port == 0) stringResource(R.string.settings_port_auto) else profile.port.toString()
                 val targetName = when {
-                    profile.targetServerId != null -> stringResource(R.string.profile_server_info, profile.targetServerName ?: profile.targetServerId)
+                    profile.targetServerId != null -> stringResource(R.string.profile_server_info, profile.targetServerName ?: profile.targetServerId!!)
                     profile.targetCity != null -> {
-                        val displayCity = profile.localizedCity ?: profile.targetCity
+                        val displayCity = profile.localizedCity ?: profile.targetCity!!
                         stringResource(R.string.profile_city_info, displayCity, CountryUtils.getCountryName(context, profile.targetCountry!!))
                     }
                     profile.targetCountry != null -> {
-                        val flagEmoji = CountryUtils.getFlagForCountry(profile.targetCountry)
-                        val localizedCountryName = CountryUtils.getCountryName(context, profile.targetCountry)
+                        val flagEmoji = CountryUtils.getFlagForCountry(profile.targetCountry!!)
+                        val localizedCountryName = CountryUtils.getCountryName(context, profile.targetCountry!!)
                         stringResource(R.string.profile_country_info, flagEmoji, localizedCountryName)
                     }
                     else -> stringResource(R.string.profile_fastest_info, stringResource(R.string.location_fastest))
