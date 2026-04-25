@@ -136,6 +136,34 @@ class DesktopDatabase(private val dbPath: String = getDefaultDatabasePath()) {
             )
 
             println("Database schema initialized")
+            
+            // Migrations: Add missing columns to existing tables
+            addColumnIfMissing(connection, "session", "user_tier", "INTEGER DEFAULT 0")
+            addColumnIfMissing(connection, "session", "wg_private_key", "TEXT")
+            addColumnIfMissing(connection, "session", "wg_public_key_pem", "TEXT")
+            addColumnIfMissing(connection, "session", "wg_certificate", "TEXT")
+            
+            addColumnIfMissing(connection, "servers", "average_load", "INTEGER DEFAULT 0")
+            
+            addColumnIfMissing(connection, "servers_cache", "last_modified", "TEXT")
+            addColumnIfMissing(connection, "servers_cache", "status_id", "TEXT")
+        }
+    }
+
+    private fun addColumnIfMissing(connection: Connection, tableName: String, columnName: String, columnDef: String) {
+        try {
+            val resultSet = connection.metaData.getColumns(null, null, tableName, columnName)
+            val exists = resultSet.next()
+            resultSet.close()
+
+            if (!exists) {
+                println("$TAG: Adding missing column $columnName to table $tableName")
+                connection.createStatement().use { statement ->
+                    statement.executeUpdate("ALTER TABLE $tableName ADD COLUMN $columnName $columnDef")
+                }
+            }
+        } catch (e: Exception) {
+            println("$TAG: Error checking/adding column $columnName to $tableName: ${e.message}")
         }
     }
 

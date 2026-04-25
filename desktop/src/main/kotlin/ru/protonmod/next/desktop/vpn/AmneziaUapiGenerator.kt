@@ -84,6 +84,17 @@ class AmneziaUapiGenerator : AmneziaConfigGenerator {
             sb.append("allowed_ip=").append(it).append("\n")
         }
 
+        // --- Metadata Section for Desktop Helper ---
+        // Separated by an empty line to distinguish from UAPI
+        sb.append("\n")
+        sb.append("metadata_version=1\n")
+        sb.append("is_include_mode=").append(isIncludeMode).append("\n")
+        
+        selectedApps.forEach {
+            val key = if (isIncludeMode) "include_app" else "exclude_app"
+            sb.append(key).append("=").append(it).append("\n")
+        }
+
         return sb.toString()
     }
 }

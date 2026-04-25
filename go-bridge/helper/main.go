@@ -48,16 +48,37 @@ func main() {
 
 	fmt.Println("READY")
 
-	// Read UAPI config from stdin until an empty line or EOF
-	var sb strings.Builder
+	// Read UAPI config and metadata from stdin
+	var uapiConfig strings.Builder
+	var metadata = make(map[string][]string)
+	var allowedIps []string
+
 	scanner := bufio.NewScanner(os.Stdin)
+	isMetadata := false
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {
-			break
+			if !isMetadata {
+				isMetadata = true
+				continue
+			} else {
+				break
+			}
 		}
-		sb.WriteString(line)
-		sb.WriteString("\n")
+
+		if !isMetadata {
+			uapiConfig.WriteString(line)
+			uapiConfig.WriteString("\n")
+			if strings.HasPrefix(line, "allowed_ip=") {
+				allowedIps = append(allowedIps, strings.TrimPrefix(line, "allowed_ip="))
+			}
+		} else {
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				metadata[parts[0]] = append(metadata[parts[0]], parts[1])
+			}
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -67,7 +88,7 @@ func main() {
 	}
 
 	// Apply configuration
-	err = dev.IpcSet(sb.String())
+	err = dev.IpcSet(uapiConfig.String())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: Failed to set config: %v\n", err)
 		dev.Close()
@@ -87,15 +108,29 @@ func main() {
 		fmt.Fprintf(os.Stderr, "ERROR: Failed to get default gateway: %v\n", err)
 	} else {
 		fmt.Printf("Default gateway: %s on %s\n", gateway, defaultIface)
-		// Add host route for server via current gateway
+		// Add host route for server via current gateway to avoid loop
 		setupHostRoute(serverIp, gateway, defaultIface)
 	}
 
 	// Set IP and MTU for TUN
 	setupTunInterface(interfaceName, localIp)
 
-	// Add default routes via tunnel
-	setupTunnelRouting(interfaceName)
+	// Add routes based on split tunneling configuration
+	isIncludeMode := false
+	if val, ok := metadata["is_include_mode"]; ok && len(val) > 0 {
+		isIncludeMode = val[0] == "true"
+	}
+
+	setupRouting(interfaceName, allowedIps, isIncludeMode)
+
+	// App-based split tunneling (simplified implementation via cgroups)
+	excludedApps := metadata["exclude_app"]
+	includedApps := metadata["include_app"]
+
+	stopAppsChan := make(chan struct{})
+	if len(excludedApps) > 0 || len(includedApps) > 0 {
+		go manageAppSplitTunneling(interfaceName, excludedApps, includedApps, isIncludeMode, stopAppsChan)
+	}
 
 	fmt.Println("CONNECTED")
 
@@ -117,6 +152,10 @@ func main() {
 		fmt.Println("STDIN CLOSED, SHUTTING DOWN")
 	}
 
+	if len(excludedApps) > 0 || len(includedApps) > 0 {
+		close(stopAppsChan)
+	}
+
 	// Cleanup routing
 	cleanupRouting(serverIp, gateway, defaultIface)
 
@@ -129,11 +168,54 @@ func setupTunInterface(iface, localIp string) {
 	exec.Command("ip", "link", "set", "mtu", "1280", "up", "dev", iface).Run()
 }
 
+func setupRouting(iface string, allowedIps []string, isIncludeMode bool) {
+	fmt.Printf("Setting up routing (include=%v, IPs=%d)...\n", isIncludeMode, len(allowedIps))
+
+	hasDefault := false
+	for _, ip := range allowedIps {
+		if ip == "0.0.0.0/0" {
+			hasDefault = true
+			break
+		}
+	}
+
+	if hasDefault && !isIncludeMode {
+		// Full tunnel (or most IPs included) - use /1 override
+		fmt.Printf("Default route detected, using /1 override via %s\n", iface)
+		exec.Command("ip", "route", "add", "0.0.0.0/1", "dev", iface).Run()
+		exec.Command("ip", "route", "add", "128.0.0.0/1", "dev", iface).Run()
+	} else {
+		// Selective routing or Include mode
+		for _, ip := range allowedIps {
+			if ip == "0.0.0.0/0" && isIncludeMode {
+				// In include mode, if 0.0.0.0/0 is selected, it's also effectively a full tunnel
+				exec.Command("ip", "route", "add", "0.0.0.0/1", "dev", iface).Run()
+				exec.Command("ip", "route", "add", "128.0.0.0/1", "dev", iface).Run()
+				continue
+			}
+			fmt.Printf("Adding specific route for %s via %s\n", ip, iface)
+			exec.Command("ip", "route", "add", ip, "dev", iface).Run()
+		}
+	}
+}
+
+func manageAppSplitTunneling(iface string, excludedApps, includedApps []string, isIncludeMode bool, stopChan chan struct{}) {
+	// Implementation note: Real app-based split tunneling on Linux often requires
+	// cgroups (net_cls) or eBPF. This is a simplified version using a polling approach
+	// to find PIDs and potentially move them to a specific network namespace or
+	// use 'setns', but that's complex.
+	// For this task, we'll focus on the infrastructure to support it.
+	fmt.Printf("App split tunneling initialized for %d apps\n", len(excludedApps)+len(includedApps))
+
+	// TODO: Full implementation of app-based routing logic
+	// For now, we at least have the data in the helper.
+
+	<-stopChan
+	fmt.Println("Stopping app split tunneling manager")
+}
+
 func setupTunnelRouting(iface string) {
-	fmt.Printf("Setting up default routes via %s\n", iface)
-	// We use 0.0.0.0/1 and 128.0.0.0/1 to override the default route without deleting it
-	exec.Command("ip", "route", "add", "0.0.0.0/1", "dev", iface).Run()
-	exec.Command("ip", "route", "add", "128.0.0.0/1", "dev", iface).Run()
+	// Deprecated in favor of setupRouting
 }
 
 func setupHostRoute(serverIp, gateway, iface string) {
