@@ -211,9 +211,9 @@ class AuthRepository @Inject constructor(
                 val proofs = cryptoWrapper.generateSrpProofs(
                     username = username,
                     passwordRaw = passwordRaw.toByteArray(),
-                    salt = authInfo.salt,
-                    modulus = authInfo.modulus,
-                    serverEphemeral = authInfo.serverEphemeral
+                    salt = authInfo.salt!!,
+                    modulus = authInfo.modulus!!,
+                    serverEphemeral = authInfo.serverEphemeral!!
                 )
 
                 // If token was used in Phase 0 or Phase 1, do NOT pass it to Phase 2
@@ -376,7 +376,7 @@ class AuthRepository @Inject constructor(
                 val currentSession = sessionDao.getSession()
                 if (currentSession != null && currentSession.sessionId == sessionId) {
                     val updatedSession = currentSession.copy(
-                        accessToken = refreshResponse.accessToken,
+                        accessToken = refreshResponse.accessToken!!,
                         refreshToken = refreshResponse.refreshToken ?: currentSession.refreshToken
                     )
                     sessionDao.saveSession(updatedSession)

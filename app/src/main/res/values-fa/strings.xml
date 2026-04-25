@@ -414,6 +414,7 @@
     <string name="btn_create_new_config">ایجاد پیکربندی جدید</string>
     <string name="connect_go_title">اتصال و اجرا</string>
     <string name="connect_go_desc">URL را برای باز شدن پس از اتصال وارد کنید (مثلاً https://example.com)</string>
+    <string name="placeholder_example_url">https://example.com</string>
     <string name="hint_url_placeholder">https://</string>
     <string name="title_select_protocol">انتخاب پروتکل</string>
     <string name="custom_config_name">پیکربندی سفارشی %1$d</string>
@@ -469,6 +470,7 @@
     <string name="obfuscation_btn_generate_from_domain">تولید از دامنه</string>
     <string name="obfuscation_dialog_domain_title">ورود دامنه</string>
     <string name="obfuscation_dialog_domain_desc">یک دامنه وارد کنید (مثلاً google.com) تا یک رشته شناسایی مبتنی بر QUIC تولید شود.</string>
+    <string name="placeholder_google">google.com</string>
 
     <string name="settings_widget">ویجت</string>
     <string name="settings_widget_desc">افزودن ویجت به صفحه اصلی برای کنترل سریع اتصال</string>

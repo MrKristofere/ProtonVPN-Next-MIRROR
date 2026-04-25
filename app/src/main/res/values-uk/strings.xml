@@ -426,6 +426,7 @@
     <string name="btn_create_new_config">Створити нову конфігурацію</string>
     <string name="connect_go_title">Connect &amp; Go</string>
     <string name="connect_go_desc">Введіть URL для відкриття при підключенні (напр., https://example.com)</string>
+    <string name="placeholder_example_url">https://example.com</string>
     <string name="hint_url_placeholder">https://</string>
     <string name="title_select_protocol">Виберіть протокол</string>
     <string name="custom_config_name">Своя конфігурація %1$d</string>
@@ -481,6 +482,7 @@
     <string name="obfuscation_btn_generate_from_domain">Генерація за доменом</string>
     <string name="obfuscation_dialog_domain_title">Введіть домен</string>
     <string name="obfuscation_dialog_domain_desc">Введіть домен (напр., google.com) для генерації ідентифікатора на основі QUIC.</string>
+    <string name="placeholder_google">google.com</string>
 
     <string name="settings_widget">Віджет</string>
     <string name="settings_widget_desc">Додайте віджет на головний екран для швидкого керування підключенням</string>

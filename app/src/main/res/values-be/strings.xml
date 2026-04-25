@@ -424,6 +424,7 @@
     <string name="btn_create_new_config">Стварыць новую канфігурацыю</string>
     <string name="connect_go_title">Connect &amp; Go</string>
     <string name="connect_go_desc">Увядзіце URL для адкрыцця пры падключэнні (напр., https://example.com)</string>
+    <string name="placeholder_example_url">https://example.com</string>
     <string name="hint_url_placeholder">https://</string>
     <string name="title_select_protocol">Выберыце пратакол</string>
     <string name="custom_config_name">Свая канфігурацыя %1$d</string>
@@ -479,6 +480,7 @@
     <string name="obfuscation_btn_generate_from_domain">Генерацыя па дамене</string>
     <string name="obfuscation_dialog_domain_title">Увядзіце дамен</string>
     <string name="obfuscation_dialog_domain_desc">Увядзіце дамен (напр., google.com) для генерацыі ідэнтыфікатара на аснове QUIC.</string>
+    <string name="placeholder_google">google.com</string>
 
     <string name="settings_widget">Віджэт</string>
     <string name="settings_widget_desc">Дадаць віджэт на галоўны экран для хуткага кіравання падключэннем</string>

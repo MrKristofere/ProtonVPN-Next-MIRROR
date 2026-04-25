@@ -56,6 +56,7 @@ import ru.protonmod.next.di.ApplicationScope
 import ru.protonmod.next.utils.coroutines.DispatcherProvider
 import ru.protonmod.next.utils.crypto.CryptoWrapper
 import ru.protonmod.next.utils.system.SystemContextWrapper
+import ru.protonmod.next.vpn.ObfuscationParams
 import io.sentry.Sentry
 import java.io.ByteArrayInputStream
 import java.security.cert.CertificateFactory
@@ -103,14 +104,6 @@ class AmneziaVpnManager @Inject constructor(
 
     private val _certState = MutableStateFlow<CertificateState>(CertificateState.Valid)
     val certState: StateFlow<CertificateState> = _certState.asStateFlow()
-
-    // Encapsulated obfuscation parameters based on dev branch
-    data class ObfuscationParams(
-        val jc: Int, val jmin: Int, val jmax: Int,
-        val s1: Int, val s2: Int, val s3: Int = 0, val s4: Int = 0,
-        val h1: String, val h2: String, val h3: String, val h4: String,
-        val i1: String, val i2: String = "", val i3: String = "", val i4: String = "", val i5: String = ""
-    )
 
     private val _isConnecting = MutableStateFlow(false)
     val isConnecting: StateFlow<Boolean> = _isConnecting

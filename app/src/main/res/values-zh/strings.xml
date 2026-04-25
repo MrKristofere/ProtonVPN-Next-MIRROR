@@ -409,6 +409,7 @@
     <string name="btn_create_new_config">创建新配置</string>
     <string name="connect_go_title">连接即启动</string>
     <string name="connect_go_desc">输入连接后打开的 URL (例如 https://example.com)</string>
+    <string name="placeholder_example_url">https://example.com</string>
     <string name="hint_url_placeholder">https://</string>
     <string name="title_select_protocol">选择协议</string>
     <string name="custom_config_name">自定义配置 %1$d</string>
@@ -464,6 +465,7 @@
     <string name="obfuscation_btn_generate_from_domain">从域名生成</string>
     <string name="obfuscation_dialog_domain_title">输入域名</string>
     <string name="obfuscation_dialog_domain_desc">输入域名（例如 google.com）以生成基于 QUIC 的识别字符串。</string>
+    <string name="placeholder_google">google.com</string>
 
     <string name="settings_widget">小组件</string>
     <string name="settings_widget_desc">在主屏幕添加小组件以快速管理连接</string>

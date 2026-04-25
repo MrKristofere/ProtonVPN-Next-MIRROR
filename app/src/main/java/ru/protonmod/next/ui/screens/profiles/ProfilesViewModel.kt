@@ -218,7 +218,8 @@ class ProfilesViewModel @Inject constructor(
                     session,
                     overridePort = profile.port,
                     overrideObfuscation = profile.isObfuscationEnabled,
-                    obfuscationParams = obfuscationParams
+                    obfuscationParams = obfuscationParams,
+                    logicalServer = targetServer
                 )
             } else {
                 amneziaVpnManager.connect(
@@ -227,7 +228,8 @@ class ProfilesViewModel @Inject constructor(
                     session,
                     overridePort = profile.port,
                     overrideObfuscation = profile.isObfuscationEnabled,
-                    obfuscationParams = obfuscationParams
+                    obfuscationParams = obfuscationParams,
+                    logicalServer = targetServer
                 )
             }
 

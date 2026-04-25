@@ -298,7 +298,7 @@ class VpnRepository @Inject constructor(
                         if (isSameStatus && !forceRefresh) {
                             ProtonLogger.i(TAG, "StatusID matches. Skipping full server list processing.")
                             val dbServers = serverDao.getAllServers().map { ServerMapper.toDomain(it) }
-                            Triple(dbServers, response.headers()["Last-Modified"] ?: cacheInfo.lastModified, body.statusId)
+                            Triple(dbServers, (response.headers()["Last-Modified"] ?: cacheInfo?.lastModified) ?: "", body.statusId)
                         } else {
                             Triple(body.logicalServers, response.headers()["Last-Modified"], body.statusId)
                         }
@@ -454,8 +454,9 @@ class VpnRepository @Inject constructor(
     suspend fun getServerDomain(accessToken: String, sessionId: String, serverId: String): Result<String> = withContext(dispatcherProvider.io()) {
         try {
             val response = vpnApi.getServerDomain("Bearer $accessToken", sessionId, serverId)
-            if (response.code == 1000 && response.domain != null) {
-                Result.success(response.domain)
+            val domain = response.domain
+            if (response.code == 1000 && domain != null) {
+                Result.success(domain)
             } else {
                 Result.failure(Exception("Failed to get server domain: Code ${response.code}"))
             }

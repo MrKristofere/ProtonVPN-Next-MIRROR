@@ -42,7 +42,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -125,7 +127,17 @@ class MainActivity : ComponentActivity() {
             val viewModel: MainViewModel = hiltViewModel()
             val appTheme by viewModel.appTheme.collectAsStateWithLifecycle()
 
-            ProtonNextTheme(appTheme = appTheme) {
+            val view = LocalView.current
+            ProtonNextTheme(
+                appTheme = appTheme,
+                onApplyPlatformTheme = { isDark ->
+                    if (!view.isInEditMode) {
+                        val window = this.window
+                        val controller = WindowCompat.getInsetsController(window, view)
+                        controller.isAppearanceLightStatusBars = !isDark
+                    }
+                }
+            ) {
                 ProvideDeviceType(
                     windowWidthSizeClass = windowSizeClass.widthSizeClass
                 ) {

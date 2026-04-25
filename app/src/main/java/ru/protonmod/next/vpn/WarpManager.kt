@@ -16,6 +16,7 @@ import ru.protonmod.next.data.network.WarpResponse
 import ru.protonmod.next.utils.ProtonLogger
 import ru.protonmod.next.utils.coroutines.DispatcherProvider
 import ru.protonmod.next.utils.system.SystemContextWrapper
+import ru.protonmod.next.vpn.ObfuscationParams
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Provider
@@ -120,7 +121,7 @@ class WarpManager @Inject constructor(
         val config = cachedConfig ?: return false
         
         // Constructing AmneziaVpnManager.ObfuscationParams for WARP
-        val warpParams = AmneziaVpnManager.ObfuscationParams(
+        val warpParams = ObfuscationParams(
             jc = 4,
             jmin = 40,
             jmax = 70,

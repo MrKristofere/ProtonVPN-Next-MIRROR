@@ -17,10 +17,11 @@
 
 package ru.protonmod.next.ui.theme
 
-import android.app.Activity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
@@ -33,8 +34,6 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
 
 // Predefined palette colors for various themes
 object ProtonPalette {
@@ -582,57 +581,48 @@ fun ProtonColors.textNorm(enabled: Boolean = true) = if (enabled) textNorm else 
 fun ProtonColors.textWeak(enabled: Boolean = true) = if (enabled) textWeak else textDisabled
 fun ProtonColors.interactionNorm(enabled: Boolean = true) = if (enabled) interactionNorm else interactionDisabled
 
-internal fun ProtonColors.toMaterial3ThemeColors() = androidx.compose.material3.ColorScheme(
-    primary = brandNorm,
-    onPrimary = Color.White,
-    primaryContainer = backgroundNorm,
-    onPrimaryContainer = textNorm,
-    inversePrimary = Color.White,
-    secondary = brandNorm,
-    onSecondary = Color.White,
-    secondaryContainer = backgroundSecondary,
-    onSecondaryContainer = textNorm,
-    tertiary = brandDarken20,
-    onTertiary = Color.White,
-    tertiaryContainer = backgroundNorm,
-    onTertiaryContainer = textNorm,
-    background = backgroundNorm,
-    onBackground = textNorm,
-    surface = backgroundNorm,
-    onSurface = textNorm,
-    surfaceVariant = backgroundNorm,
-    onSurfaceVariant = textNorm,
-    inverseSurface = backgroundNorm,
-    inverseOnSurface = textNorm,
-    error = notificationError,
-    onError = textInverted,
-    errorContainer = backgroundNorm,
-    onErrorContainer = textNorm,
-    outline = brandNorm,
-    surfaceTint = Color.Unspecified,
-    outlineVariant = brandNorm,
-    scrim = blenderNorm,
-    surfaceBright = backgroundNorm,
-    surfaceDim = backgroundNorm,
-    // Modern Material 3 mapping for containers and fixed colors
-    surfaceContainer = backgroundSecondary,
-    surfaceContainerHigh = backgroundSecondary,
-    surfaceContainerHighest = backgroundSecondary,
-    surfaceContainerLow = backgroundNorm,
-    surfaceContainerLowest = backgroundNorm,
-    primaryFixed = brandNorm,
-    onPrimaryFixed = Color.White,
-    primaryFixedDim = brandDarken20,
-    onPrimaryFixedVariant = Color.White,
-    secondaryFixed = brandNorm,
-    onSecondaryFixed = Color.White,
-    secondaryFixedDim = brandDarken20,
-    onSecondaryFixedVariant = Color.White,
-    tertiaryFixed = brandDarken20,
-    onTertiaryFixed = Color.White,
-    tertiaryFixedDim = brandDarken40,
-    onTertiaryFixedVariant = Color.White
-)
+internal fun ProtonColors.toMaterial3ThemeColors(): androidx.compose.material3.ColorScheme {
+    val base = if (isDark) darkColorScheme() else lightColorScheme()
+    return base.copy(
+        primary = brandNorm,
+        onPrimary = Color.White,
+        primaryContainer = backgroundNorm,
+        onPrimaryContainer = textNorm,
+        inversePrimary = Color.White,
+        secondary = brandNorm,
+        onSecondary = Color.White,
+        secondaryContainer = backgroundSecondary,
+        onSecondaryContainer = textNorm,
+        tertiary = brandDarken20,
+        onTertiary = Color.White,
+        tertiaryContainer = backgroundNorm,
+        onTertiaryContainer = textNorm,
+        background = backgroundNorm,
+        onBackground = textNorm,
+        surface = backgroundNorm,
+        onSurface = textNorm,
+        surfaceVariant = backgroundNorm,
+        onSurfaceVariant = textNorm,
+        inverseSurface = backgroundNorm,
+        inverseOnSurface = textNorm,
+        error = notificationError,
+        onError = textInverted,
+        errorContainer = backgroundNorm,
+        onErrorContainer = textNorm,
+        outline = brandNorm,
+        surfaceTint = Color.Unspecified,
+        outlineVariant = brandNorm,
+        scrim = blenderNorm,
+        surfaceBright = backgroundNorm,
+        surfaceDim = backgroundNorm,
+        // Modern Material 3 mapping for containers and fixed colors
+        surfaceContainer = backgroundSecondary,
+        surfaceContainerHigh = backgroundSecondary,
+        surfaceContainerHighest = backgroundSecondary,
+        surfaceContainerLow = backgroundNorm,
+        surfaceContainerLowest = backgroundNorm,
+    )
+}
 
 val LocalColors = staticCompositionLocalOf { ProtonColors.Light }
 
@@ -640,6 +630,7 @@ val LocalColors = staticCompositionLocalOf { ProtonColors.Light }
 fun ProtonNextTheme(
     modifier: Modifier = Modifier,
     appTheme: AppTheme = AppTheme.DARK,
+    onApplyPlatformTheme: ((isDark: Boolean) -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     val protonColors = when (appTheme) {
@@ -659,13 +650,9 @@ fun ProtonNextTheme(
 
     val isDark = protonColors.isDark
 
-    val view = LocalView.current
-    if (!view.isInEditMode) {
-        // Automatically handle status bar icon colors based on theme
+    if (onApplyPlatformTheme != null) {
         SideEffect {
-            val window = (view.context as Activity).window
-            val controller = WindowCompat.getInsetsController(window, view)
-            controller.isAppearanceLightStatusBars = !isDark
+            onApplyPlatformTheme(isDark)
         }
     }
 

@@ -53,6 +53,7 @@ import ru.protonmod.next.data.network.LogicalServer
 import ru.protonmod.next.data.state.ConnectedServerState
 import ru.protonmod.next.ui.utils.CountryUtils
 import ru.protonmod.next.vpn.AmneziaVpnManager
+import ru.protonmod.next.vpn.ObfuscationParams
 import ru.protonmod.next.vpn.WarpManager
 import io.sentry.Sentry
 import java.net.Proxy
@@ -561,9 +562,9 @@ class DashboardViewModel @Inject constructor(
 
         val targetServer = findBestServerForProfile(profile, allServers) ?: return
         val physicalServer = targetServer.servers.filter { it.status == 1 }.minByOrNull { it.load }
-            ?: targetServer.servers.minByOrNull { it.load } ?: return
+        ?: targetServer.servers.minByOrNull { it.load } ?: return
 
-        var obfuscationParams: AmneziaVpnManager.ObfuscationParams? = null
+        var obfuscationParams: ObfuscationParams? = null
         if (profile.isObfuscationEnabled && profile.obfuscationProfileId != null) {
             val customProfiles = settingsManager.customProfiles.first()
             val standardProfileName = context.getString(R.string.obfuscation_config_standard)
@@ -571,7 +572,7 @@ class DashboardViewModel @Inject constructor(
                 ?: if (profile.obfuscationProfileId == "standard_1") ObfuscationProfile.getStandardProfile(standardProfileName) else null
 
             selectedConfig?.let {
-                obfuscationParams = AmneziaVpnManager.ObfuscationParams(
+                obfuscationParams = ObfuscationParams(
                     jc = it.jc, jmin = it.jmin, jmax = it.jmax,
                     s1 = it.s1, s2 = it.s2, s3 = it.s3, s4 = it.s4,
                     h1 = it.h1, h2 = it.h2, h3 = it.h3, h4 = it.h4,

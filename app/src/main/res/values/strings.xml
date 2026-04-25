@@ -420,6 +420,7 @@
     <string name="btn_create_new_config">Create New Config</string>
     <string name="connect_go_title">Connect &amp; Go</string>
     <string name="connect_go_desc">Enter the URL to open upon connection (e.g., https://example.com)</string>
+    <string name="placeholder_example_url">https://example.com</string>
     <string name="hint_url_placeholder">https://</string>
     <string name="title_select_protocol">Select Protocol</string>
     <string name="custom_config_name">Custom Config %1$d</string>
@@ -475,6 +476,7 @@
     <string name="obfuscation_btn_generate_from_domain">Generate from Domain</string>
     <string name="obfuscation_dialog_domain_title">Enter Domain</string>
     <string name="obfuscation_dialog_domain_desc">Enter a domain (e.g., google.com) to generate a QUIC-based identification string.</string>
+    <string name="placeholder_google">google.com</string>
 
     <string name="settings_widget">Widget</string>
     <string name="settings_widget_desc">Add a widget to your home screen for quick connection control</string>
