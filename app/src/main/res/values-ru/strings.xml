@@ -51,6 +51,8 @@
     <string name="title_recent_connections">Недавние подключения</string>
     <string name="status_connected">Подключено</string>
     <string name="status_connecting">Подключение…</string>
+    <string name="status_verifying">Проверка…</string>
+    <string name="status_disconnecting">Отключение…</string>
     <string name="status_disconnected">Отключено</string>
     <string name="status_not_connected">Не подключено</string>
     <string name="msg_traffic_not_protected">Ваш трафик не защищен</string>
@@ -120,6 +122,35 @@
     <string name="api_bypass_strategy_title">СТРАТЕГИЯ МАРШРУТИЗАЦИИ</string>
     <string name="api_bypass_strategy_netlify">Прокси Netlify</string>
     <string name="api_bypass_strategy_netlify_desc">Направляет запросы API через защищенный прокси-сервер Netlify.</string>
+    <string name="api_bypass_strategy_cloudflare">Прокси Cloudflare</string>
+    <string name="api_bypass_strategy_cloudflare_desc">Направляет запросы API через высокопроизводительный Cloudflare worker.</string>
+    <string name="api_bypass_strategy_mirrors">Зеркала Proton (DoH)</string>
+    <string name="api_bypass_strategy_mirrors_desc">Находит и использует динамические зеркала Proton API через DNS-over-HTTPS fallback.</string>
+    <string name="api_bypass_strategy_warp">WARP (Cloudflare)</string>
+    <string name="api_bypass_strategy_warp_desc">Использование временного туннеля WARP для запросов к API. Высокая надежность.</string>
+    <string name="warp_fetching_config">Получение конфигурации WARP…</string>
+    <string name="warp_error_fetching">Не удалось получить конфигурацию. Проверьте подключение.</string>
+    <string name="warp_permission_title">Требуется разрешение на VPN</string>
+    <string name="warp_permission_desc">Для WARP требуется разрешение на создание локального туннеля для обхода блокировок API. Никакие данные не передаются за пределы Cloudflare.</string>
+    <string name="btn_allow">Разрешить</string>
+    <string name="api_bypass_strategy_custom">Свой прокси (SOCKS5/HTTPS)</string>
+    <string name="api_bypass_strategy_custom_desc">Направляет запросы к API через ваш собственный SOCKS5 или HTTPS прокси-сервер.</string>
+    <string name="api_proxy_host">Хост прокси</string>
+    <string name="api_proxy_port">Порт прокси</string>
+    <string name="api_proxy_type">Тип прокси</string>
+    <string name="api_proxy_type_http">HTTPS / HTTP</string>
+    <string name="api_proxy_type_socks">SOCKS5</string>
+    <string name="api_proxy_username">Имя пользователя (необязательно)</string>
+    <string name="api_proxy_password">Пароль (необязательно)</string>
+
+    <!-- Country Spoofing -->
+    <string name="settings_country_spoofing_title">Подмена страны</string>
+    <string name="settings_country_spoofing_description">Подмена кода страны, отправляемого в API, для имитации другого физического местоположения.</string>
+    <string name="settings_country_spoofing_null_label">Null-подмена</string>
+    <string name="settings_country_spoofing_null_desc">Не отправлять заголовок с кодом страны в API.</string>
+    <string name="settings_country_spoofing_code_label">Код страны (ISO 3166-1 alpha-2)</string>
+    <string name="settings_country_spoofing_code_hint">напр. US, DE, RU</string>
+    <string name="settings_country_spoofing_update_toast">Обновление списка серверов…</string>
 
     <!-- Custom DNS -->
     <string name="settings_custom_dns">Пользовательский DNS</string>
@@ -235,9 +266,15 @@
     <string name="about_codeberg">Codeberg</string>
     <string name="about_unavailable">Временно недоступно</string>
 
-    <string name="url_github">https://github.com/SMH01-MOD-NEXT/ProtonMOD-NEXT</string>
+    <string name="about_sentry">На базе Sentry</string>
+    <string name="url_sentry">https://sentry.io/</string>
+
+    <string name="url_github">https://github.com/SMH01-MIRRORS/ProtonVPN-Next-MIRROR</string>
     <string name="url_codeberg">https://codeberg.org/SMH01/ProtonVPN-Next</string>
     <string name="url_telegram">https://t.me/ProtonVPN_MOD</string>
+
+    <string name="url_ota_mirror_1" translatable="false">https://kvn.protonnext.qzz.io/update.json</string>
+    <string name="url_ota_mirror_2" translatable="false">https://home.protonnext.qzz.io/update.json</string>
 
     <!-- Licenses Screen -->
     <string name="licenses_title">Лицензии</string>
@@ -266,9 +303,6 @@
     <string name="st_mode_include_desc">Только выбранные приложения и IP будут использовать VPN</string>
     <string name="st_enabled_subtitle">VPN соединение будет следовать правилам раздельного туннелирования</string>
     <string name="st_disabled_subtitle">Весь трафик идет через VPN</string>
-    <string name="st_input_app_label">Введите путь к исполняемому файлу (напр. /usr/bin/browser)</string>
-    <string name="st_input_ip_label">Введите IP или CIDR (напр. 1.1.1.1/32)</string>
-    <string name="st_input_domain_label">Введите домен (напр. google.com)</string>
     <plurals name="st_apps_selected">
         <item quantity="one">%1$d приложение выбрано</item>
         <item quantity="few">%1$d приложения выбрано</item>
@@ -324,6 +358,7 @@
     <string name="notification_channel_name">Статус VPN</string>
     <string name="notification_channel_desc">Отображает текущий статус подключения VPN</string>
     <string name="notification_title_connected">Подключено к %1$s</string>
+    <string name="notification_title_verifying">Проверка соединения…</string>
     <string name="notification_title_disconnected">Отключено</string>
     <string name="notification_title_connecting">Подключение…</string>
     <string name="notification_action_disconnect">Отключить</string>
@@ -340,6 +375,7 @@
     <string name="error_unknown">Неизвестная ошибка</string>
     <string name="error_auth_failed">Произошла непредвиденная ошибка аутентификации</string>
     <string name="error_2fa_failed">Ошибка двухфакторной проверки</string>
+    <string name="unknown">Неизвестно</string>
 
     <!-- Profiles Screen -->
     <string name="profiles_title">Профили</string>
@@ -408,6 +444,8 @@
     <string name="debug_cert_issued">Выдан: %1$s</string>
     <string name="debug_cert_expires">Истекает: %1$s</string>
     <string name="debug_btn_refresh_cert">Обновить сертификат принудительно</string>
+    <string name="debug_btn_refresh_session">Обновить сессию принудительно</string>
+    <string name="debug_session_refreshed">Сессия успешно обновлена!</string>
     <string name="debug_exports_header">Экспорт и Диагностика</string>
     <string name="debug_btn_export_logs">Экспорт Logcat в Downloads</string>
     <string name="debug_btn_export_config">Экспорт WG конфига (.conf)</string>
@@ -459,6 +497,45 @@
     <string name="captcha_message">Для обеспечения безопасности аккаунта, пожалуйста, пройдите проверку ниже.</string>
     <string name="captcha_proxy_active">Антиблокировочный прокси активен</string>
     <string name="desc_close">Закрыть</string>
-    <string name="placeholder_google">google.com</string>
-    <string name="placeholder_example_url">https://example.com</string>
+
+    <!-- Token Login & Session Management -->
+    <string name="btn_login_tokens">Вход по токенам</string>
+    <string name="title_login_tokens">Вход по токенам</string>
+    <string name="msg_login_tokens_desc">Вставьте JSON вашей сессии ниже для прямого входа. Храните эти данные в секрете!</string>
+    <string name="hint_session_json">JSON сессии</string>
+    <string name="debug_btn_export_session">Экспорт сессии (Буфер)</string>
+    <string name="debug_btn_import_session">Импорт сессии</string>
+    <string name="debug_btn_fetch_domains">Получить доступные домены (буфер)</string>
+    <string name="debug_export_session_title">Экспорт конфиденциальных данных</string>
+    <string name="debug_export_session_msg">Это скопирует вашу полную сессию (включая токены и приватные ключи) в буфер обмена. НЕ делитесь этим ни с кем!</string>
+    <string name="debug_import_session_warning">ВНИМАНИЕ: Импорт сессии перезапишет текущую. Используйте с осторожностью.</string>
+    <string name="debug_btn_copy">Копировать</string>
+    <string name="btn_import">Импортировать</string>
+    <string name="btn_logout">Выйти</string>
+    <string name="logout_confirmation">Вы уверены, что хотите выйти?</string>
+
+    <!-- OTA Updates -->
+    <string name="ota_title">Обновление ПО</string>
+    <string name="ota_new_version">Доступна новая версия: %1$s</string>
+    <string name="ota_changelog">Что нового:</string>
+    <string name="ota_btn_update">Обновить сейчас</string>
+    <string name="ota_btn_install">Установить</string>
+    <string name="ota_btn_later">Позже</string>
+    <string name="ota_force_title">Требуется обновление</string>
+    <string name="ota_force_desc">Доступно критическое обновление. Пожалуйста, обновите приложение, чтобы продолжить использование Proton VPN-Next.</string>
+    <string name="ota_check_frequency">Проверка обновлений</string>
+    <string name="ota_channel">Канал обновлений</string>
+    <string name="ota_channel_stable">Стабильный</string>
+    <string name="ota_channel_nightly">Nightly (Ночные сборки)</string>
+    <string name="ota_channel_unavailable">Недоступно</string>
+    <string name="ota_freq_hourly">Каждый час</string>
+    <string name="ota_freq_daily">Ежедневно</string>
+    <string name="ota_freq_weekly">Еженедельно</string>
+    <string name="ota_freq_monthly">Ежемесячно</string>
+    <string name="ota_freq_disabled">Отключено</string>
+    <string name="ota_status_checking">Проверка обновлений…</string>
+    <string name="ota_status_up_to_date">Установлена актуальная версия</string>
+    <string name="ota_btn_check">Проверить обновления</string>
+    <string name="ota_downloading">Загрузка обновления… %1$d%%</string>
+    <string name="ota_download_failed">Ошибка загрузки. Попробуйте позже.</string>
 </resources>

@@ -17,6 +17,8 @@
 
 package ru.protonmod.next.data.network
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -24,6 +26,22 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Query
+
+@Serializable
+data class CityTranslationsResponse(
+    @SerialName("Language")
+    val languageCode: String,
+    @SerialName("Cities")
+    val cities: Map<String, Map<String, String?>>, // CountryCode -> (CityEnglishName -> LocalizedName)
+    @SerialName("States")
+    val states: Map<String, Map<String, String?>>,
+)
+
+@Serializable
+data class ConnectingDomainResponse(
+    @SerialName("Code") val code: Int,
+    @SerialName("Domain") val domain: String? = null
+)
 
 interface ProtonVpnApi {
 
@@ -39,15 +57,13 @@ interface ProtonVpnApi {
         @Header("If-Modified-Since") lastModified: String? = null,
         @Header("x-pm-locale") locale: String? = null,
         @Query("WithEntriesForProtocols") protocols: String? = "wireguard",
-        @Query("WithState") withState: Boolean = true,
-        @Query("Tier") userTier: Int? = null
+        @Query("WithState") withState: Boolean = true
     ): Response<LogicalServersResponse>
 
     @GET("vpn/v1/loads")
     suspend fun getLoads(
         @Header("Authorization") authorization: String,
-        @Header("x-pm-uid") sessionId: String,
-        @Query("Tier") userTier: Int? = null
+        @Header("x-pm-uid") sessionId: String
     ): Response<ResponseBody>
 
     @GET("vpn/v2")
@@ -64,6 +80,23 @@ interface ProtonVpnApi {
         @Header("Authorization") authorization: String,
         @Header("x-pm-uid") sessionId: String
     ): Response<ResponseBody>
+
+    /**
+     * Get localized names for cities and states.
+     */
+    @GET("vpn/v1/cities/names")
+    suspend fun getServerCities(
+        @Header("Authorization") authorization: String,
+        @Header("x-pm-uid") sessionId: String,
+        @Header("x-pm-locale") languageTag: String,
+    ): CityTranslationsResponse
+
+    @GET("vpn/v1/servers/{serverId}")
+    suspend fun getServerDomain(
+        @Header("Authorization") authorization: String,
+        @Header("x-pm-uid") sessionId: String,
+        @retrofit2.http.Path(value = "serverId", encoded = true) serverId: String
+    ): ConnectingDomainResponse
 
     /**
      * Registers the WireGuard public key and obtains the internal VPN IP.

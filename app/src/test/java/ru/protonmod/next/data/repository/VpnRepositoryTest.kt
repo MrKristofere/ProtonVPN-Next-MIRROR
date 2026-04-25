@@ -54,6 +54,27 @@ class VpnRepositoryTest {
     @Mock
     private lateinit var serversCacheDao: ServersCacheDao
 
+    @Mock
+    private lateinit var cityTranslationDao: ru.protonmod.next.data.local.CityTranslationDao
+
+    @Mock
+    private lateinit var profileDao: ru.protonmod.next.data.local.ProfileDao
+
+    @Mock
+    private lateinit var recentConnectionDao: ru.protonmod.next.data.local.RecentConnectionDao
+
+    @Mock
+    private lateinit var cityRepository: ru.protonmod.next.data.repository.CityRepository
+
+    @Mock
+    private lateinit var settingsManager: ru.protonmod.next.data.local.SettingsManager
+
+    @Mock
+    private lateinit var amneziaVpnManager: ru.protonmod.next.vpn.AmneziaVpnManager
+
+    @Mock
+    private lateinit var warpManager: ru.protonmod.next.vpn.WarpManager
+
     private val testDispatcher = StandardTestDispatcher()
     
     private val testDispatcherProvider = object : DispatcherProvider {
@@ -71,6 +92,8 @@ class VpnRepositoryTest {
         MockitoAnnotations.openMocks(this)
         repository = VpnRepository(
             vpnApi, serverDao, sessionDao, serversCacheDao,
+            cityTranslationDao, profileDao, recentConnectionDao,
+            cityRepository, settingsManager, { amneziaVpnManager }, { warpManager },
             testDispatcherProvider, testScope
         )
     }
@@ -138,11 +161,10 @@ class VpnRepositoryTest {
             lastModified = anyOrNull(),
             locale = anyOrNull(),
             protocols = anyOrNull(),
-            withState = any(),
-            userTier = anyOrNull()
+            withState = any()
         )).thenReturn(Response.success(logicalServersResponse))
 
-        whenever(vpnApi.getLoads(any(), any(), anyOrNull())).thenReturn(
+        whenever(vpnApi.getLoads(any(), any())).thenReturn(
             Response.success(loadsJson.toResponseBody())
         )
 

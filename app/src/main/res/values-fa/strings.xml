@@ -51,6 +51,8 @@
     <string name="title_recent_connections">اتصال‌های اخیر</string>
     <string name="status_connected">متصل شد</string>
     <string name="status_connecting">در حال اتصال…</string>
+    <string name="status_verifying">در حال تایید…</string>
+    <string name="status_disconnecting">در حال قطع اتصال…</string>
     <string name="status_disconnected">قطع شد</string>
     <string name="status_not_connected">متصل نیست</string>
     <string name="msg_traffic_not_protected">ترافیک شما محافظت نمی‌شود</string>
@@ -118,6 +120,35 @@
     <string name="api_bypass_strategy_title">استراتژی مسیریابی</string>
     <string name="api_bypass_strategy_netlify">پراکسی Netlify</string>
     <string name="api_bypass_strategy_netlify_desc">درخواست‌های API را از طریق یک پراکسی امن Netlify مسیریابی می‌کند.</string>
+    <string name="api_bypass_strategy_cloudflare">پراکسی Cloudflare</string>
+    <string name="api_bypass_strategy_cloudflare_desc">هدایت درخواست‌های API از طریق یک ورکر با کارایی بالای کلودفلر.</string>
+    <string name="api_bypass_strategy_mirrors">آینه‌های پروتون (DoH)</string>
+    <string name="api_bypass_strategy_mirrors_desc">آینه‌های داینامیک API پروتون را از طریق سیستم جایگزین DoH شناسایی و استفاده می‌کند.</string>
+    <string name="api_bypass_strategy_warp">وارپ (کلادفلر)</string>
+    <string name="api_bypass_strategy_warp_desc">استفاده از یک تونل موقت WARP برای درخواست‌های API. قابلیت اطمینان بالا.</string>
+    <string name="warp_fetching_config">در حال دریافت پیکربندی WARP…</string>
+    <string name="warp_error_fetching">دریافت پیکربندی ناموفق بود. اتصال خود را بررسی کنید.</string>
+    <string name="warp_permission_title">مجوز VPN لازم است</string>
+    <string name="warp_permission_desc">وارپ برای ایجاد یک تونل محلی جهت دور زدن مسدودسازی API به مجوز نیاز دارد. هیچ داده‌ای به خارج از کلادفلر ارسال نمی‌شود.</string>
+    <string name="btn_allow">اجازه دادن</string>
+    <string name="api_bypass_strategy_custom">پراکسی سفارشی (SOCKS5/HTTPS)</string>
+    <string name="api_bypass_strategy_custom_desc">درخواست‌های API را از طریق پراکسی SOCKS5 یا HTTPS خودتان مسیریابی می‌کند.</string>
+    <string name="api_proxy_host">هاست پراکسی</string>
+    <string name="api_proxy_port">پورت پراکسی</string>
+    <string name="api_proxy_type">نوع پراکسی</string>
+    <string name="api_proxy_type_http">HTTPS / HTTP</string>
+    <string name="api_proxy_type_socks">SOCKS5</string>
+    <string name="api_proxy_username">نام کاربری (اختیاری)</string>
+    <string name="api_proxy_password">رمز عبور (اختیاری)</string>
+
+    <!-- Country Spoofing -->
+    <string name="settings_country_spoofing_title">جعل کشور</string>
+    <string name="settings_country_spoofing_description">جایگزینی کد کشور ارسال شده به API برای شبیه‌سازی یک مکان فیزیکی متفاوت.</string>
+    <string name="settings_country_spoofing_null_label">جعل تهی (Null Spoof)</string>
+    <string name="settings_country_spoofing_null_desc">هیچ هدر کد کشوری به API ارسال نشود.</string>
+    <string name="settings_country_spoofing_code_label">کد کشور (ISO 3166-1 alpha-2)</string>
+    <string name="settings_country_spoofing_code_hint">به عنوان مثال US, DE, RU</string>
+    <string name="settings_country_spoofing_update_toast">در حال به‌روزرسانی لیست سرورها…</string>
 
     <!-- Custom DNS -->
     <string name="settings_custom_dns">DNS سفارشی</string>
@@ -233,9 +264,15 @@
     <string name="about_codeberg">Codeberg</string>
     <string name="about_unavailable">موقت در دسترس نیست</string>
 
-    <string name="url_github">https://github.com/SMH01-MOD-NEXT/ProtonMOD-NEXT</string>
+    <string name="about_sentry">طراحی شده توسط Sentry</string>
+    <string name="url_sentry">https://sentry.io/</string>
+
+    <string name="url_github">https://github.com/SMH01-MIRRORS/ProtonVPN-Next-MIRROR</string>
     <string name="url_codeberg">https://codeberg.org/SMH01/ProtonVPN-Next</string>
     <string name="url_telegram">https://t.me/ProtonVPN_MOD</string>
+
+    <string name="url_ota_mirror_1" translatable="false">https://kvn.protonnext.qzz.io/update.json</string>
+    <string name="url_ota_mirror_2" translatable="false">https://home.protonnext.qzz.io/update.json</string>
 
     <!-- Licenses Screen -->
     <string name="licenses_title">مجوزها</string>
@@ -312,6 +349,7 @@
     <string name="notification_channel_name">وضعیت VPN</string>
     <string name="notification_channel_desc">وضعیت فعلی اتصال VPN را نشان می‌دهد</string>
     <string name="notification_title_connected">متصل به %1$s</string>
+    <string name="notification_title_verifying">در حال تایید اتصال…</string>
     <string name="notification_title_disconnected">قطع شد</string>
     <string name="notification_title_connecting">در حال اتصال…</string>
     <string name="notification_action_disconnect">قطع اتصال</string>
@@ -321,6 +359,7 @@
     <string name="error_unknown">خطای ناشناخته</string>
     <string name="error_auth_failed">یک خطای احراز هویت غیرمنتظره رخ داد</string>
     <string name="error_2fa_failed">تایید دو مرحله‌ای ناموفق بود</string>
+    <string name="unknown">نامشخص</string>
 
     <!-- Profiles Screen -->
     <string name="profiles_title">پروفایل‌ها</string>
@@ -389,6 +428,8 @@
     <string name="debug_cert_issued">صادر شده: %1$s</string>
     <string name="debug_cert_expires">انقضا: %1$s</string>
     <string name="debug_btn_refresh_cert">تازه‌سازی اجباری گواهی</string>
+    <string name="debug_btn_refresh_session">تازه‌سازی اجباری نشست</string>
+    <string name="debug_session_refreshed">نشست با موفقیت تازه‌سازی شد!</string>
     <string name="debug_exports_header">خروجی‌ها و تشخیص</string>
     <string name="debug_btn_export_logs">خروجی Logcat به Downloads</string>
     <string name="debug_btn_export_config">خروجی پیکربندی WG (.conf)</string>
@@ -448,4 +489,45 @@
     <string name="captcha_message">برای ایمن نگه داشتن حساب خود، لطفاً تأیید زیر را کامل کنید.</string>
     <string name="captcha_proxy_active">پراکسی ضد مسدودسازی فعال است</string>
     <string name="desc_close">بستن</string>
+
+    <!-- Token Login & Session Management -->
+    <string name="btn_login_tokens">ورود با توکن</string>
+    <string name="title_login_tokens">ورود مبتنی بر توکن</string>
+    <string name="msg_login_tokens_desc">JSON نشست خود را برای ورود مستقیم در زیر جایگذاری کنید. این اطلاعات را محرمانه نگه دارید!</string>
+    <string name="hint_session_json">JSON نشست</string>
+    <string name="debug_btn_export_session">خروجی نشست (حافظه موقت)</string>
+    <string name="debug_btn_import_session">وارد کردن نشست</string>
+    <string name="debug_btn_fetch_domains">دریافت دامنه‌های موجود (حافظه موقت)</string>
+    <string name="debug_export_session_title">خروجی اطلاعات حساس</string>
+    <string name="debug_export_session_msg">این کار تمام اطلاعات نشست شما (از جمله توکن‌ها و کلیدهای خصوصی) را در حافظه موقت کپی می‌کند. آن را با هیچ‌کس به اشتراک نگذارید!</string>
+    <string name="debug_import_session_warning">هشدار: وارد کردن نشست جدید جایگزین نشست فعلی خواهد شد. با احتیاط استفاده کنید.</string>
+    <string name="debug_btn_copy">کپی در حافظه موقت</string>
+    <string name="btn_import">وارد کردن</string>
+    <string name="btn_logout">خروج</string>
+    <string name="logout_confirmation">آیا مطمئن هستید که می‌خواهید خارج شوید؟</string>
+
+    <!-- OTA Updates -->
+    <string name="ota_title">بروزرسانی نرم‌افزار</string>
+    <string name="ota_new_version">نسخه جدید در دسترس است: %1$s</string>
+    <string name="ota_changelog">چه خبر:</string>
+    <string name="ota_btn_update">همین حالا بروزرسانی کن</string>
+    <string name="ota_btn_install">نصب</string>
+    <string name="ota_btn_later">بعداً</string>
+    <string name="ota_force_title">بروزرسانی اجباری</string>
+    <string name="ota_force_desc">یک بروزرسانی بحرانی در دسترس است. لطفاً برای ادامه استفاده از Proton VPN-Next برنامه را بروزرسانی کنید.</string>
+    <string name="ota_check_frequency">بررسی برای بروزرسانی</string>
+    <string name="ota_channel">کانال به‌روزرسانی</string>
+    <string name="ota_channel_stable">پایدار</string>
+    <string name="ota_channel_nightly">شبانه (Nightly)</string>
+    <string name="ota_channel_unavailable">در دسترس نیست</string>
+    <string name="ota_freq_hourly">ساعتی</string>
+    <string name="ota_freq_daily">روزانه</string>
+    <string name="ota_freq_weekly">هفتگی</string>
+    <string name="ota_freq_monthly">ماهانه</string>
+    <string name="ota_freq_disabled">غیرفعال</string>
+    <string name="ota_status_checking">در حال بررسی برای بروزرسانی…</string>
+    <string name="ota_status_up_to_date">برنامه بروز است</string>
+    <string name="ota_btn_check">بررسی برای بروزرسانی</string>
+    <string name="ota_downloading">در حال دانلود بروزرسانی… %1$d%%</string>
+    <string name="ota_download_failed">دانلود ناموفق بود. لطفاً بعداً دوباره تلاش کنید.</string>
 </resources>

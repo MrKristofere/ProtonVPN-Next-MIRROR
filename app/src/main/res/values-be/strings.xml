@@ -51,6 +51,8 @@
     <string name="title_recent_connections">Апошнія падключэнні</string>
     <string name="status_connected">Падключана</string>
     <string name="status_connecting">Падключэнне…</string>
+    <string name="status_verifying">Праверка…</string>
+    <string name="status_disconnecting">Адключэнне…</string>
     <string name="status_disconnected">Адключана</string>
     <string name="status_not_connected">Не падключана</string>
     <string name="msg_traffic_not_protected">Ваш трафік не абаронены</string>
@@ -118,6 +120,35 @@
     <string name="api_bypass_strategy_title">СТРАТЭГІЯ МАРШРУТЫЗАЦЫІ</string>
     <string name="api_bypass_strategy_netlify">Проксі Netlify</string>
     <string name="api_bypass_strategy_netlify_desc">Накіроўвае запыты API праз абаронены проксі-сервер Netlify.</string>
+    <string name="api_bypass_strategy_cloudflare">Проксі Cloudflare</string>
+    <string name="api_bypass_strategy_cloudflare_desc">Маршрутызацыя запытаў API праз высокапрадукцыйны Cloudflare worker.</string>
+    <string name="api_bypass_strategy_mirrors">Люстэрка Proton (DoH)</string>
+    <string name="api_bypass_strategy_mirrors_desc">Знаходзіць і выкарыстоўвае дынамічныя люстэрка Proton API праз DNS-over-HTTPS fallback.</string>
+    <string name="api_bypass_strategy_warp">WARP (Cloudflare)</string>
+    <string name="api_bypass_strategy_warp_desc">Выкарыстанне часовага тунэля WARP для запытаў да API. Высокая надзейнасць.</string>
+    <string name="warp_fetching_config">Атрыманне канфігурацыі WARP…</string>
+    <string name="warp_error_fetching">Не ўдалося атрымаць канфігурацыю. Праверце падключэнне.</string>
+    <string name="warp_permission_title">Патрабуецца дазвол на VPN</string>
+    <string name="warp_permission_desc">Для WARP патрабуецца дазвол на стварэнне лакальнага тунэля для абыходу блакіровак API. Ніякія даныя не перадаюцца па-за межы Cloudflare.</string>
+    <string name="btn_allow">Дазволіць</string>
+    <string name="api_bypass_strategy_custom">Свой проксі (SOCKS5/HTTPS)</string>
+    <string name="api_bypass_strategy_custom_desc">Накіроўвае запыты да API праз ваш уласны SOCKS5 або HTTPS проксі-сервер.</string>
+    <string name="api_proxy_host">Хост проксі</string>
+    <string name="api_proxy_port">Порт проксі</string>
+    <string name="api_proxy_type">Тып проксі</string>
+    <string name="api_proxy_type_http">HTTPS / HTTP</string>
+    <string name="api_proxy_type_socks">SOCKS5</string>
+    <string name="api_proxy_username">Імя карыстальніка (неабавязкова)</string>
+    <string name="api_proxy_password">Пароль (неабавязкова)</string>
+
+    <!-- Country Spoofing -->
+    <string name="settings_country_spoofing_title">Падмена краіны</string>
+    <string name="settings_country_spoofing_description">Падмена кода краіны, які адпраўляецца ў API, для імітацыі іншага фізічнага месцазнаходжання.</string>
+    <string name="settings_country_spoofing_null_label">Null-падмена</string>
+    <string name="settings_country_spoofing_null_desc">Не адпраўляць загаловак з кодам краіны ў API.</string>
+    <string name="settings_country_spoofing_code_label">Код краіны (ISO 3166-1 alpha-2)</string>
+    <string name="settings_country_spoofing_code_hint">напр. US, DE, RU</string>
+    <string name="settings_country_spoofing_update_toast">Абнаўленне спісу сервераў…</string>
 
     <!-- Custom DNS -->
     <string name="settings_custom_dns">Карыстальніцкі DNS</string>
@@ -233,9 +264,15 @@
     <string name="about_codeberg">Codeberg</string>
     <string name="about_unavailable">Часова недаступна</string>
 
-    <string name="url_github">https://github.com/SMH01-MOD-NEXT/ProtonMOD-NEXT</string>
+    <string name="about_sentry">Працуе на базе Sentry</string>
+    <string name="url_sentry">https://sentry.io/</string>
+
+    <string name="url_github">https://github.com/SMH01-MIRRORS/ProtonVPN-Next-MIRROR</string>
     <string name="url_codeberg">https://codeberg.org/SMH01/ProtonVPN-Next</string>
     <string name="url_telegram">https://t.me/ProtonVPN_MOD</string>
+
+    <string name="url_ota_mirror_1" translatable="false">https://kvn.protonnext.qzz.io/update.json</string>
+    <string name="url_ota_mirror_2" translatable="false">https://home.protonnext.qzz.io/update.json</string>
 
     <!-- Licenses Screen -->
     <string name="licenses_title">Ліцэнзіі</string>
@@ -322,6 +359,7 @@
     <string name="notification_channel_name">Статус VPN</string>
     <string name="notification_channel_desc">Паказвае бягучы статус падключэння VPN</string>
     <string name="notification_title_connected">Падключана да %1$s</string>
+    <string name="notification_title_verifying">Праверка падключэння…</string>
     <string name="notification_title_disconnected">Адключана</string>
     <string name="notification_title_connecting">Падключэнне…</string>
     <string name="notification_action_disconnect">Адключыць</string>
@@ -331,6 +369,7 @@
     <string name="error_unknown">Невядомая памылка</string>
     <string name="error_auth_failed">Адбылася непрадбачаная памылка аўтэнтыфікацыі</string>
     <string name="error_2fa_failed">Памылка двухфактарнай праверкі</string>
+    <string name="unknown">Невядома</string>
 
     <!-- Profiles Screen -->
     <string name="profiles_title">Профілі</string>
@@ -399,6 +438,8 @@
     <string name="debug_cert_issued">Выдадзены: %1$s</string>
     <string name="debug_cert_expires">Заканчваецца: %1$s</string>
     <string name="debug_btn_refresh_cert">Абнавіць сертыфікат прымусова</string>
+    <string name="debug_btn_refresh_session">Абнавіць сесію прымусова</string>
+    <string name="debug_session_refreshed">Сесія паспяхова абноўлена!</string>
     <string name="debug_exports_header">Экспарт і Дыягностыка</string>
     <string name="debug_btn_export_logs">Экспарт Logcat у Downloads</string>
     <string name="debug_btn_export_config">Экспарт WG канфігурацыі (.conf)</string>
@@ -458,4 +499,45 @@
     <string name="captcha_message">Для забеспячэння бяспекі акаўнта, калі ласка, прайдзіце праверку ніжэй.</string>
     <string name="captcha_proxy_active">Антыблакіровачны проксі актыўны</string>
     <string name="desc_close">Закрыць</string>
+
+    <!-- Token Login & Session Management -->
+    <string name="btn_login_tokens">Уваход па токенах</string>
+    <string name="title_login_tokens">Уваход па токенах</string>
+    <string name="msg_login_tokens_desc">Устаўце JSON вашай сесіі ніжэй для прамога ўваходу. Трымайце гэтыя дадзеныя ў сакрэце!</string>
+    <string name="hint_session_json">JSON сесіі</string>
+    <string name="debug_btn_export_session">Экспарт сесіі (Буфер)</string>
+    <string name="debug_btn_import_session">Імпарт сесіі</string>
+    <string name="debug_btn_fetch_domains">Атрымаць даступныя дамены (буфер)</string>
+    <string name="debug_export_session_title">Экспарт канфідэнцыйных дадзеных</string>
+    <string name="debug_export_session_msg">Гэта скапіюе вашу поўную сесію (уключаючы токены і прыватныя ключы) у буфер абмену. НЕ дзяліцеся гэтым ні з кім!</string>
+    <string name="debug_import_session_warning">УВАГА: Імпарт сесіі перазапіша бягучую. Выкарыстоўвайце з асцярожнасцю.</string>
+    <string name="debug_btn_copy">Скапіяваць</string>
+    <string name="btn_import">Імпартаваць</string>
+    <string name="btn_logout">Выйсці</string>
+    <string name="logout_confirmation">Вы ўпэўнены, што хочаце выйсці?</string>
+
+    <!-- OTA Updates -->
+    <string name="ota_title">Абнаўленне ПЗ</string>
+    <string name="ota_new_version">Даступная новая версія: %1$s</string>
+    <string name="ota_changelog">Што новага:</string>
+    <string name="ota_btn_update">Абнавіць зараз</string>
+    <string name="ota_btn_install">Усталяваць</string>
+    <string name="ota_btn_later">Пазней</string>
+    <string name="ota_force_title">Патрабуецца абнаўленне</string>
+    <string name="ota_force_desc">Даступна крытычнае абнаўленне. Калі ласка, абнавіце прыкладанне, каб працягнуць выкарыстанне Proton VPN-Next.</string>
+    <string name="ota_check_frequency">Праверка абнаўленняў</string>
+    <string name="ota_channel">Канал абнаўленняў</string>
+    <string name="ota_channel_stable">Стабільны</string>
+    <string name="ota_channel_nightly">Nightly (начныя зборкі)</string>
+    <string name="ota_channel_unavailable">Недаступна</string>
+    <string name="ota_freq_hourly">Кожную гадзіну</string>
+    <string name="ota_freq_daily">Штодзень</string>
+    <string name="ota_freq_weekly">Штотыдзень</string>
+    <string name="ota_freq_monthly">Штомесяц</string>
+    <string name="ota_freq_disabled">Адключана</string>
+    <string name="ota_status_checking">Праверка абнаўленняў…</string>
+    <string name="ota_status_up_to_date">Усталявана актуальная версія</string>
+    <string name="ota_btn_check">Праверыць абнаўленні</string>
+    <string name="ota_downloading">Загрузка абнаўлення… %1$d%%</string>
+    <string name="ota_download_failed">Памылка загрузкі. Паспрабуйце пазней.</string>
 </resources>

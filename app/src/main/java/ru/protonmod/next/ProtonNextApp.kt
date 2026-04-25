@@ -22,9 +22,13 @@ import android.webkit.WebView
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 import okhttp3.OkHttp
 import ru.protonmod.next.data.local.SettingsManager
 import ru.protonmod.next.data.repository.VpnRepository
+import ru.protonmod.next.ota.OTAUpdateManager
+import ru.protonmod.next.utils.NetworkMonitor
 import ru.protonmod.next.utils.ProtonLogger
 import javax.inject.Inject
 
@@ -42,6 +46,12 @@ class ProtonNextApp : Application(), Configuration.Provider {
 
     @Inject
     lateinit var vpnRepository: VpnRepository
+
+    @Inject
+    lateinit var otaUpdateManager: OTAUpdateManager
+
+    @Inject
+    lateinit var networkMonitor: NetworkMonitor
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -83,6 +93,20 @@ class ProtonNextApp : Application(), Configuration.Provider {
 
         // Start background server load updates
         vpnRepository.startAutoUpdate()
+
+        // Sync servers on network changes
+        MainScope().launch {
+            networkMonitor.networkChanged.collect { timestamp ->
+                if (timestamp > 0) {
+                    vpnRepository.refreshServersOnNetworkChange()
+                }
+            }
+        }
+
+        // Schedule OTA update checks
+        MainScope().launch {
+            otaUpdateManager.scheduleUpdateCheck()
+        }
     }
 
     override fun onTerminate() {

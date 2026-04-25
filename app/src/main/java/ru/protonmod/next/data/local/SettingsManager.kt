@@ -45,9 +45,22 @@ class SettingsManager @Inject constructor(
     private val prefs = context.getSharedPreferences("boot_settings", Context.MODE_PRIVATE)
 
     companion object {
+        const val STRATEGY_NETLIFY = "netlify"
+        const val STRATEGY_CLOUDFLARE = "cloudflare"
+        const val STRATEGY_PROTON_MIRRORS = "proton_mirrors"
+        const val STRATEGY_WARP = "warp"
+        const val STRATEGY_CUSTOM_PROXY = "custom_proxy"
+
+        const val PROXY_TYPE_HTTP = "http"
+        const val PROXY_TYPE_SOCKS = "socks"
+
         private val KILL_SWITCH = booleanPreferencesKey("kill_switch")
         private val AUTO_CONNECT = booleanPreferencesKey("auto_connect")
         private val NOTIFICATIONS = booleanPreferencesKey("notifications")
+
+        private val OTA_UPDATE_FREQUENCY = stringPreferencesKey("ota_update_frequency") // "hourly", "daily", "weekly", "monthly", "disabled"
+        private val OTA_LAST_CHECK_TIME = intPreferencesKey("ota_last_check_time")
+        private val OTA_UPDATE_CHANNEL = stringPreferencesKey("ota_update_channel") // "stable" or "nightly"
 
         private val APP_THEME = stringPreferencesKey("app_theme")
         private val SERVER_LOAD_DISPLAY_MODE = stringPreferencesKey("server_load_display_mode")
@@ -66,6 +79,17 @@ class SettingsManager @Inject constructor(
         // API Bypass Settings
         private val API_BYPASS_ENABLED = booleanPreferencesKey("api_bypass_enabled")
         private val API_BYPASS_STRATEGY = stringPreferencesKey("api_bypass_strategy")
+
+        private val API_PROXY_HOST = stringPreferencesKey("api_proxy_host")
+        private val API_PROXY_PORT = intPreferencesKey("api_proxy_port")
+        private val API_PROXY_TYPE = stringPreferencesKey("api_proxy_type") // "http" or "socks"
+        private val API_PROXY_USERNAME = stringPreferencesKey("api_proxy_username")
+        private val API_PROXY_PASSWORD = stringPreferencesKey("api_proxy_password")
+
+        // API Mirroring / Spoofing Settings
+        private val SPOOF_COUNTRY_ENABLED = booleanPreferencesKey("spoof_country_enabled")
+        private val SPOOF_COUNTRY_NULL = booleanPreferencesKey("spoof_country_null")
+        private val SPOOF_COUNTRY_CODE = stringPreferencesKey("spoof_country_code")
 
         private val OBFUSCATION_ENABLED = booleanPreferencesKey("obfuscation_enabled")
         private val OBFUSCATION_ADVANCED_MODE = booleanPreferencesKey("obfuscation_advanced_mode")
@@ -104,8 +128,12 @@ class SettingsManager @Inject constructor(
     }
 
     val killSwitchEnabled: Flow<Boolean> = context.dataStore.data.map { it[KILL_SWITCH] ?: false }
-    val autoConnectEnabled: Flow<Boolean> = context.dataStore.data.map { it[AUTO_CONNECT] ?: true }
+    val autoConnectEnabled: Flow<Boolean> = context.dataStore.data.map { it[AUTO_CONNECT] ?: false }
     val notificationsEnabled: Flow<Boolean> = context.dataStore.data.map { it[NOTIFICATIONS] ?: true }
+
+    val otaUpdateFrequency: Flow<String> = context.dataStore.data.map { it[OTA_UPDATE_FREQUENCY] ?: "daily" }
+    val otaLastCheckTime: Flow<Long> = context.dataStore.data.map { it[OTA_LAST_CHECK_TIME]?.toLong() ?: 0L }
+    val otaUpdateChannel: Flow<String> = context.dataStore.data.map { it[OTA_UPDATE_CHANNEL] ?: ru.protonmod.next.BuildConfig.UPDATE_CHANNEL }
 
     val appTheme: Flow<ru.protonmod.next.ui.theme.AppTheme> = context.dataStore.data.map { preferences ->
         val themeString = preferences[APP_THEME] ?: ru.protonmod.next.ui.theme.AppTheme.DARK.name
@@ -131,11 +159,21 @@ class SettingsManager @Inject constructor(
     val excludedIps: Flow<Set<String>> = context.dataStore.data.map { it[EXCLUDED_IPS] ?: emptySet() }
     val excludedDomains: Flow<Set<String>> = context.dataStore.data.map { it[EXCLUDED_DOMAINS] ?: emptySet() }
 
-    val vpnPort: Flow<Int> = context.dataStore.data.map { it[VPN_PORT] ?: 1194 }
+    val vpnPort: Flow<Int> = context.dataStore.data.map { it[VPN_PORT] ?: 0 }
     val customDns: Flow<String> = context.dataStore.data.map { it[CUSTOM_DNS] ?: "" }
 
     val apiBypassEnabled: Flow<Boolean> = context.dataStore.data.map { it[API_BYPASS_ENABLED] ?: false }
     val apiBypassStrategy: Flow<String> = context.dataStore.data.map { it[API_BYPASS_STRATEGY] ?: "netlify" }
+
+    val apiProxyHost: Flow<String> = context.dataStore.data.map { it[API_PROXY_HOST] ?: "" }
+    val apiProxyPort: Flow<Int> = context.dataStore.data.map { it[API_PROXY_PORT] ?: 1080 }
+    val apiProxyType: Flow<String> = context.dataStore.data.map { it[API_PROXY_TYPE] ?: PROXY_TYPE_SOCKS }
+    val apiProxyUsername: Flow<String> = context.dataStore.data.map { it[API_PROXY_USERNAME] ?: "" }
+    val apiProxyPassword: Flow<String> = context.dataStore.data.map { it[API_PROXY_PASSWORD] ?: "" }
+
+    val spoofCountryEnabled: Flow<Boolean> = context.dataStore.data.map { it[SPOOF_COUNTRY_ENABLED] ?: false }
+    val spoofCountryNull: Flow<Boolean> = context.dataStore.data.map { it[SPOOF_COUNTRY_NULL] ?: false }
+    val spoofCountryCode: Flow<String> = context.dataStore.data.map { it[SPOOF_COUNTRY_CODE] ?: "" }
 
     val obfuscationEnabled: Flow<Boolean> = context.dataStore.data.map { it[OBFUSCATION_ENABLED] ?: false }
     val obfuscationAdvancedMode: Flow<Boolean> = context.dataStore.data.map { it[OBFUSCATION_ADVANCED_MODE] ?: false }
@@ -164,7 +202,21 @@ class SettingsManager @Inject constructor(
     fun isLogsEnabledSync(): Boolean = prefs.getBoolean("sentry_logs_enabled", true)
 
     fun isApiBypassEnabledSync(): Boolean = prefs.getBoolean("api_bypass_enabled", false)
-    fun getApiBypassStrategySync(): String = prefs.getString("api_bypass_strategy", "netlify") ?: "netlify"
+    fun getApiBypassStrategySync(): String {
+        val strategy = prefs.getString("api_bypass_strategy", "netlify") ?: "netlify"
+        ProtonLogger.d("SettingsManager", "Sync get strategy: $strategy")
+        return strategy
+    }
+
+    fun getApiProxyHostSync(): String = prefs.getString("api_proxy_host", "") ?: ""
+    fun getApiProxyPortSync(): Int = prefs.getInt("api_proxy_port", 1080)
+    fun getApiProxyTypeSync(): String = prefs.getString("api_proxy_type", PROXY_TYPE_SOCKS) ?: PROXY_TYPE_SOCKS
+    fun getApiProxyUsernameSync(): String = prefs.getString("api_proxy_username", "") ?: ""
+    fun getApiProxyPasswordSync(): String = prefs.getString("api_proxy_password", "") ?: ""
+
+    fun isSpoofCountryEnabledSync(): Boolean = prefs.getBoolean("spoof_country_enabled", false)
+    fun isSpoofCountryNullSync(): Boolean = prefs.getBoolean("spoof_country_null", false)
+    fun getSpoofCountryCodeSync(): String = prefs.getString("spoof_country_code", "") ?: ""
 
     val quickConnectStrategy: Flow<String> = context.dataStore.data.map { it[QUICK_CONNECT_STRATEGY] ?: "fastest" }
     val quickConnectTargetId: Flow<String?> = context.dataStore.data.map { it[QUICK_CONNECT_TARGET_ID] }
@@ -237,6 +289,18 @@ class SettingsManager @Inject constructor(
         context.dataStore.edit { it[NOTIFICATIONS] = enabled }
     }
 
+    suspend fun setOtaUpdateFrequency(frequency: String) {
+        context.dataStore.edit { it[OTA_UPDATE_FREQUENCY] = frequency }
+    }
+
+    suspend fun setOtaLastCheckTime(time: Long) {
+        context.dataStore.edit { it[OTA_LAST_CHECK_TIME] = time.toInt() }
+    }
+
+    suspend fun setOtaUpdateChannel(channel: String) {
+        context.dataStore.edit { it[OTA_UPDATE_CHANNEL] = channel }
+    }
+
     suspend fun setAppTheme(theme: ru.protonmod.next.ui.theme.AppTheme) {
         context.dataStore.edit { it[APP_THEME] = theme.name }
     }
@@ -279,8 +343,49 @@ class SettingsManager @Inject constructor(
     }
 
     suspend fun setApiBypassStrategy(strategy: String) {
+        ProtonLogger.d("SettingsManager", "Setting strategy to: $strategy")
         prefs.edit { putString("api_bypass_strategy", strategy) }
         context.dataStore.edit { it[API_BYPASS_STRATEGY] = strategy }
+    }
+
+    suspend fun setApiProxyHost(host: String) {
+        prefs.edit { putString("api_proxy_host", host) }
+        context.dataStore.edit { it[API_PROXY_HOST] = host }
+    }
+
+    suspend fun setApiProxyPort(port: Int) {
+        prefs.edit { putInt("api_proxy_port", port) }
+        context.dataStore.edit { it[API_PROXY_PORT] = port }
+    }
+
+    suspend fun setApiProxyType(type: String) {
+        prefs.edit { putString("api_proxy_type", type) }
+        context.dataStore.edit { it[API_PROXY_TYPE] = type }
+    }
+
+    suspend fun setApiProxyUsername(username: String) {
+        prefs.edit { putString("api_proxy_username", username) }
+        context.dataStore.edit { it[API_PROXY_USERNAME] = username }
+    }
+
+    suspend fun setApiProxyPassword(password: String) {
+        prefs.edit { putString("api_proxy_password", password) }
+        context.dataStore.edit { it[API_PROXY_PASSWORD] = password }
+    }
+
+    suspend fun setSpoofCountryEnabled(enabled: Boolean) {
+        prefs.edit { putBoolean("spoof_country_enabled", enabled) }
+        context.dataStore.edit { it[SPOOF_COUNTRY_ENABLED] = enabled }
+    }
+
+    suspend fun setSpoofCountryNull(enabled: Boolean) {
+        prefs.edit { putBoolean("spoof_country_null", enabled) }
+        context.dataStore.edit { it[SPOOF_COUNTRY_NULL] = enabled }
+    }
+
+    suspend fun setSpoofCountryCode(code: String) {
+        prefs.edit { putString("spoof_country_code", code) }
+        context.dataStore.edit { it[SPOOF_COUNTRY_CODE] = code }
     }
 
     suspend fun setObfuscationEnabled(enabled: Boolean) {

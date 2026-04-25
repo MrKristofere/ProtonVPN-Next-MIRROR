@@ -28,15 +28,46 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.amnezia.awg.backend.Tunnel
 import ru.protonmod.next.R
 import ru.protonmod.next.data.repository.VpnRepository
+import ru.protonmod.next.data.local.ServerLoadDisplayMode
 import ru.protonmod.next.data.local.SessionDao
 import ru.protonmod.next.data.local.SettingsManager
 import ru.protonmod.next.data.network.LogicalServer
 import ru.protonmod.next.data.state.ConnectedServerState
 import ru.protonmod.next.vpn.AmneziaVpnManager
 import javax.inject.Inject
+
+data class CountryDisplayItem(val code: String, val averageLoad: Int)
+data class CityDisplayItem(val name: String, val localizedName: String, val averageLoad: Int)
+
+sealed class CountriesUiState {
+    data object Loading : CountriesUiState()
+    data class CountriesList(
+        val countries: List<CountryDisplayItem>,
+        val loadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
+    ) : CountriesUiState()
+    data class CitiesList(
+        val country: String,
+        val cities: List<CityDisplayItem>,
+        val loadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
+    ) : CountriesUiState()
+    data class ServersList(
+        val country: String,
+        val city: String,
+        val servers: List<LogicalServer>,
+        val loadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
+    ) : CountriesUiState()
+    data class Error(val message: String) : CountriesUiState()
+}
+
+sealed class NavigationState {
+    data object Countries : NavigationState()
+    data class Cities(val countryCode: String) : NavigationState()
+    data class Servers(val countryCode: String, val cityName: String) : NavigationState()
+}
 
 @HiltViewModel
 class CountriesViewModel @Inject constructor(
@@ -84,15 +115,17 @@ class CountriesViewModel @Inject constructor(
                     .groupBy { it.city }
                     .map { (name, cityServers) ->
                         val avg = if (cityServers.isEmpty()) 0 else cityServers.map { it.averageLoad }.average().toInt()
-                        CityDisplayItem(name, avg)
+                        val localizedName = cityServers.firstOrNull()?.localizedCity ?: name
+                        CityDisplayItem(name, localizedName, avg)
                     }
-                    .sortedBy { it.name }
+                    .sortedBy { it.localizedName }
                 CountriesUiState.CitiesList(nav.countryCode, cities, loadMode)
             }
             is NavigationState.Servers -> {
                 val cityServers = servers.filter { it.exitCountry == nav.countryCode && it.city == nav.cityName }
                     .sortedBy { it.name }
-                CountriesUiState.ServersList(nav.countryCode, nav.cityName, cityServers, loadMode)
+                val localizedCityName = cityServers.firstOrNull()?.localizedCity ?: nav.cityName
+                CountriesUiState.ServersList(nav.countryCode, localizedCityName, cityServers, loadMode)
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CountriesUiState.Loading)
@@ -121,12 +154,6 @@ class CountriesViewModel @Inject constructor(
     }
 
     private suspend fun connectToServer(server: LogicalServer) {
-        val session = sessionDao.getSession()
-        if (session == null) {
-            ProtonLogger.e(TAG, "Cannot connect: No session found")
-            return
-        }
-
         // Reliable server selection: Fallback to any server with min load if status == 1 is absent.
         val physicalServer = server.servers.filter { it.status == 1 }.minByOrNull { it.load }
             ?: server.servers.minByOrNull { it.load }
@@ -135,6 +162,15 @@ class CountriesViewModel @Inject constructor(
             connectedServerState.setConnectedServer(server)
             val tunnelState = amneziaVpnManager.tunnelState.value
             val isConnecting = amneziaVpnManager.isConnecting.value
+
+            // Re-fetch the session right before use so we always pass the freshest credentials,
+            // even if a token refresh occurred between server selection and the actual connect call.
+            val session = sessionDao.getSession()
+            if (session == null) {
+                ProtonLogger.e(TAG, "Cannot connect: No session found")
+                return
+            }
+
             if (tunnelState == Tunnel.State.UP || isConnecting) {
                 amneziaVpnManager.reconnect(server.id, physicalServer, session)
             } else {
@@ -152,9 +188,9 @@ class CountriesViewModel @Inject constructor(
             if (serversInCountry.isNotEmpty()) {
                 val bestServer = serversInCountry
                     .filter { it.servers.any { s -> s.status == 1 } }
-                    .minByOrNull { it.averageLoad } 
+                    .minByOrNull { it.averageLoad }
                     ?: serversInCountry.minByOrNull { it.averageLoad }
-                
+
                 bestServer?.let { connectToServer(it) }
             }
         }
@@ -180,7 +216,7 @@ class CountriesViewModel @Inject constructor(
                     .filter { it.servers.any { s -> s.status == 1 } }
                     .minByOrNull { it.averageLoad }
                     ?: serversInCity.minByOrNull { it.averageLoad }
-                    
+
                 bestServer?.let { connectToServer(it) }
             }
         }

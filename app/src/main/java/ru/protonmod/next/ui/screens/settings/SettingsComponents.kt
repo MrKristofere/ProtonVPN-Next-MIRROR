@@ -32,51 +32,60 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ru.protonmod.next.R
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.ui.theme.liquidGlass
+import android.content.Intent
+import androidx.core.net.toUri
 
 @Composable
-fun Category(
-    modifier: Modifier = Modifier,
+fun SettingsCategory(
     title: String,
+    modifier: Modifier = Modifier,
     content: (@Composable ColumnScope.() -> Unit),
 ) {
     val colors = ProtonNextTheme.colors
-    if (title.isNotEmpty()) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = colors.textNorm,
-            modifier = modifier
-                .padding(start = 12.dp, top = 24.dp, bottom = 8.dp)
-                .fillMaxWidth()
-        )
-    } else {
-        Spacer(modifier = Modifier.height(16.dp))
-    }
+    Column(modifier = modifier) {
+        if (title.isNotEmpty()) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = colors.textNorm,
+                modifier = Modifier
+                    .padding(start = 12.dp, top = 24.dp, bottom = 8.dp)
+                    .fillMaxWidth()
+            )
+        } else {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .liquidGlass(shape = RoundedCornerShape(20.dp), alpha = 0.4f, shadowElevation = 0.dp)
-    ) {
-        Column(modifier = Modifier.padding(vertical = 4.dp)) {
-            content()
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .liquidGlass(shape = RoundedCornerShape(20.dp), alpha = 0.4f, shadowElevation = 0.dp)
+        ) {
+            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                content()
+            }
         }
     }
 }
 
 @Composable
 fun SettingRowWithIcon(
-    modifier: Modifier = Modifier,
-    icon: ImageVector?,
     title: String,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
     subtitle: String? = null,
     enabled: Boolean = true,
-    trailingContent: (@Composable () -> Unit)? = null,
-    onClick: (() -> Unit)? = null
+    titleColor: Color = ProtonNextTheme.colors.textNorm,
+    onClick: (() -> Unit)? = null,
+    trailingContent: (@Composable () -> Unit)? = null
 ) {
     val colors = ProtonNextTheme.colors
     var baseModifier = modifier.fillMaxWidth()
@@ -110,7 +119,7 @@ fun SettingRowWithIcon(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = colors.brandNorm,
+                    tint = if (titleColor != colors.textNorm) titleColor else colors.brandNorm,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -125,7 +134,7 @@ fun SettingRowWithIcon(
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                color = colors.textNorm
+                color = titleColor
             )
             if (subtitle != null) {
                 Text(
@@ -153,11 +162,12 @@ fun SettingRowWithIcon(
 @Composable
 fun SettingToggleRow(
     title: String,
-    subtitle: String? = null,
-    icon: ImageVector,
     checked: Boolean,
-    enabled: Boolean = true,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    icon: ImageVector? = null,
+    enabled: Boolean = true
 ) {
     val colors = ProtonNextTheme.colors
     SettingRowWithIcon(
@@ -166,6 +176,7 @@ fun SettingToggleRow(
         icon = icon,
         enabled = enabled,
         onClick = { onCheckedChange(!checked) },
+        modifier = modifier,
         trailingContent = {
             Switch(
                 checked = checked,
@@ -181,4 +192,36 @@ fun SettingToggleRow(
             )
         }
     )
+}
+
+@Composable
+fun SentryPoweredBy(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val url = stringResource(R.string.url_sentry)
+    val colors = ProtonNextTheme.colors
+    val sentryLogo = if (colors.isDark) R.drawable.sentry_light else R.drawable.sentry_dark
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable {
+                val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+                context.startActivity(intent)
+            }
+            .padding(vertical = 24.dp, horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = stringResource(R.string.about_sentry),
+            style = MaterialTheme.typography.labelSmall,
+            color = colors.textWeak
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Icon(
+            painter = painterResource(id = sentryLogo),
+            contentDescription = "Sentry",
+            tint = Color.Unspecified,
+            modifier = Modifier.height(24.dp)
+        )
+    }
 }

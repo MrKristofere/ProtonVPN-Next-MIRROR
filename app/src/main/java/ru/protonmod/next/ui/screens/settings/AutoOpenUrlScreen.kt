@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.protonmod.next.R
 import ru.protonmod.next.ui.components.NavigationHeader
+import ru.protonmod.next.ui.components.SmoothOutlinedTextField
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.ui.theme.liquidGlass
 
@@ -41,12 +42,13 @@ import ru.protonmod.next.ui.theme.liquidGlass
 fun AutoOpenUrlScreen(
     currentUrl: String,
     onBack: () -> Unit,
-    onUrlSaved: (String) -> Unit
+    onUrlSave: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val colors = ProtonNextTheme.colors
     var url by remember { mutableStateOf(currentUrl) }
 
-    Box(modifier = Modifier.fillMaxSize().background(colors.backgroundNorm)) {
+    Box(modifier = modifier.fillMaxSize().background(colors.backgroundNorm)) {
         // Background gradient
         Box(
             modifier = Modifier
@@ -98,7 +100,7 @@ fun AutoOpenUrlScreen(
                             modifier = Modifier.padding(bottom = 24.dp)
                         )
 
-                        OutlinedTextField(
+                        SmoothOutlinedTextField(
                             value = url,
                             onValueChange = { url = it },
                             label = { Text(stringResource(R.string.label_enter_url)) },
@@ -122,7 +124,7 @@ fun AutoOpenUrlScreen(
                                 if (finalUrl.isNotBlank() && !finalUrl.contains("://")) {
                                     finalUrl = "https://$finalUrl"
                                 }
-                                onUrlSaved(finalUrl)
+                                onUrlSave(finalUrl)
                             },
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = RoundedCornerShape(16.dp),

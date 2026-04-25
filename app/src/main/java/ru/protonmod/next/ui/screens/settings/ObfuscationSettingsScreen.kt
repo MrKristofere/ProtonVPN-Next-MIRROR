@@ -39,9 +39,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.protonmod.next.R
 import ru.protonmod.next.data.model.ObfuscationProfile
 import ru.protonmod.next.ui.components.NavigationHeader
+import ru.protonmod.next.ui.components.SmoothOutlinedTextField
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.ui.theme.liquidGlass
 import ru.protonmod.next.ui.utils.isTablet
@@ -50,10 +52,11 @@ import ru.protonmod.next.ui.utils.isTablet
 @Composable
 fun ObfuscationSettingsScreen(
     onBack: () -> Unit,
+    modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val colors = ProtonNextTheme.colors
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isTablet = isTablet()
 
     // Aggregate profiles logic
@@ -69,7 +72,7 @@ fun ObfuscationSettingsScreen(
     var showConfigDropdown by remember { mutableStateOf(false) }
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         containerColor = colors.backgroundNorm,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { paddingValues ->
@@ -101,7 +104,7 @@ fun ObfuscationSettingsScreen(
             ) {
                 val contentModifier = if (isTablet) Modifier.widthIn(max = 600.dp) else Modifier.fillMaxWidth()
 
-                item {
+                item(contentType = "Header") {
                     NavigationHeader(
                         title = stringResource(R.string.obfuscation_title),
                         onBack = onBack,
@@ -118,7 +121,7 @@ fun ObfuscationSettingsScreen(
                 }
 
                 // Master Toggle
-                item {
+                item(contentType = "MasterToggle") {
                     Box(
                         modifier = contentModifier
                             .padding(horizontal = 16.dp)
@@ -164,7 +167,7 @@ fun ObfuscationSettingsScreen(
                 }
 
                 // Animated content for detailed settings
-                item {
+                item(contentType = "DetailedSettings") {
                     AnimatedVisibility(
                         visible = uiState.isObfuscationEnabled,
                         enter = fadeIn() + expandVertically(),
@@ -352,7 +355,7 @@ fun ObfuscationSettingsScreen(
                                                     Column {
                                                         Text(stringResource(R.string.obfuscation_dialog_domain_desc), style = MaterialTheme.typography.bodySmall, color = colors.textWeak)
                                                         Spacer(modifier = Modifier.height(16.dp))
-                                                        OutlinedTextField(
+                                                        SmoothOutlinedTextField(
                                                             value = domainInput,
                                                             onValueChange = { domainInput = it },
                                                             placeholder = { Text(stringResource(R.string.placeholder_google), color = colors.textWeak.copy(alpha = 0.5f)) },
@@ -575,7 +578,7 @@ fun ObfuscationSettingsScreen(
                                     onDismissRequest = { showSaveDialog = false },
                                     title = { Text(stringResource(R.string.obfuscation_save_config), color = colors.textNorm) },
                                     text = {
-                                        OutlinedTextField(
+                                        SmoothOutlinedTextField(
                                             value = newProfileName,
                                             onValueChange = { newProfileName = it },
                                             label = { Text(stringResource(R.string.obfuscation_config_name)) },
@@ -628,10 +631,13 @@ fun ObfuscationSettingsScreen(
 }
 
 @Composable
-fun InfoCard(text: String) {
+fun InfoCard(
+    text: String,
+    modifier: Modifier = Modifier
+) {
     val colors = ProtonNextTheme.colors
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .liquidGlass(shape = RoundedCornerShape(16.dp), alpha = 0.3f, shadowElevation = 0.dp)
     ) {
@@ -656,19 +662,25 @@ fun InfoCard(text: String) {
 }
 
 @Composable
-fun CategoryHeader(title: String) {
+fun CategoryHeader(
+    title: String,
+    modifier: Modifier = Modifier
+) {
     Text(
         text = title.uppercase(),
         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
         color = ProtonNextTheme.colors.brandNorm,
-        modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
+        modifier = modifier.padding(start = 8.dp, bottom = 4.dp)
     )
 }
 
 @Composable
-fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
+fun SettingsCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .liquidGlass(shape = RoundedCornerShape(20.dp), alpha = 0.4f, shadowElevation = 0.dp)
     ) {
@@ -681,12 +693,12 @@ fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 fun ObfuscationParamField(
-    modifier: Modifier = Modifier,
     label: String,
     value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
     isEnabled: Boolean = true,
-    isNumeric: Boolean = true,
-    onValueChange: (String) -> Unit
+    isNumeric: Boolean = true
 ) {
     val colors = ProtonNextTheme.colors
     Column(modifier = modifier) {
@@ -696,7 +708,7 @@ fun ObfuscationParamField(
             color = colors.textWeak
         )
         Spacer(modifier = Modifier.height(4.dp))
-        OutlinedTextField(
+        SmoothOutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             enabled = isEnabled,

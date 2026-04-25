@@ -17,6 +17,8 @@
 
 package ru.protonmod.next.ui.screens.settings
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.os.Environment
@@ -39,6 +41,7 @@ import ru.protonmod.next.data.local.SettingsManager
 import ru.protonmod.next.data.local.ServerDao
 import ru.protonmod.next.data.local.ServerMapper
 import ru.protonmod.next.data.network.LogicalServer
+import ru.protonmod.next.data.repository.AuthRepository
 import ru.protonmod.next.utils.ProtonLogger
 import ru.protonmod.next.vpn.AmneziaConfigGenerator
 import ru.protonmod.next.vpn.AmneziaVpnManager
@@ -74,6 +77,7 @@ class DebugSettingsViewModel @Inject constructor(
     private val settingsManager: SettingsManager,
     private val vpnManager: AmneziaVpnManager,
     private val configGenerator: AmneziaConfigGenerator,
+    private val authRepository: AuthRepository,
     private val database: AppDatabase
 ) : ViewModel() {
 
@@ -142,6 +146,79 @@ class DebugSettingsViewModel @Inject constructor(
         }
     }
 
+    fun forceRefreshSession() {
+        viewModelScope.launch {
+            val session = sessionDao.getSession()
+            if (session == null) {
+                _uiState.value = _uiState.value.copy(message = "No active session to refresh")
+                return@launch
+            }
+
+            ProtonLogger.d("DebugVM", "Force refreshing session...")
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            
+            val result = authRepository.refreshSession(session.sessionId, session.refreshToken)
+            
+            val message = if (result.isSuccess) {
+                ProtonLogger.i("DebugVM", "Session refreshed successfully")
+                context.getString(ru.protonmod.next.R.string.debug_session_refreshed)
+            } else {
+                val error = result.exceptionOrNull()?.message ?: "Unknown error"
+                ProtonLogger.e("DebugVM", "Failed to refresh session: $error")
+                "Failed: $error"
+            }
+
+            loadCurrentData()
+            
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                message = message
+            )
+        }
+    }
+
+    fun exportSession() {
+        viewModelScope.launch {
+            val sessionJson = authRepository.exportSession()
+            if (sessionJson != null) {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("ProtonVPN Session", sessionJson)
+                clipboard.setPrimaryClip(clip)
+                _uiState.value = _uiState.value.copy(message = "Session copied to clipboard")
+            } else {
+                _uiState.value = _uiState.value.copy(message = "No active session to export")
+            }
+        }
+    }
+
+    fun importSession(json: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            try {
+                val session = kotlinx.serialization.json.Json.decodeFromString<SessionEntity>(json)
+                authRepository.loginBySession(session)
+                    .onSuccess {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            message = "Session imported successfully. Restart app to apply.",
+                            session = session
+                        )
+                    }
+                    .onFailure { e ->
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            message = "Import failed: ${e.message}"
+                        )
+                    }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    message = "Invalid session JSON"
+                )
+            }
+        }
+    }
+
     fun exportLogs() {
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = _uiState.value.copy(isLoading = true)
@@ -191,9 +268,11 @@ class DebugSettingsViewModel @Inject constructor(
                 } else {
                     ObfuscationParams(0, 0, 0, 0, 0, 0, 0, "", "", "", "", "", "", "", "", "")
                 }
+                val localIp = session.vpnIpv4 ?: "10.2.0.2"
+                val assignedDns = session.vpnDns?.split(",")?.firstOrNull() ?: "10.2.0.1"
                 
                 val userDns = settingsManager.customDns.first().trim()
-                val activeDns = if (userDns.isNotEmpty()) userDns else "10.2.0.1"
+                val activeDns = if (userDns.isNotEmpty()) userDns else assignedDns
                 
                 val selectedPort = settingsManager.vpnPort.first().let { port ->
                     if (port == 0) 1194 else port
@@ -210,7 +289,7 @@ class DebugSettingsViewModel @Inject constructor(
                 val config = configGenerator.buildConfig(
                     serverPublicKey = physicalServer.wgPublicKey ?: "",
                     privateKey = session.wgPrivateKey ?: "",
-                    localIp = "10.2.0.2",
+                    localIp = localIp,
                     dnsServer = activeDns,
                     targetIp = targetIp,
                     port = selectedPort,
@@ -316,7 +395,7 @@ class DebugSettingsViewModel @Inject constructor(
     }
 
     fun triggerArithmeticException() {
-        val x = 10 / 0
+        @Suppress("DIVISION_BY_ZERO") val x = 10 / 0
         ProtonLogger.d("DebugVM", "Result: $x")
     }
 
@@ -331,6 +410,29 @@ class DebugSettingsViewModel @Inject constructor(
         } catch (e: Exception) {
             Sentry.captureException(e)
             _uiState.value = _uiState.value.copy(message = "Non-fatal exception captured in Sentry")
+        }
+    }
+
+    fun fetchAvailableDomains() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            val result = authRepository.getAvailableDomains()
+            
+            result.onSuccess { domains ->
+                val domainsList = domains.joinToString("\n")
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("ProtonVPN Domains", domainsList)
+                clipboard.setPrimaryClip(clip)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    message = "Fetched ${domains.size} domains and copied to clipboard"
+                )
+            }.onFailure { e ->
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    message = "Failed to fetch domains: ${e.message}"
+                )
+            }
         }
     }
 }

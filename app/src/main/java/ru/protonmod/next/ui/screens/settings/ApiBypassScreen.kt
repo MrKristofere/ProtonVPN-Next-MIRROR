@@ -17,6 +17,10 @@
 
 package ru.protonmod.next.ui.screens.settings
 
+import android.app.Activity
+import android.net.VpnService
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -36,20 +40,28 @@ import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.protonmod.next.R
+import ru.protonmod.next.data.local.SettingsManager
+import ru.protonmod.next.ui.components.ExpressiveCircularProgressIndicator
 import ru.protonmod.next.ui.components.NavigationHeader
+import ru.protonmod.next.ui.components.SmoothOutlinedTextField
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.ui.theme.liquidGlass
 import ru.protonmod.next.ui.utils.isTablet
@@ -61,22 +73,34 @@ import ru.protonmod.next.ui.utils.isTablet
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApiBypassScreen(
+    modifier: Modifier = Modifier,
     onBack: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val colors = ProtonNextTheme.colors
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isTablet = isTablet()
+    val context = LocalContext.current
 
     // Assuming the ViewModel exposes whether ANY VPN (ours or third-party) is active
     // via ConnectivityManager NetworkCapabilities.TRANSPORT_VPN
     val isAnyVpnActive = uiState.isAnyVpnActive
 
+    var showWarpPermissionDialog by remember { mutableStateOf(false) }
+
+    val vpnPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            viewModel.setApiBypassStrategy(SettingsManager.STRATEGY_WARP)
+        }
+    }
+
     // Force disable the feature if VPN is active
     val isEffectivelyEnabled = uiState.apiBypassEnabled && !isAnyVpnActive
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         containerColor = colors.backgroundNorm,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { paddingValues ->
@@ -233,14 +257,135 @@ fun ApiBypassScreen(
                                     modifier = Modifier.padding(start = 24.dp, top = 16.dp, bottom = 8.dp)
                                 )
 
-                                // Strategy 1: Netlify (Currently the only one, but built to scale)
+                                // Strategy 1: Netlify
                                 StrategySelectionRow(
                                     title = stringResource(R.string.api_bypass_strategy_netlify),
                                     description = stringResource(R.string.api_bypass_strategy_netlify_desc),
                                     icon = Icons.Rounded.Public,
-                                    isSelected = uiState.apiBypassStrategy == "netlify",
-                                    onClick = { viewModel.setApiBypassStrategy("netlify") }
+                                    isSelected = uiState.apiBypassStrategy == SettingsManager.STRATEGY_NETLIFY,
+                                    onClick = { viewModel.setApiBypassStrategy(SettingsManager.STRATEGY_NETLIFY) }
                                 )
+
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 24.dp),
+                                    color = colors.separatorNorm.copy(alpha = 0.2f)
+                                )
+
+                                // Strategy 2: Cloudflare
+                                StrategySelectionRow(
+                                    title = stringResource(R.string.api_bypass_strategy_cloudflare),
+                                    description = stringResource(R.string.api_bypass_strategy_cloudflare_desc),
+                                    icon = Icons.Rounded.Public,
+                                    isSelected = uiState.apiBypassStrategy == SettingsManager.STRATEGY_CLOUDFLARE,
+                                    onClick = { viewModel.setApiBypassStrategy(SettingsManager.STRATEGY_CLOUDFLARE) }
+                                )
+
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 24.dp),
+                                    color = colors.separatorNorm.copy(alpha = 0.2f)
+                                )
+
+                                // Strategy 3: Proton Mirrors (DoH)
+                                StrategySelectionRow(
+                                    title = stringResource(R.string.api_bypass_strategy_mirrors),
+                                    description = stringResource(R.string.api_bypass_strategy_mirrors_desc),
+                                    icon = Icons.Rounded.Public,
+                                    isSelected = uiState.apiBypassStrategy == SettingsManager.STRATEGY_PROTON_MIRRORS,
+                                    onClick = { viewModel.setApiBypassStrategy(SettingsManager.STRATEGY_PROTON_MIRRORS) }
+                                )
+
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 24.dp),
+                                    color = colors.separatorNorm.copy(alpha = 0.2f)
+                                )
+
+                                // Strategy 4: WARP (Cloudflare Tunnel)
+                                StrategySelectionRow(
+                                    title = stringResource(R.string.api_bypass_strategy_warp),
+                                    description = stringResource(R.string.api_bypass_strategy_warp_desc),
+                                    icon = Icons.Rounded.Security,
+                                    isSelected = uiState.apiBypassStrategy == SettingsManager.STRATEGY_WARP,
+                                    onClick = {
+                                        if (uiState.apiBypassStrategy != SettingsManager.STRATEGY_WARP) {
+                                            showWarpPermissionDialog = true
+                                        }
+                                    }
+                                )
+
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 24.dp),
+                                    color = colors.separatorNorm.copy(alpha = 0.2f)
+                                )
+
+                                // Strategy 5: Custom Proxy (SOCKS5/HTTPS)
+                                StrategySelectionRow(
+                                    title = stringResource(R.string.api_bypass_strategy_custom),
+                                    description = stringResource(R.string.api_bypass_strategy_custom_desc),
+                                    icon = Icons.Rounded.Security,
+                                    isSelected = uiState.apiBypassStrategy == SettingsManager.STRATEGY_CUSTOM_PROXY,
+                                    onClick = { viewModel.setApiBypassStrategy(SettingsManager.STRATEGY_CUSTOM_PROXY) }
+                                )
+
+                                // Configuration for Custom Proxy
+                                AnimatedVisibility(
+                                    visible = uiState.apiBypassStrategy == SettingsManager.STRATEGY_CUSTOM_PROXY,
+                                    enter = fadeIn() + expandVertically(),
+                                    exit = fadeOut() + shrinkVertically()
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .padding(horizontal = 24.dp, vertical = 8.dp)
+                                            .background(colors.backgroundSecondary.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                            .padding(12.dp)
+                                    ) {
+                                        // Host input
+                                        SettingInputRow(
+                                            label = stringResource(R.string.api_proxy_host),
+                                            value = uiState.apiProxyHost,
+                                            onValueChange = { viewModel.setApiProxyHost(it) },
+                                            placeholder = "127.0.0.1"
+                                        )
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        // Port input
+                                        SettingInputRow(
+                                            label = stringResource(R.string.api_proxy_port),
+                                            value = uiState.apiProxyPort.toString(),
+                                            onValueChange = { it.toIntOrNull()?.let { port -> viewModel.setApiProxyPort(port) } },
+                                            placeholder = "1080",
+                                            isNumber = true
+                                        )
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        // Proxy Type selection
+                                        ProxyTypeDropdown(
+                                            selectedType = uiState.apiProxyType,
+                                            onTypeSelect = { viewModel.setApiProxyType(it) }
+                                        )
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        // Username input
+                                        SettingInputRow(
+                                            label = stringResource(R.string.api_proxy_username),
+                                            value = uiState.apiProxyUsername,
+                                            onValueChange = { viewModel.setApiProxyUsername(it) },
+                                            placeholder = "user123"
+                                        )
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        // Password input
+                                        SettingInputRow(
+                                            label = stringResource(R.string.api_proxy_password),
+                                            value = uiState.apiProxyPassword,
+                                            onValueChange = { viewModel.setApiProxyPassword(it) },
+                                            placeholder = "password"
+                                        )
+                                    }
+                                }
 
                                 // Future strategies can be added here easily
                             }
@@ -250,7 +395,165 @@ fun ApiBypassScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
             }
+
+            if (showWarpPermissionDialog) {
+                AlertDialog(
+                    onDismissRequest = { showWarpPermissionDialog = false },
+                    title = { Text(stringResource(R.string.warp_permission_title)) },
+                    text = { Text(stringResource(R.string.warp_permission_desc)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showWarpPermissionDialog = false
+                            try {
+                                val intent = VpnService.prepare(context)
+                                if (intent != null) {
+                                    vpnPermissionLauncher.launch(intent)
+                                } else {
+                                    viewModel.setApiBypassStrategy(SettingsManager.STRATEGY_WARP)
+                                }
+                            } catch (_: SecurityException) {
+                                // Fallback for cases where prepare throws SecurityException
+                                viewModel.setApiBypassStrategy(SettingsManager.STRATEGY_WARP)
+                            }
+                        }) {
+                            Text(stringResource(R.string.btn_allow))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showWarpPermissionDialog = false }) {
+                            Text(stringResource(R.string.btn_cancel))
+                        }
+                    },
+                    containerColor = colors.backgroundSecondary,
+                    titleContentColor = colors.textNorm,
+                    textContentColor = colors.textWeak
+                )
+            }
+
+            // WARP Configuration Loading Overlay
+            if (uiState.isWarpFetching) {
+                Dialog(onDismissRequest = {}) {
+                    Surface(
+                        shape = RoundedCornerShape(24.dp),
+                        color = colors.backgroundSecondary,
+                        tonalElevation = 8.dp
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            ExpressiveCircularProgressIndicator(
+                                modifier = Modifier.size(64.dp),
+                                color = colors.brandNorm
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Text(
+                                text = stringResource(R.string.warp_fetching_config),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = colors.textNorm,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun ProxyTypeDropdown(
+    selectedType: String,
+    onTypeSelect: (String) -> Unit
+) {
+    val colors = ProtonNextTheme.colors
+    var expanded by remember { mutableStateOf(false) }
+
+    Column {
+        Text(
+            text = stringResource(R.string.api_proxy_type),
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.textWeak,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(colors.backgroundNorm.copy(alpha = 0.5f))
+                .clickable { expanded = true }
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = if (selectedType == SettingsManager.PROXY_TYPE_HTTP) 
+                    stringResource(R.string.api_proxy_type_http) 
+                else stringResource(R.string.api_proxy_type_socks),
+                color = colors.textNorm,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(colors.backgroundNorm)
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.api_proxy_type_socks), color = colors.textNorm) },
+                    onClick = {
+                        onTypeSelect(SettingsManager.PROXY_TYPE_SOCKS)
+                        expanded = false
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.api_proxy_type_http), color = colors.textNorm) },
+                    onClick = {
+                        onTypeSelect(SettingsManager.PROXY_TYPE_HTTP)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingInputRow(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String = "",
+    isNumber: Boolean = false
+) {
+    val colors = ProtonNextTheme.colors
+
+    Column {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.textWeak,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        SmoothOutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text(placeholder, color = colors.textWeak) },
+            singleLine = true,
+            shape = RoundedCornerShape(8.dp),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = if (isNumber) androidx.compose.ui.text.input.KeyboardType.Number 
+                              else androidx.compose.ui.text.input.KeyboardType.Text
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = colors.brandNorm,
+                unfocusedBorderColor = colors.separatorNorm,
+                focusedTextColor = colors.textNorm,
+                unfocusedTextColor = colors.textNorm,
+                cursorColor = colors.brandNorm
+            ),
+            textStyle = MaterialTheme.typography.bodyMedium
+        )
     }
 }
 
@@ -263,12 +566,13 @@ private fun StrategySelectionRow(
     description: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val colors = ProtonNextTheme.colors
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),

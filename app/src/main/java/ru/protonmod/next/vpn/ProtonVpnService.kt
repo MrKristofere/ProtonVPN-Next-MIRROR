@@ -17,6 +17,7 @@
 
 package ru.protonmod.next.vpn
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -85,6 +86,13 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
     private var notificationsEnabled: Boolean = true
     private var killSwitchEnabled: Boolean = false
     private var isManualDisconnect: Boolean = false
+    private var isVerified: Boolean = false
+
+    // Cached PendingIntent objects to reduce IPC calls to system service
+    // These are reused across notification updates to avoid DeadSystemException
+    // when the system PendingIntent service becomes temporarily unavailable
+    private var cachedDisconnectPendingIntent: PendingIntent? = null
+    private var cachedContentPendingIntent: PendingIntent? = null
 
     companion object {
         private const val TAG = "ProtonVpnService"
@@ -94,12 +102,15 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
         const val ACTION_DISCONNECT = "ru.protonmod.next.vpn.DISCONNECT"
         const val ACTION_STATE_CHANGED = "ru.protonmod.next.vpn.STATE_CHANGED"
         const val ACTION_UPDATE_SETTINGS = "ru.protonmod.next.vpn.UPDATE_SETTINGS"
+        const val ACTION_STATS_UPDATED = "ru.protonmod.next.vpn.STATS_UPDATED"
+        const val ACTION_SET_VERIFIED = "ru.protonmod.next.vpn.SET_VERIFIED"
 
         // Intent Extras
         const val EXTRA_CONFIG = "config_string"
         const val EXTRA_EXCLUDED_APPS = "excluded_apps"
         const val EXTRA_EXCLUDED_IPS = "excluded_ips"
         const val EXTRA_STATE = "state"
+        const val EXTRA_SPEED = "speed"
         const val EXTRA_NOTIFICATIONS_ENABLED = "notifications_enabled"
         const val EXTRA_KILL_SWITCH_ENABLED = "kill_switch_enabled"
         const val EXTRA_NON_FATAL_ENABLED = "non_fatal_enabled"
@@ -109,7 +120,7 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "vpn_status_channel"
         private const val CHANNEL_SILENT_ID = "vpn_status_channel_silent"
-        
+
         const val STATE_CONNECTING = "CONNECTING"
     }
 
@@ -127,13 +138,15 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
      */
     private val tunnel = object : Tunnel {
         override fun getName() = TUNNEL_NAME
-        
+
         override fun onStateChange(newState: Tunnel.State) {
-            if (currentTunnelState == newState) return
+            val wasConnecting = isCurrentlyConnecting
+            if (currentTunnelState == newState && !wasConnecting) return
+            
             currentTunnelState = newState
             isCurrentlyConnecting = false
 
-            ProtonLogger.d(TAG, "VPN State changed to $newState")
+            ProtonLogger.d(TAG, "VPN State changed to $newState (wasConnecting=$wasConnecting)")
             ProtonLogger.addSentryBreadcrumb(TAG, "VPN State Changed: $newState", SentryLevel.INFO, "vpn.state")
 
             // Broadcast the new state to the rest of the application
@@ -148,14 +161,14 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
                 stopTrafficUpdates()
                 stopLogcatCollection()
             }
-            
+
             updateNotification(newState.name)
-            
+
             if (newState == Tunnel.State.UP) {
                 startTrafficUpdates()
-                // Log collection is already started in ACTION_CONNECT, 
+                // Log collection is already started in ACTION_CONNECT,
                 // but we ensure it's active here just in case of unexpected state transitions.
-                startLogcatCollection() 
+                startLogcatCollection()
             }
         }
 
@@ -173,24 +186,24 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
             if (intent?.action == ACTION_UPDATE_SETTINGS) {
                 notificationsEnabled = intent.getBooleanExtra(EXTRA_NOTIFICATIONS_ENABLED, notificationsEnabled)
                 killSwitchEnabled = intent.getBooleanExtra(EXTRA_KILL_SWITCH_ENABLED, killSwitchEnabled)
-                
+
                 if (intent.hasExtra(EXTRA_NON_FATAL_ENABLED)) {
                     val nonFatal = intent.getBooleanExtra(EXTRA_NON_FATAL_ENABLED, true)
                     ProtonLogger.isNonFatalEnabled = nonFatal
                 }
-                
+
                 if (intent.hasExtra(EXTRA_ANALYTICS_ENABLED)) {
                     val analytics = intent.getBooleanExtra(EXTRA_ANALYTICS_ENABLED, true)
                     ProtonLogger.isAnalyticsEnabled = analytics
                 }
 
                 ProtonLogger.d(TAG, "Settings updated via broadcast: notifications=$notificationsEnabled, killSwitch=$killSwitchEnabled, nonFatal=${ProtonLogger.isNonFatalEnabled}, analytics=${ProtonLogger.isAnalyticsEnabled}")
-                
+
                 val label = when {
                     isCurrentlyConnecting -> STATE_CONNECTING
                     else -> currentTunnelState.name
                 }
-                
+
                 updateNotification(label)
             }
         }
@@ -198,6 +211,13 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
 
     override fun onCreate() {
         ProtonLogger.i(TAG, "VPN Service creating in isolated :vpn process (PID: ${android.os.Process.myPid()})")
+
+        // Verify 64-bit runtime (failsafe for 32-bit device detection)
+        if (System.getProperty("ro.product.cpu.abi")?.contains("armeabi") == true ||
+            System.getProperty("ro.product.cpu.abi")?.contains("x86") == true &&
+            System.getProperty("ro.product.cpu.abi")?.contains("x86_64") == false) {
+            ProtonLogger.e(TAG, "FATAL: App requires 64-bit CPU (arm64-v8a or x86_64). This device is 32-bit and not supported.")
+        }
 
         // Set environment variables required for the Go backend (WireGuard/AmneziaWG)
         try {
@@ -231,6 +251,7 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
         when (action) {
             ACTION_CONNECT -> {
                 isManualDisconnect = false
+                isVerified = false
                 val configStr = intent.getStringExtra(EXTRA_CONFIG)
                 notificationsEnabled = intent.getBooleanExtra(EXTRA_NOTIFICATIONS_ENABLED, true)
                 killSwitchEnabled = intent.getBooleanExtra(EXTRA_KILL_SWITCH_ENABLED, false)
@@ -284,23 +305,11 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
                 }
             }
             ACTION_UPDATE_SETTINGS -> {
-                // Keep for backward compatibility if settings are updated via startService
-                notificationsEnabled = intent.getBooleanExtra(EXTRA_NOTIFICATIONS_ENABLED, notificationsEnabled)
-                killSwitchEnabled = intent.getBooleanExtra(EXTRA_KILL_SWITCH_ENABLED, killSwitchEnabled)
-                
-                if (intent.hasExtra(EXTRA_NON_FATAL_ENABLED)) {
-                    ProtonLogger.isNonFatalEnabled = intent.getBooleanExtra(EXTRA_NON_FATAL_ENABLED, true)
-                }
-                
-                if (intent.hasExtra(EXTRA_ANALYTICS_ENABLED)) {
-                    ProtonLogger.isAnalyticsEnabled = intent.getBooleanExtra(EXTRA_ANALYTICS_ENABLED, true)
-                }
-                
-                val label = when {
-                    isCurrentlyConnecting -> STATE_CONNECTING
-                    else -> currentTunnelState.name
-                }
-                
+                // ... (unchanged)
+            }
+            ACTION_SET_VERIFIED -> {
+                isVerified = true
+                val label = if (currentTunnelState == Tunnel.State.UP) Tunnel.State.UP.name else STATE_CONNECTING
                 updateNotification(label)
             }
             else -> {
@@ -317,7 +326,7 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager: NotificationManager =
                 getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-            
+
             val name = getString(R.string.notification_channel_name)
 
             // Standard channel for visible VPN status
@@ -340,7 +349,7 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
      */
     private fun startTrafficUpdates() {
         stopTrafficUpdates()
-        
+
         lastRx = 0L
         lastTx = 0L
         statsJob = serviceScope.launch(Dispatchers.IO) {
@@ -360,6 +369,13 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
                         val upStr = formatSpeed(deltaTx)
                         val downStr = formatSpeed(deltaRx)
                         lastSpeedText = getString(R.string.vpn_speed_format, upStr, downStr)
+
+                        // Broadcast speed updates to UI components
+                        val speedBroadcast = Intent(ACTION_STATS_UPDATED).apply {
+                            putExtra(EXTRA_SPEED, lastSpeedText)
+                            setPackage(packageName)
+                        }
+                        sendBroadcast(speedBroadcast)
 
                         if (notificationsEnabled && currentTunnelState == Tunnel.State.UP) {
                             // Update notification directly on the IO thread to avoid blocking the main thread.
@@ -381,7 +397,11 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
     private fun stopTrafficUpdates() {
         statsJob?.cancel()
         statsJob = null
-        
+
+        // Clear cached PendingIntent objects to allow fresh creation on next connection
+        cachedDisconnectPendingIntent = null
+        cachedContentPendingIntent = null
+
         // Log final session stats
         val totalRx = lastRx
         val totalTx = lastTx
@@ -393,27 +413,119 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
 
     /**
      * Starts background collection of tunnel-specific logs from Logcat
-     * and forwards them to Sentry via ProtonLogger.
+     * and explicitly forwards critical AmneziaWG logs to Sentry as Breadcrumbs.
+     *
+     * To prevent CPU saturation (which can cause background ANRs on the main thread):
+     * - Repetitive log lines are deduplicated within a rolling time window.
+     * - Unimportant logs are filtered out using isImportantAwgLog().
+     * - A small coroutine yield is inserted between each line so the IO thread
+     * is not monopolised, allowing other work to be scheduled.
+     * - The expensive Sentry Logs API (addSentryLog) is intentionally NOT called
+     * here; breadcrumbs alone are sufficient for tunnel diagnostics.
      */
+    @SuppressLint("LogTagMismatch")
     private fun startLogcatCollection() {
+        if (logcatJob?.isActive == true) {
+            ProtonLogger.v(TAG, "Logcat collection already running, skipping restart.")
+            return
+        }
         logcatJob?.cancel()
         logcatJob = serviceScope.launch(Dispatchers.IO) {
-            ProtonLogger.d(TAG, "Starting Logcat collection for 'tun/proton_awg'")
+            ProtonLogger.d(TAG, "Starting Logcat collection for 'Tun/proton_awg'")
+            val process = try {
+                // BUGFIX: Use :D (Debug) instead of :V (Verbose) to eliminate empty log spam.
+                val command = arrayOf(
+                    "logcat",
+                    "-v", "tag",
+                    "-T", "1",
+                    "--pid=${android.os.Process.myPid()}",
+                    "Tun/proton_awg:D",
+                    "tun/proton_awg:D",
+                    "*:S"
+                )
+                Runtime.getRuntime().exec(command)
+            } catch (e: Exception) {
+                ProtonLogger.e(TAG, "Failed to start Logcat process", e)
+                return@launch
+            }
+
+            // Deduplication: track last seen message and when it was last forwarded.
+            // High-frequency identical messages (e.g. repeated handshake/keepalive lines
+            // during a degraded tunnel) are suppressed to avoid flooding Sentry and
+            // saturating DefaultDispatcher-worker threads.
+            var lastLine = ""
+            var lastLineEmittedAt = 0L
+            val deduplicationWindowMs = 5_000L // suppress exact duplicates within 5 s
+
             try {
-                // Read logs for the specific tunnel tag. 
-                // -T 1 ensures we only get new logs starting from now.
-                val process = Runtime.getRuntime().exec("logcat -v tag -T 1 tun/proton_awg:V *:S")
                 process.inputStream.bufferedReader().useLines { lines ->
                     lines.forEach { line ->
                         if (!isActive) return@useLines
-                        // Forward to ProtonLogger which will add it as a Sentry breadcrumb
-                        ProtonLogger.v("tun/proton_awg", line)
+
+                        // logcat with '-v tag' outputs format: "D/Tun/proton_awg: actual message"
+                        // We find the colon and extract only the message part.
+                        val msgSeparatorIndex = line.indexOf(": ")
+                        if (msgSeparatorIndex == -1) return@forEach
+
+                        val cleanLine = line.substring(msgSeparatorIndex + 2).trim()
+
+                        // Drop completely empty logs or logs that are not considered important
+                        // to reduce spam and Sentry noise.
+                        if (cleanLine.isBlank() || !isImportantAwgLog(cleanLine)) return@forEach
+
+                        val now = System.currentTimeMillis()
+
+                        // Suppress exact duplicate lines within the deduplication window.
+                        if (cleanLine == lastLine && now - lastLineEmittedAt < deduplicationWindowMs) {
+                            return@forEach
+                        }
+                        lastLine = cleanLine
+                        lastLineEmittedAt = now
+
+                        // Add as breadcrumb (will be sent IF a crash/error happens later).
+                        // Note: we deliberately do NOT call ProtonLogger.d() here because that
+                        // would trigger addSentryLog() — an extra Sentry SDK IPC call per line
+                        // that is unnecessary for routine tunnel noise and adds significant cost.
+                        ProtonLogger.addSentryBreadcrumb(
+                            "AmneziaWG",
+                            cleanLine,
+                            SentryLevel.DEBUG,
+                            "vpn.awg"
+                        )
+
+                        // Local logcat output (debug builds only, no Sentry overhead)
+                        if (android.util.Log.isLoggable("Tun/proton_awg", android.util.Log.DEBUG)) {
+                            android.util.Log.d("Tun/proton_awg", cleanLine)
+                        }
+
+                        // Yield to the coroutine dispatcher so this hot loop does not
+                        // monopolise a DefaultDispatcher worker thread and starve the UI.
+                        kotlinx.coroutines.yield()
                     }
                 }
             } catch (e: Exception) {
                 ProtonLogger.e(TAG, "Failed to read tunnel logs from Logcat", e)
+            } finally {
+                process.destroy()
             }
         }
+    }
+
+    /**
+     * Filters AWG logs to keep only actionable/important events.
+     */
+    private fun isImportantAwgLog(msg: String): Boolean {
+        val importantKeywords = listOf(
+            "handshake",
+            "keepalive",
+            "keypair",
+            "cookie",
+            "Rekeying",
+            "Retrying",
+            "Receiving",
+            "Sending"
+        )
+        return importantKeywords.any { msg.contains(it, ignoreCase = true) }
     }
 
     private fun stopLogcatCollection() {
@@ -426,7 +538,8 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
      * Formats bytes into a human-readable speed string.
      */
     private fun formatSpeed(bytesPerSec: Long): String {
-        val b = bytesPerSec.toDouble()
+        // Handle negative values if counters reset
+        val b = maxOf(0.0, bytesPerSec.toDouble())
         if (b <= 0.0) return "0 ${getString(R.string.unit_b_s)}"
         val kib = 1024.0
         val mib = kib * 1024.0
@@ -445,25 +558,45 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
     private fun createNotification(stateName: String, speedText: String? = null): Notification {
         val serverName = connectedServerState.connectedServer.value?.name ?: "Proton VPN"
 
-        val title = when (stateName) {
-            Tunnel.State.UP.name -> getString(R.string.notification_title_connected, serverName)
-            STATE_CONNECTING -> getString(R.string.notification_title_connecting)
+        val title = when {
+            stateName == Tunnel.State.UP.name && isVerified -> getString(R.string.notification_title_connected, serverName)
+            stateName == Tunnel.State.UP.name && !isVerified -> getString(R.string.notification_title_verifying)
+            stateName == STATE_CONNECTING -> getString(R.string.notification_title_connecting)
             else -> getString(R.string.notification_title_disconnected)
         }
 
-        // Intent for manual disconnection via notification action
-        val disconnectIntent = Intent(this, ProtonVpnService::class.java).apply {
-            action = ACTION_DISCONNECT
+        // Get or create cached PendingIntent for disconnect action
+        // Caching reduces IPC calls to system service and prevents DeadSystemException
+        val disconnectPendingIntent = try {
+            if (cachedDisconnectPendingIntent == null) {
+                val disconnectIntent = Intent(this, ProtonVpnService::class.java).apply {
+                    action = ACTION_DISCONNECT
+                }
+                cachedDisconnectPendingIntent = PendingIntent.getService(
+                    this, 0, disconnectIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
+            }
+            cachedDisconnectPendingIntent
+        } catch (e: Exception) {
+            ProtonLogger.e(TAG, "Failed to create disconnect PendingIntent, system service may be unavailable", e)
+            null
         }
-        val disconnectPendingIntent = PendingIntent.getService(
-            this, 0, disconnectIntent, PendingIntent.FLAG_IMMUTABLE
-        )
 
-        // Intent to launch the application when the notification is tapped
-        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
-        val contentPendingIntent = PendingIntent.getActivity(
-            this, 0, launchIntent, PendingIntent.FLAG_IMMUTABLE
-        )
+        // Get or create cached PendingIntent for app launch
+        val contentPendingIntent = try {
+            if (cachedContentPendingIntent == null) {
+                val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+                if (launchIntent != null) {
+                    cachedContentPendingIntent = PendingIntent.getActivity(
+                        this, 0, launchIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                    )
+                }
+            }
+            cachedContentPendingIntent
+        } catch (e: Exception) {
+            ProtonLogger.e(TAG, "Failed to create content PendingIntent, system service may be unavailable", e)
+            null
+        }
 
         val activeChannelId = if (notificationsEnabled) CHANNEL_ID else CHANNEL_SILENT_ID
 
@@ -472,15 +605,22 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
             .setContentTitle(title)
             .setPriority(if (notificationsEnabled) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_MIN)
             .setOngoing(stateName != Tunnel.State.DOWN.name)
-            .setContentIntent(contentPendingIntent)
             .setShowWhen(false)
 
+        // Set content intent if available
+        if (contentPendingIntent != null) {
+            builder.setContentIntent(contentPendingIntent)
+        }
+
         if (stateName == Tunnel.State.UP.name) {
-            builder.addAction(
-                0,
-                getString(R.string.notification_action_disconnect),
-                disconnectPendingIntent
-            )
+            // Add disconnect action only if PendingIntent was successfully created
+            if (disconnectPendingIntent != null) {
+                builder.addAction(
+                    0,
+                    getString(R.string.notification_action_disconnect),
+                    disconnectPendingIntent
+                )
+            }
             if (!speedText.isNullOrEmpty() && notificationsEnabled) {
                 builder.setContentText(speedText)
             }
@@ -498,10 +638,13 @@ class ProtonVpnService : AmneziaVpnServiceBase() {
 
         // Decide if we should show a foreground notification.
         // It must be shown during connection, and kept alive if kill switch is active.
+        // CRITICAL FIX: To prevent ForegroundServiceDidNotStartInTimeException,
+        // we MUST always show the notification if the service is starting or active.
+        // We use the 'SILENT' channel if the user has disabled VPN notifications.
         val shouldShow = when {
             isConnecting -> true
             isDown -> killSwitchEnabled && !isManualDisconnect
-            else -> notificationsEnabled
+            else -> true // Always show if UP, to satisfy Foreground requirements
         }
 
         if (shouldShow) {

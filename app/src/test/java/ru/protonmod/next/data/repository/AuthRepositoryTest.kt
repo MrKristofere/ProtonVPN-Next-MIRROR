@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
+import okhttp3.Headers
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -32,6 +33,7 @@ import org.mockito.kotlin.*
 import retrofit2.HttpException
 import retrofit2.Response
 import ru.protonmod.next.data.local.SessionDao
+import ru.protonmod.next.data.local.SessionEntity
 import ru.protonmod.next.data.network.*
 import ru.protonmod.next.ui.screens.CaptchaRequiredException
 import ru.protonmod.next.utils.DeviceInfoProvider
@@ -58,6 +60,9 @@ class AuthRepositoryTest {
     @Mock
     private lateinit var cryptoWrapper: CryptoWrapper
 
+    @Mock
+    private lateinit var amneziaVpnManager: ru.protonmod.next.vpn.AmneziaVpnManager
+
     private val testDispatcher = StandardTestDispatcher()
     
     private val testDispatcherProvider = object : DispatcherProvider {
@@ -73,7 +78,7 @@ class AuthRepositoryTest {
         MockitoAnnotations.openMocks(this)
         repository = AuthRepository(
             authApi, vpnRepository, sessionDao, deviceInfoProvider, 
-            cryptoWrapper, testDispatcherProvider
+            cryptoWrapper, testDispatcherProvider, { amneziaVpnManager }
         )
         
         whenever(deviceInfoProvider.getAppVersion()).thenReturn("5.16.31.0")
@@ -192,7 +197,18 @@ class AuthRepositoryTest {
                 }
             }
         """.trimIndent()
-        val response = Response.error<LoginResponse>(422, errorJson.toResponseBody("application/json".toResponseBody().contentType()))
+        
+        val headers = Headers.Builder().add("X-PM-Session-ID", "pending_uid").build()
+        val response = Response.error<LoginResponse>(
+            errorJson.toResponseBody("application/json".toResponseBody().contentType()),
+            okhttp3.Response.Builder()
+                .code(422)
+                .message("Unprocessable Entity")
+                .protocol(okhttp3.Protocol.HTTP_1_1)
+                .request(okhttp3.Request.Builder().url("https://api.proton.me/auth/v4").build())
+                .headers(headers)
+                .build()
+        )
         val exception = HttpException(response)
 
         whenever(authApi.createAnonymousSession(any(), anyOrNull(), anyOrNull())).thenThrow(exception)
@@ -208,12 +224,16 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `login returns generic error on 12087 error`() = runTest(testDispatcher) {
+    fun `login returns generic Exception on 12087 error`() = runTest(testDispatcher) {
         // Arrange
         val errorJson = """
             {
                 "Code": 12087,
-                "Error": "Captcha validation failed"
+                "Error": "Captcha validation failed",
+                "Details": {
+                    "WebUrl": "https://fresh.captcha.url",
+                    "HumanVerificationToken": "fresh_token"
+                }
             }
         """.trimIndent()
         val response = Response.error<LoginResponse>(422, errorJson.toResponseBody("application/json".toResponseBody().contentType()))
@@ -226,6 +246,79 @@ class AuthRepositoryTest {
 
         // Assert
         assertTrue(result.isFailure)
-        assertEquals("Verification failed. Please try again.", result.exceptionOrNull()?.message)
+        val caught = result.exceptionOrNull()
+        assertTrue("Expected generic Exception but was $caught", caught !is CaptchaRequiredException)
+        assertEquals("Captcha session expired. Please click Login to try again.", caught?.message)
+    }
+
+    @Test
+    fun `refreshSession success flow`() = runTest(testDispatcher) {
+        // Arrange
+        val sessionId = "session_id"
+        val refreshToken = "refresh_token"
+        val refreshResponse = LoginResponse(
+            code = 1000,
+            accessToken = "new_access_token",
+            refreshToken = "new_refresh_token",
+            sessionId = sessionId
+        )
+        val currentSession = SessionEntity(
+            sessionId = sessionId,
+            accessToken = "old_access_token",
+            refreshToken = refreshToken,
+            userId = "user_id"
+        )
+
+        whenever(authApi.refreshSession(any())).thenReturn(refreshResponse)
+        whenever(sessionDao.getSession()).thenReturn(currentSession)
+
+        // Act
+        val result = repository.refreshSession(sessionId, refreshToken)
+
+        // Assert
+        assertTrue(result.isSuccess)
+        verify(sessionDao).saveSession(argThat {
+            this.accessToken == "new_access_token" && this.refreshToken == "new_refresh_token"
+        })
+    }
+
+    @Test
+    fun `refreshSession debounces calls within 1 minute`() = runTest(testDispatcher) {
+        // Arrange
+        val sessionId = "session_id"
+        val refreshToken = "refresh_token"
+        val refreshResponse = LoginResponse(
+            code = 1000,
+            accessToken = "new_access_token",
+            sessionId = sessionId
+        )
+        whenever(authApi.refreshSession(any())).thenReturn(refreshResponse)
+
+        // Act
+        repository.refreshSession(sessionId, refreshToken) // First call
+        val secondResult = repository.refreshSession(sessionId, refreshToken) // Second call (debounced)
+
+        // Assert
+        assertTrue(secondResult.isFailure)
+        assertEquals("Debounced", secondResult.exceptionOrNull()?.message)
+        verify(authApi, times(1)).refreshSession(any())
+    }
+
+    @Test
+    fun `refreshSession triggers logout on HTTP 401`() = runTest(testDispatcher) {
+        // Arrange
+        val sessionId = "session_id"
+        val refreshToken = "refresh_token"
+        val response = Response.error<LoginResponse>(401, "Unauthorized".toResponseBody())
+        val exception = HttpException(response)
+
+        whenever(authApi.refreshSession(any())).thenThrow(exception)
+
+        // Act
+        val result = repository.refreshSession(sessionId, refreshToken)
+
+        // Assert
+        assertTrue(result.isFailure)
+        verify(sessionDao).clearSession()
     }
 }

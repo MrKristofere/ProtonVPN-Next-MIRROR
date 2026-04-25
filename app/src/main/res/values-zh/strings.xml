@@ -51,6 +51,8 @@
     <string name="title_recent_connections">最近连接</string>
     <string name="status_connected">已连接</string>
     <string name="status_connecting">正在连接…</string>
+    <string name="status_verifying">正在验证…</string>
+    <string name="status_disconnecting">正在断开连接…</string>
     <string name="status_disconnected">已断开</string>
     <string name="status_not_connected">未连接</string>
     <string name="msg_traffic_not_protected">您的流量未受保护</string>
@@ -118,6 +120,35 @@
     <string name="api_bypass_strategy_title">路由策略</string>
     <string name="api_bypass_strategy_netlify">Netlify 代理</string>
     <string name="api_bypass_strategy_netlify_desc">通过安全的 Netlify 代理路由 API 请求。</string>
+    <string name="api_bypass_strategy_cloudflare">Cloudflare 代理</string>
+    <string name="api_bypass_strategy_cloudflare_desc">通过高性能 Cloudflare worker 路由 API 请求。</string>
+    <string name="api_bypass_strategy_mirrors">Proton 镜像 (DoH)</string>
+    <string name="api_bypass_strategy_mirrors_desc">通过 DNS-over-HTTPS fallback 发现并使用动态 Proton API 镜像。</string>
+    <string name="api_bypass_strategy_warp">WARP (Cloudflare)</string>
+    <string name="api_bypass_strategy_warp_desc">使用临时 WARP 隧道进行 API 请求。可靠性高。</string>
+    <string name="warp_fetching_config">正在获取 WARP 配置…</string>
+    <string name="warp_error_fetching">获取配置失败。请检查您的连接。</string>
+    <string name="warp_permission_title">需要 VPN 权限</string>
+    <string name="warp_permission_desc">WARP 需要权限才能创建用于绕过 API 阻止的本地隧道。没有任何数据会发送到 Cloudflare 之外。</string>
+    <string name="btn_allow">允许</string>
+    <string name="api_bypass_strategy_custom">自定义代理 (SOCKS5/HTTPS)</string>
+    <string name="api_bypass_strategy_custom_desc">通过您自己的 SOCKS5 或 HTTPS 代理服务器路由 API 请求。</string>
+    <string name="api_proxy_host">代理主机</string>
+    <string name="api_proxy_port">代理端口</string>
+    <string name="api_proxy_type">代理类型</string>
+    <string name="api_proxy_type_http">HTTPS / HTTP</string>
+    <string name="api_proxy_type_socks">SOCKS5</string>
+    <string name="api_proxy_username">用户名 (可选)</string>
+    <string name="api_proxy_password">密码 (可选)</string>
+
+    <!-- Country Spoofing -->
+    <string name="settings_country_spoofing_title">国家伪装</string>
+    <string name="settings_country_spoofing_description">覆盖发送到 API 的国家代码，以模拟不同的物理位置。</string>
+    <string name="settings_country_spoofing_null_label">空伪装 (Null Spoof)</string>
+    <string name="settings_country_spoofing_null_desc">不向 API 发送任何国家代码标头。</string>
+    <string name="settings_country_spoofing_code_label">国家代码 (ISO 3166-1 alpha-2)</string>
+    <string name="settings_country_spoofing_code_hint">例如 US, DE, RU</string>
+    <string name="settings_country_spoofing_update_toast">正在更新服务器列表…</string>
 
     <!-- Custom DNS -->
     <string name="settings_custom_dns">自定义 DNS</string>
@@ -233,9 +264,15 @@
     <string name="about_codeberg">Codeberg</string>
     <string name="about_unavailable">暂时不可用</string>
 
-    <string name="url_github">https://github.com/SMH01-MOD-NEXT/ProtonMOD-NEXT</string>
+    <string name="about_sentry">由 Sentry 提供支持</string>
+    <string name="url_sentry">https://sentry.io/</string>
+
+    <string name="url_github">https://github.com/SMH01-MIRRORS/ProtonVPN-Next-MIRROR</string>
     <string name="url_codeberg">https://codeberg.org/SMH01/ProtonVPN-Next</string>
     <string name="url_telegram">https://t.me/ProtonVPN_MOD</string>
+
+    <string name="url_ota_mirror_1" translatable="false">https://kvn.protonnext.qzz.io/update.json</string>
+    <string name="url_ota_mirror_2" translatable="false">https://home.protonnext.qzz.io/update.json</string>
 
     <!-- Licenses Screen -->
     <string name="licenses_title">许可</string>
@@ -307,6 +344,7 @@
     <string name="notification_channel_name">VPN 状态</string>
     <string name="notification_channel_desc">显示 VPN 的当前连接状态</string>
     <string name="notification_title_connected">已连接到 %1$s</string>
+    <string name="notification_title_verifying">正在验证连接…</string>
     <string name="notification_title_disconnected">已断开连接</string>
     <string name="notification_title_connecting">正在连接…</string>
     <string name="notification_action_disconnect">断开连接</string>
@@ -316,6 +354,7 @@
     <string name="error_unknown">未知错误</string>
     <string name="error_auth_failed">发生意外的身份验证错误</string>
     <string name="error_2fa_failed">双重验证失败</string>
+    <string name="unknown">未知</string>
 
     <!-- Profiles Screen -->
     <string name="profiles_title">配置方案</string>
@@ -384,6 +423,8 @@
     <string name="debug_cert_issued">签发时间：%1$s</string>
     <string name="debug_cert_expires">过期时间：%1$s</string>
     <string name="debug_btn_refresh_cert">强制刷新证书</string>
+    <string name="debug_btn_refresh_session">强制刷新会话</string>
+    <string name="debug_session_refreshed">会话刷新成功！</string>
     <string name="debug_exports_header">导出与诊断</string>
     <string name="debug_btn_export_logs">导出 Logcat 到下载目录</string>
     <string name="debug_btn_export_config">导出 WG 配置 (.conf)</string>
@@ -443,4 +484,45 @@
     <string name="captcha_message">为了您的账户安全，请完成下方验证。</string>
     <string name="captcha_proxy_active">防封锁代理已激活</string>
     <string name="desc_close">关闭</string>
+
+    <!-- Token Login & Session Management -->
+    <string name="btn_login_tokens">通过令牌登录</string>
+    <string name="title_login_tokens">基于令牌的登录</string>
+    <string name="msg_login_tokens_desc">在下面粘贴您的会话 JSON 以直接登录。请务必保密此数据！</string>
+    <string name="hint_session_json">会话 JSON</string>
+    <string name="debug_btn_export_session">导出会话 (剪贴板)</string>
+    <string name="debug_btn_import_session">导入会话</string>
+    <string name="debug_btn_fetch_domains">获取可用域 (剪贴板)</string>
+    <string name="debug_export_session_title">导出敏感数据</string>
+    <string name="debug_export_session_msg">这将把您的完整会话（包括令牌和私钥）复制到剪贴板。切勿与任何人共享！</string>
+    <string name="debug_import_session_warning">警告：导入会话将覆盖当前的会话。请谨慎使用。</string>
+    <string name="debug_btn_copy">复制到剪贴板</string>
+    <string name="btn_import">导入</string>
+    <string name="btn_logout">退出</string>
+    <string name="logout_confirmation">您确定要退出吗？</string>
+
+    <!-- OTA Updates -->
+    <string name="ota_title">软件更新</string>
+    <string name="ota_new_version">发现新版本：%1$s</string>
+    <string name="ota_changelog">更新内容：</string>
+    <string name="ota_btn_update">立即更新</string>
+    <string name="ota_btn_install">安装</string>
+    <string name="ota_btn_later">稍后</string>
+    <string name="ota_force_title">需要更新</string>
+    <string name="ota_force_desc">发现关键更新。请更新应用以继续使用 Proton VPN-Next。</string>
+    <string name="ota_check_frequency">检查更新</string>
+    <string name="ota_channel">更新频道</string>
+    <string name="ota_channel_stable">稳定版</string>
+    <string name="ota_channel_nightly">Nightly (每晚构建)</string>
+    <string name="ota_channel_unavailable">不可用</string>
+    <string name="ota_freq_hourly">每小时</string>
+    <string name="ota_freq_daily">每天</string>
+    <string name="ota_freq_weekly">每周</string>
+    <string name="ota_freq_monthly">每月</string>
+    <string name="ota_freq_disabled">已禁用</string>
+    <string name="ota_status_checking">正在检查更新…</string>
+    <string name="ota_status_up_to_date">应用已是最新版本</string>
+    <string name="ota_btn_check">检查更新</string>
+    <string name="ota_downloading">正在下载更新… %1$d%%</string>
+    <string name="ota_download_failed">下载失败。请稍后再试。</string>
 </resources>

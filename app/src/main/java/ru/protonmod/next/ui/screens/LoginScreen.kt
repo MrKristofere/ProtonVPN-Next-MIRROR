@@ -18,6 +18,10 @@
 
 package ru.protonmod.next.ui.screens
 
+import android.app.Activity
+import android.net.VpnService
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -33,6 +37,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -41,10 +46,14 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.protonmod.next.R
-import ru.protonmod.next.ui.components.MainHeader
+import ru.protonmod.next.data.local.SettingsManager
+import ru.protonmod.next.ui.components.ExpressiveCircularProgressIndicator
 import ru.protonmod.next.ui.components.NavigationHeader
+import ru.protonmod.next.ui.components.SmoothOutlinedTextField
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.ui.utils.isTablet
 
@@ -53,20 +62,52 @@ import ru.protonmod.next.ui.utils.isTablet
 fun LoginScreen(
     onBackClick: () -> Unit,
     onLoginSuccess: () -> Unit,
+    modifier: Modifier = Modifier,
     viewModel: LoginViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val isApiBypassEnabled by viewModel.isApiBypassEnabled.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isWarpLoading by viewModel.isWarpLoading.collectAsStateWithLifecycle()
+    val isApiBypassEnabled by viewModel.isApiBypassEnabled.collectAsStateWithLifecycle()
+    val apiBypassStrategy by viewModel.apiBypassStrategy.collectAsStateWithLifecycle()
     val colors = ProtonNextTheme.colors
     val isTablet = isTablet()
+    val context = LocalContext.current
 
     // Form states
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var totpCode by remember { mutableStateOf("") }
+    
+    var showTokenLoginDialog by remember { mutableStateOf(false) }
+    var sessionJson by remember { mutableStateOf("") }
 
-    LaunchedEffect(uiState) {
+    val vpnPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            viewModel.login(username, password)
+        }
+    }
+
+    val checkVpnAndLogin: () -> Unit = {
+        if (isApiBypassEnabled && apiBypassStrategy == SettingsManager.STRATEGY_WARP) {
+            try {
+                val intent = VpnService.prepare(context)
+                if (intent != null) {
+                    vpnPermissionLauncher.launch(intent)
+                } else {
+                    viewModel.login(username, password)
+                }
+            } catch (_: SecurityException) {
+                viewModel.login(username, password)
+            }
+        } else {
+            viewModel.login(username, password)
+        }
+    }
+
+    LaunchedEffect(uiState, onLoginSuccess) {
         if (uiState is LoginUiState.Success) {
             onLoginSuccess()
         }
@@ -74,19 +115,23 @@ fun LoginScreen(
 
     AnimatedContent(
         targetState = uiState,
-        label = "login_transitions"
+        label = "login_transitions",
+        modifier = modifier
     ) { state ->
         when (state) {
             is LoginUiState.RequiresCaptcha -> {
-                CaptchaScreen(
-                    webUrl = state.webUrl,
-                    sessionId = state.sessionId,
-                    isApiBypassEnabled = isApiBypassEnabled,
-                    onDismiss = { viewModel.resetError() },
-                    onCaptchaSolved = { verifiedToken ->
-                        viewModel.retryWithCaptcha(state, verifiedToken)
-                    }
-                )
+                key(state.nonce) {
+                    CaptchaScreen(
+                        webUrl = state.webUrl,
+                        sessionId = state.sessionId,
+                        isApiBypassEnabled = isApiBypassEnabled,
+                        apiBypassStrategy = apiBypassStrategy,
+                        onDismiss = { viewModel.resetError() },
+                        onCaptchaSolve = { verifiedToken ->
+                            viewModel.retryWithCaptcha(state, verifiedToken)
+                        }
+                    )
+                }
             }
 
             is LoginUiState.Requires2FA -> {
@@ -135,7 +180,7 @@ fun LoginScreen(
 
                             Spacer(modifier = Modifier.height(32.dp))
 
-                            OutlinedTextField(
+                            SmoothOutlinedTextField(
                                 value = totpCode,
                                 onValueChange = { totpCode = it },
                                 label = { Text(stringResource(R.string.hint_2fa_code)) },
@@ -173,7 +218,7 @@ fun LoginScreen(
                                 enabled = totpCode.isNotBlank() && uiState !is LoginUiState.Loading
                             ) {
                                 if (uiState is LoginUiState.Loading) {
-                                    CircularProgressIndicator(color = colors.textInverted, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                    ExpressiveCircularProgressIndicator(color = colors.textInverted, modifier = Modifier.size(24.dp))
                                 } else {
                                     Text(stringResource(R.string.btn_verify), fontWeight = FontWeight.Bold)
                                 }
@@ -240,7 +285,7 @@ fun LoginScreen(
                             Spacer(modifier = Modifier.height(32.dp))
 
                             Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-                                OutlinedTextField(
+                                SmoothOutlinedTextField(
                                     value = username,
                                     onValueChange = { username = it },
                                     label = { Text(stringResource(R.string.hint_username)) },
@@ -258,7 +303,7 @@ fun LoginScreen(
 
                                 Spacer(modifier = Modifier.height(16.dp))
 
-                                OutlinedTextField(
+                                SmoothOutlinedTextField(
                                     value = password,
                                     onValueChange = { password = it },
                                     label = { Text(stringResource(R.string.hint_password)) },
@@ -271,7 +316,7 @@ fun LoginScreen(
                                     keyboardActions = KeyboardActions(
                                         onDone = {
                                             if (username.isNotBlank() && password.isNotBlank()) {
-                                                viewModel.login(username, password)
+                                                checkVpnAndLogin()
                                             }
                                         }
                                     ),
@@ -294,14 +339,14 @@ fun LoginScreen(
                                 Spacer(modifier = Modifier.height(24.dp))
 
                                 Button(
-                                    onClick = { viewModel.login(username, password) },
+                                    onClick = { checkVpnAndLogin() },
                                     modifier = Modifier.fillMaxWidth().height(56.dp),
                                     shape = RoundedCornerShape(16.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = colors.brandNorm),
                                     enabled = uiState !is LoginUiState.Loading && username.isNotBlank() && password.isNotBlank()
                                 ) {
                                     if (uiState is LoginUiState.Loading) {
-                                        CircularProgressIndicator(color = colors.textInverted, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                        ExpressiveCircularProgressIndicator(color = colors.textInverted, modifier = Modifier.size(24.dp))
                                     } else {
                                         Text(stringResource(R.string.btn_login), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
                                     }
@@ -333,9 +378,104 @@ fun LoginScreen(
                                         )
                                     }
                                 }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                    TextButton(
+                                        onClick = { showTokenLoginDialog = true },
+                                        modifier = Modifier.height(48.dp),
+                                        enabled = uiState !is LoginUiState.Loading
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.btn_login_tokens),
+                                            color = colors.textWeak,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
+                }
+
+                if (showTokenLoginDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showTokenLoginDialog = false },
+                        title = { Text(stringResource(R.string.title_login_tokens)) },
+                        text = {
+                            Column {
+                                Text(
+                                    text = stringResource(R.string.msg_login_tokens_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.textWeak,
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                )
+                                SmoothOutlinedTextField(
+                                    value = sessionJson,
+                                    onValueChange = { sessionJson = it },
+                                    label = { Text(stringResource(R.string.hint_session_json)) },
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = colors.brandNorm,
+                                        unfocusedBorderColor = colors.shade20,
+                                        focusedTextColor = colors.textNorm,
+                                        unfocusedTextColor = colors.textNorm
+                                    )
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    if (sessionJson.isNotBlank()) {
+                                        viewModel.loginBySessionJson(sessionJson)
+                                        showTokenLoginDialog = false
+                                    }
+                                },
+                                enabled = sessionJson.isNotBlank()
+                            ) {
+                                Text(stringResource(R.string.btn_login))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showTokenLoginDialog = false }) {
+                                Text(stringResource(R.string.btn_cancel))
+                            }
+                        },
+                        containerColor = colors.backgroundSecondary,
+                        titleContentColor = colors.textNorm,
+                        textContentColor = colors.textWeak
+                    )
+                }
+            }
+        }
+    }
+
+    // WARP Loading Overlay
+    if (isWarpLoading) {
+        Dialog(onDismissRequest = {}) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = colors.backgroundSecondary,
+                tonalElevation = 8.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    ExpressiveCircularProgressIndicator(
+                        modifier = Modifier.size(64.dp),
+                        color = colors.brandNorm
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = stringResource(R.string.warp_fetching_config),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = colors.textNorm,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }

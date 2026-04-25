@@ -74,11 +74,28 @@ android {
         versionCode = getDynamicVersionCode(rootDir)
         versionName = getDynamicVersionName(rootDir)
 
+        // Support 64-bit architectures only
+        // 32-bit devices (armeabi-v7a, armeabi) are not supported as the VPN engine
+        // (AmneziaWG via go-vpn-lib) and its native libraries are compiled for 64-bit only
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "x86_64"))
         }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    flavorDimensions.add("channel")
+    productFlavors {
+        create("stable") {
+            dimension = "channel"
+            buildConfigField("String", "UPDATE_CHANNEL", "\"stable\"")
+        }
+        create("nightly") {
+            dimension = "channel"
+            applicationIdSuffix = ".nightly"
+            versionNameSuffix = "-nightly"
+            buildConfigField("String", "UPDATE_CHANNEL", "\"nightly\"")
+        }
     }
 
     lint {
@@ -184,10 +201,12 @@ room {
 }
 
 sentry {
-    includeProguardMapping = true
-    autoUploadProguardMapping = true
-    uploadNativeSymbols = true
-    includeNativeSources = true
+    includeProguardMapping.set(true)
+    autoUploadProguardMapping.set(true)
+    uploadNativeSymbols.set(true)
+    includeNativeSources.set(true)
+    includeSourceContext.set(true)
+    autoUploadSourceContext.set(true)
     tracingInstrumentation {
         enabled.set(true)
         logcat {
@@ -203,10 +222,12 @@ dependencies {
     // AndroidX & Core UI
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.android.svg)
+    implementation(libs.kotlinx.collections.immutable)
 
     // Jetpack Compose
     val composeBom = platform(libs.compose.bom)

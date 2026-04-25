@@ -34,16 +34,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -58,8 +61,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.protonmod.next.data.local.SessionDao
 import ru.protonmod.next.data.local.SettingsManager
-import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
-import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import ru.protonmod.next.ota.OTAUpdateScreen
 import ru.protonmod.next.ui.components.LiquidGlassBottomBar
 import ru.protonmod.next.ui.nav.MainTarget
 import ru.protonmod.next.ui.nav.Screen
@@ -78,6 +80,13 @@ class MainViewModel @Inject constructor(
 ) : ViewModel() {
     private val _startDestination = MutableStateFlow<String>("")
     val startDestination: StateFlow<String> = _startDestination.asStateFlow()
+
+    val session = sessionDao.getSessionFlow()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
 
     val appTheme: StateFlow<AppTheme> = settingsManager.appTheme
         .stateIn(
@@ -114,10 +123,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             val windowSizeClass = calculateWindowSizeClass(this)
             val viewModel: MainViewModel = hiltViewModel()
-            val appTheme by viewModel.appTheme.collectAsState()
+            val appTheme by viewModel.appTheme.collectAsStateWithLifecycle()
 
             ProtonNextTheme(appTheme = appTheme) {
-                ProvideDeviceType(windowSizeClass.widthSizeClass) {
+                ProvideDeviceType(
+                    windowWidthSizeClass = windowSizeClass.widthSizeClass
+                ) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -127,6 +138,7 @@ class MainActivity : ComponentActivity() {
                             checkAndRequestNotificationPermission()
                         }
                         ProtonNextAppNavHost(viewModel = viewModel)
+                        OTAUpdateOverlay()
                     }
                 }
             }
@@ -159,9 +171,36 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun ProtonNextAppNavHost(viewModel: MainViewModel = hiltViewModel()) {
+fun OTAUpdateOverlay(
+    modifier: Modifier = Modifier,
+    viewModel: ru.protonmod.next.ota.OTAUpdateViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    
+    LaunchedEffect(viewModel) {
+        viewModel.checkForUpdates()
+    }
+
+    if (uiState.updateInfo != null) {
+        OTAUpdateScreen(
+            uiState = uiState,
+            onInstall = { viewModel.installUpdate(context) },
+            onDownload = { info -> viewModel.startDownload(context, info) },
+            onDismiss = { viewModel.dismissUpdate() },
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
+fun ProtonNextAppNavHost(
+    modifier: Modifier = Modifier,
+    viewModel: MainViewModel = hiltViewModel()
+) {
     val navController = rememberNavController()
-    val startDestination by viewModel.startDestination.collectAsState()
+    val startDestination by viewModel.startDestination.collectAsStateWithLifecycle()
+    val session by viewModel.session.collectAsStateWithLifecycle()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
@@ -173,9 +212,22 @@ fun ProtonNextAppNavHost(viewModel: MainViewModel = hiltViewModel()) {
         else -> null
     }
 
+    LaunchedEffect(session) {
+        ru.protonmod.next.utils.ProtonLogger.d("MainActivity", "Session changed: ${session != null}")
+        if (session == null && startDestination.isNotEmpty()) {
+            ru.protonmod.next.utils.ProtonLogger.d("MainActivity", "User logged out, navigating to welcome. Current route: $currentRoute")
+            // Only navigate if we're not already on a public screen
+            if (currentRoute != "welcome" && currentRoute != "login" && currentRoute != Screen.ApiBypass.route) {
+                navController.navigate("welcome") {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
+        }
+    }
+
     if (startDestination.isEmpty()) return
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
         NavHost(navController = navController, startDestination = startDestination) {
             composable("welcome") {
                 WelcomeScreen(

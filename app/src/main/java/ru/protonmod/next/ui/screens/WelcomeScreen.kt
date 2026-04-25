@@ -18,6 +18,10 @@
 
 package ru.protonmod.next.ui.screens
 
+import android.app.Activity
+import android.net.VpnService
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -39,14 +43,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import ru.protonmod.next.R
+import ru.protonmod.next.data.local.SettingsManager
+import ru.protonmod.next.ui.components.ExpressiveCircularProgressIndicator
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.ui.theme.liquidGlass
 import ru.protonmod.next.ui.utils.isTablet
@@ -57,23 +66,52 @@ fun WelcomeScreen(
     onNavigateToRegister: () -> Unit,
     onNavigateToHome: () -> Unit,
     onNavigateToApiBypassSettings: () -> Unit,
+    modifier: Modifier = Modifier,
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val colors = ProtonNextTheme.colors
-    val uiState by viewModel.uiState.collectAsState()
-    val isApiBypassEnabled by viewModel.isApiBypassEnabled.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isWarpLoading by viewModel.isWarpLoading.collectAsStateWithLifecycle()
+    val isApiBypassEnabled by viewModel.isApiBypassEnabled.collectAsStateWithLifecycle()
+    val apiBypassStrategy by viewModel.apiBypassStrategy.collectAsStateWithLifecycle()
     val isTablet = isTablet()
+    val context = LocalContext.current
 
     var isVisible by remember { mutableStateOf(false) }
 
+    val vpnPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            viewModel.loginAnonymous()
+        }
+    }
+
+    val checkVpnAndLoginAnonymous: () -> Unit = {
+        if (isApiBypassEnabled && apiBypassStrategy == SettingsManager.STRATEGY_WARP) {
+            try {
+                val intent = VpnService.prepare(context)
+                if (intent != null) {
+                    vpnPermissionLauncher.launch(intent)
+                } else {
+                    viewModel.loginAnonymous()
+                }
+            } catch (_: SecurityException) {
+                viewModel.loginAnonymous()
+            }
+        } else {
+            viewModel.loginAnonymous()
+        }
+    }
+
     // Start entry animations
-    LaunchedEffect(Unit) {
+    LaunchedEffect(viewModel) {
         delay(100)
         isVisible = true
     }
 
     // Handle successful login/guest auth
-    LaunchedEffect(uiState) {
+    LaunchedEffect(uiState, onNavigateToHome) {
         if (uiState is LoginUiState.Success) {
             onNavigateToHome()
         }
@@ -81,26 +119,28 @@ fun WelcomeScreen(
 
     val captchaState = uiState as? LoginUiState.RequiresCaptcha
 
-    AnimatedContent(
-        targetState = captchaState,
-        label = "welcome_to_captcha_transition"
-    ) { currentCaptcha ->
-        if (currentCaptcha != null) {
-            CaptchaScreen(
-                webUrl = currentCaptcha.webUrl,
-                sessionId = currentCaptcha.sessionId,
-                isApiBypassEnabled = isApiBypassEnabled,
-                onDismiss = { viewModel.resetError() },
-                onCaptchaSolved = { verifiedToken ->
-                    viewModel.retryWithCaptcha(currentCaptcha, verifiedToken)
-                }
-            )
-        } else {
-            if (isTablet) {
-                WelcomeTabletContent(
+    Box(modifier = modifier.fillMaxSize()) {
+        AnimatedContent(
+            targetState = captchaState,
+            label = "welcome_to_captcha_transition"
+        ) { currentCaptcha ->
+            if (currentCaptcha != null) {
+                CaptchaScreen(
+                    webUrl = currentCaptcha.webUrl,
+                    sessionId = currentCaptcha.sessionId,
+                    isApiBypassEnabled = isApiBypassEnabled,
+                    apiBypassStrategy = apiBypassStrategy,
+                    onDismiss = { viewModel.resetError() },
+                    onCaptchaSolve = { verifiedToken ->
+                        viewModel.retryWithCaptcha(currentCaptcha, verifiedToken)
+                    }
+                )
+            } else {
+                if (isTablet) {
+                    WelcomeTabletContent(
                     isVisible = isVisible,
                     uiState = uiState,
-                    onLoginAnonymous = { viewModel.loginAnonymous() },
+                    onLoginAnonymous = checkVpnAndLoginAnonymous,
                     onNavigateToRegister = onNavigateToRegister,
                     onNavigateToLogin = onNavigateToLogin,
                     onNavigateToApiBypassSettings = onNavigateToApiBypassSettings
@@ -109,11 +149,40 @@ fun WelcomeScreen(
                 WelcomePhoneContent(
                     isVisible = isVisible,
                     uiState = uiState,
-                    onLoginAnonymous = { viewModel.loginAnonymous() },
+                    onLoginAnonymous = checkVpnAndLoginAnonymous,
                     onNavigateToRegister = onNavigateToRegister,
                     onNavigateToLogin = onNavigateToLogin,
                     onNavigateToApiBypassSettings = onNavigateToApiBypassSettings
                 )
+            }
+            }
+        }
+
+        // WARP Loading Overlay
+        if (isWarpLoading) {
+            Dialog(onDismissRequest = {}) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = colors.backgroundSecondary,
+                    tonalElevation = 8.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        ExpressiveCircularProgressIndicator(
+                            modifier = Modifier.size(64.dp),
+                            color = colors.brandNorm
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Text(
+                            text = stringResource(R.string.warp_fetching_config),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = colors.textNorm,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
             }
         }
     }
@@ -351,7 +420,7 @@ private fun WelcomeButtons(
             colors = ButtonDefaults.buttonColors(containerColor = colors.brandNorm, contentColor = colors.textInverted)
         ) {
             if (isLoading) {
-                CircularProgressIndicator(color = colors.textInverted, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
+                ExpressiveCircularProgressIndicator(color = colors.textInverted, modifier = Modifier.size(24.dp))
             } else {
                 Text(text = stringResource(R.string.btn_continue_guest), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
             }

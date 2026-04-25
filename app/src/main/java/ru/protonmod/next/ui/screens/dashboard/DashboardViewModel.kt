@@ -18,11 +18,14 @@
 package ru.protonmod.next.ui.screens.dashboard
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import ru.protonmod.next.utils.ProtonLogger
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,7 +53,7 @@ import ru.protonmod.next.data.network.LogicalServer
 import ru.protonmod.next.data.state.ConnectedServerState
 import ru.protonmod.next.ui.utils.CountryUtils
 import ru.protonmod.next.vpn.AmneziaVpnManager
-import ru.protonmod.next.vpn.ObfuscationParams
+import ru.protonmod.next.vpn.WarpManager
 import io.sentry.Sentry
 import java.net.Proxy
 import javax.inject.Inject
@@ -74,11 +77,13 @@ sealed class DashboardUiState {
         val isConnected: Boolean = false,
         val connectedServer: LogicalServer? = null,
         val isConnecting: Boolean = false,
+        val vpnState: AmneziaVpnManager.VpnState = AmneziaVpnManager.VpnState.DISCONNECTED,
         val certificateState: AmneziaVpnManager.CertificateState = AmneziaVpnManager.CertificateState.Valid,
         val originalLocationText: LocationText? = null,
         val vpnLocationText: LocationText? = null,
         val isIpHidden: Boolean = false,
-        val serverLoadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
+        val serverLoadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL,
+        val speed: String? = null
     ) : DashboardUiState()
     data class Error(val message: String, val isSessionError: Boolean = false) : DashboardUiState()
 }
@@ -90,10 +95,25 @@ class DashboardViewModel @Inject constructor(
     private val sessionDao: SessionDao,
     private val settingsManager: SettingsManager,
     private val amneziaVpnManager: AmneziaVpnManager,
+    private val warpManager: WarpManager,
     private val connectedServerState: ConnectedServerState,
     private val profileDao: ProfileDao,
     private val recentConnectionDao: ru.protonmod.next.data.local.RecentConnectionDao
 ) : ViewModel() {
+
+    // Shared OkHttpClient instances — created once, reused for every IP fetch, shut down in onCleared().
+    // noProxyClient forces requests outside any system proxy so we always see the device's real IP.
+    private val noProxyClient: OkHttpClient = OkHttpClient.Builder()
+        .proxy(Proxy.NO_PROXY)
+        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
+
+    // defaultClient lets requests travel through whatever route is active (i.e. the VPN tunnel).
+    private val defaultClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
 
     private val prefs = context.getSharedPreferences("dashboard_ui_prefs", Context.MODE_PRIVATE)
 
@@ -111,8 +131,7 @@ class DashboardViewModel @Inject constructor(
         vpnRepository.getServersFlow(),
         vpnRepository.isUpdating,
         _errorMessage,
-        amneziaVpnManager.tunnelState,
-        amneziaVpnManager.isConnecting,
+        amneziaVpnManager.vpnState,
         amneziaVpnManager.certState,
         connectedServerState.connectedServer,
         recentConnectionDao.getRecentConnections(),
@@ -122,33 +141,35 @@ class DashboardViewModel @Inject constructor(
         settingsManager.serverLoadDisplayMode,
         _originalLocationText,
         _vpnLocationText,
-        _isIpHidden
+        _isIpHidden,
+        amneziaVpnManager.speed
     ) { args: Array<Any?> ->
         @Suppress("UNCHECKED_CAST")
         val servers = args[0] as List<LogicalServer>
         val isUpdating = args[1] as Boolean
         val error = args[2] as String?
-        val tunnelState = args[3] as Tunnel.State
-        val isConnecting = args[4] as Boolean
-        val certState = args[5] as AmneziaVpnManager.CertificateState
-        val connectedServer = args[6] as LogicalServer?
+        val vpnState = args[3] as AmneziaVpnManager.VpnState
+        val certState = args[4] as AmneziaVpnManager.CertificateState
+        val connectedServer = args[5] as LogicalServer?
         @Suppress("UNCHECKED_CAST")
-        val recentEntities = args[7] as List<RecentConnectionEntity>
+        val recentEntities = args[6] as List<RecentConnectionEntity>
         @Suppress("UNCHECKED_CAST")
-        val profiles = args[8] as List<VpnProfileEntity>
-        val qcStrategy = args[9] as String
-        val qcTargetId = args[10] as String?
-        val loadMode = args[11] as ServerLoadDisplayMode
-        val originalLocationText = args[12] as LocationText?
-        val vpnLocationText = args[13] as LocationText?
-        val isIpHidden = args[14] as Boolean
+        val profiles = args[7] as List<VpnProfileEntity>
+        val qcStrategy = args[8] as String
+        val qcTargetId = args[9] as String?
+        val loadMode = args[10] as ServerLoadDisplayMode
+        val originalLocationText = args[11] as LocationText?
+        val vpnLocationText = args[12] as LocationText?
+        val isIpHidden = args[13] as Boolean
+        val speed = args[14] as String?
 
         if (isUpdating && servers.isEmpty()) {
             DashboardUiState.Loading
         } else if (error != null && servers.isEmpty()) {
             DashboardUiState.Error(error)
         } else {
-            val isConnected = tunnelState == Tunnel.State.UP
+            val isConnected = vpnState == AmneziaVpnManager.VpnState.CONNECTED
+            val isConnecting = vpnState == AmneziaVpnManager.VpnState.CONNECTING || vpnState == AmneziaVpnManager.VpnState.VERIFYING
 
             val recentServers = recentEntities.mapNotNull { entity ->
                 servers.find { it.id == entity.serverId }
@@ -163,18 +184,34 @@ class DashboardViewModel @Inject constructor(
                 isConnected = isConnected,
                 connectedServer = connectedServer,
                 isConnecting = isConnecting,
+                vpnState = vpnState,
                 certificateState = certState,
                 originalLocationText = originalLocationText,
                 vpnLocationText = vpnLocationText,
                 isIpHidden = isIpHidden,
-                serverLoadDisplayMode = loadMode
+                serverLoadDisplayMode = loadMode,
+                speed = speed
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardUiState.Loading)
 
+    private var hasAttemptedAutoConnect = false
+
     init {
         loadServers()
         fetchOriginalLocation()
+
+        viewModelScope.launch {
+            val autoConnect = settingsManager.autoConnectEnabled.first()
+            if (autoConnect && !hasAttemptedAutoConnect) {
+                uiState.first { it is DashboardUiState.Success && it.servers.isNotEmpty() }
+                val currentState = uiState.value as? DashboardUiState.Success
+                if (currentState != null && !currentState.isConnected && !currentState.isConnecting) {
+                    hasAttemptedAutoConnect = true
+                    quickConnect()
+                }
+            }
+        }
 
         // Global listener: Any time the VPN starts connecting (even from other screens), clear the old IP.
         viewModelScope.launch {
@@ -185,18 +222,18 @@ class DashboardViewModel @Inject constructor(
             }
         }
 
-        // Use collectLatest on both tunnelState AND connectedServer.
+        // Use collectLatest on both vpnState AND connectedServer.
         // This ensures that if the server changes while already connected, we restart the delay and fetch the new IP.
         viewModelScope.launch {
             combine(
-                amneziaVpnManager.tunnelState,
+                amneziaVpnManager.vpnState,
                 connectedServerState.connectedServer
             ) { state, server ->
                 Pair(state, server)
             }.collectLatest { (state, server) ->
-                if (state == Tunnel.State.UP && server != null) {
-                    // Give the tunnel 3 seconds to stabilize routing before updating servers/load
-                    delay(3000)
+                if (state == AmneziaVpnManager.VpnState.CONNECTED && server != null) {
+                    // Give the tunnel 1 second to stabilize routing before starting fetch attempts
+                    delay(1000)
 
                     recentConnectionDao.addRecentConnection(
                         RecentConnectionEntity(
@@ -212,7 +249,7 @@ class DashboardViewModel @Inject constructor(
 
                     // Refresh server loads after connection is established
                     loadServers()
-                } else if (state == Tunnel.State.DOWN) {
+                } else if (state == AmneziaVpnManager.VpnState.DISCONNECTED) {
                     _vpnLocationText.value = null
                 }
             }
@@ -239,15 +276,42 @@ class DashboardViewModel @Inject constructor(
                 _originalLocationText.value = LocationText(localizedCountry, cleanCode, location.ip)
             } else {
                 // Fallback if API completely fails on boot
-                _originalLocationText.value = LocationText(context.getString(R.string.status_disconnected), null, context.getString(R.string.ip_placeholder))
+                val unknown = context.getString(R.string.unknown)
+                _originalLocationText.value = LocationText(unknown, null, unknown)
             }
         }
     }
 
     private fun fetchVpnLocation(countryCode: String) {
         viewModelScope.launch {
-            // Fetch real location through the VPN tunnel
-            val location = fetchRealLocation(useProxy = false)
+            val unknown = context.getString(R.string.unknown)
+            val originalIp = _originalLocationText.value?.ip
+
+            // Clear connection pool to ensure we don't reuse a pre-VPN connection.
+            withContext(Dispatchers.IO) {
+                defaultClient.connectionPool.evictAll()
+            }
+
+            var location: LocationData? = null
+
+            // Try up to 3 cycles to get an IP that is NOT the original one (handling routing lag)
+            for (cycle in 1..3) {
+                location = fetchRealLocation(bypassVpn = false)
+
+                if (location != null) {
+                    // If we got an IP and it's different from original (or original is unknown) - success
+                    if (location.ip != originalIp || originalIp == unknown) {
+                        break
+                    } else {
+                        ProtonLogger.d("DashboardVM", "Leak detected: fetched IP matches original (cycle $cycle). Waiting...")
+                    }
+                }
+
+                if (cycle < 3) {
+                    delay(2000)
+                    withContext(Dispatchers.IO) { defaultClient.connectionPool.evictAll() }
+                }
+            }
 
             // Prioritize API country code if valid, otherwise use the server's declared country code
             val apiCountryCode = location?.countryCode?.trim()?.uppercase()?.ifBlank { null }
@@ -257,13 +321,19 @@ class DashboardViewModel @Inject constructor(
             val localizedCountry = CountryUtils.getCountryName(context, finalCountryCode)
                 .ifBlank { finalCountryCode }
 
-            // If API failed to fetch IP, generate a simulated IP to keep the UI looking alive
-            val safeIp = location?.ip?.ifBlank { null }
-                ?: "185.201.${(10..250).random()}.${(10..250).random()}"
+            // If API failed to fetch IP after all retries, use "Unknown"
+            val safeIp = location?.ip?.ifBlank { null } ?: unknown
+
+            // If IP is unknown, country name and code should also be unknown/null for honesty as in official app
+            val (finalCountryName, finalSafeCountryCode) = if (location?.ip.isNullOrBlank()) {
+                unknown to null
+            } else {
+                localizedCountry to finalCountryCode
+            }
 
             // Guard against race condition: check if tunnel is still active before updating UI
             if (amneziaVpnManager.tunnelState.value == Tunnel.State.UP) {
-                _vpnLocationText.value = LocationText(localizedCountry, finalCountryCode, safeIp)
+                _vpnLocationText.value = LocationText(finalCountryName, finalSafeCountryCode, safeIp)
             }
         }
     }
@@ -271,75 +341,98 @@ class DashboardViewModel @Inject constructor(
     /**
      * Fetches the user's real location based on IP.
      *
-     * @param useProxy If true, forces the request to bypass system proxy (used for original IP).
+     * @param bypassVpn If true, attempts to bypass the VPN tunnel (used for original IP).
      * @return [LocationData] object containing location info, or null in case of an error.
      */
-    private suspend fun fetchRealLocation(useProxy: Boolean = true): LocationData? = withContext(Dispatchers.IO) {
+    private suspend fun fetchRealLocation(bypassVpn: Boolean = true): LocationData? = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
-        val client = OkHttpClient.Builder()
-            .apply { if (useProxy) proxy(Proxy.NO_PROXY) }
-            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
 
+        // CRITICAL FIX: To truly bypass the VPN tunnel on Android, we must bind the socket
+        // to a physical network interface (WiFi or Cellular). Proxy.NO_PROXY only affects
+        // HTTP proxies, not the routing table / TUN interface.
+        val client = if (bypassVpn) {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val network = cm.allNetworks.find { net ->
+                val caps = cm.getNetworkCapabilities(net)
+                caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true &&
+                        caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN) == true
+            }
+
+            if (network != null) {
+                noProxyClient.newBuilder()
+                    .socketFactory(network.socketFactory)
+                    .build()
+            } else {
+                noProxyClient
+            }
+        } else {
+            defaultClient
+        }
+
+        // Only the lightest and fastest APIs (IP + Country Code)
         val endpoints = listOf(
-            "https://ipwho.is/",
-            "https://ipapi.co/json/",
-            "https://freeipapi.com/api/json"
+            "https://api.myip.com",
+            "https://freeipapi.com/api/json",
+            "http://ip-api.com/json/"
         )
 
         for (url in endpoints) {
-            try {
-                val request = Request.Builder().url(url).build()
-                client.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        val body = response.body.string()
-                        if (body.isNotBlank()) {
-                            val json = JSONObject(body)
-                            val ip = when {
-                                json.has("ip") -> json.optString("ip", "")
-                                json.has("ipAddress") -> json.optString("ipAddress", "")
-                                else -> ""
-                            }
+            // Try each endpoint up to 3 times with 1s delay before moving to next
+            for (attempt in 1..3) {
+                try {
+                    val request = Request.Builder().url(url).build()
+                    client.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            val body = response.body.string()
+                            if (body.isNotBlank()) {
+                                val json = JSONObject(body)
 
-                            val countryCode = when {
-                                json.has("country_code") -> json.optString("country_code", "")
-                                json.has("countryCode") -> json.optString("countryCode", "")
-                                else -> ""
-                            }
+                                val ip = json.optString("ip")
+                                    .ifBlank { json.optString("ipAddress") }
+                                    .ifBlank { json.optString("query") }
 
-                            val cleanIp = if (ip.equals("null", ignoreCase = true)) "" else ip.trim()
-                            val cleanCountryCode = if (countryCode.equals("null", ignoreCase = true)) "" else countryCode.trim()
+                                val countryCode = json.optString("cc")
+                                    .ifBlank { json.optString("countryCode") }
+                                    .ifBlank { json.optString("country_code") }
 
-                            if (cleanIp.isNotEmpty() && cleanCountryCode.isNotEmpty()) {
-                                // Metrics
-                                val duration = System.currentTimeMillis() - startTime
-                                Sentry.metrics().distribution("location_fetch_latency", duration.toDouble())
-                                Sentry.metrics().count("location_fetch_success", 1.0)
-                                
-                                return@withContext LocationData(cleanIp, cleanCountryCode)
+                                if (ip.isNotBlank() && countryCode.isNotBlank()) {
+                                    val duration = System.currentTimeMillis() - startTime
+                                    Sentry.metrics().distribution("location_fetch_latency", duration.toDouble())
+                                    Sentry.metrics().count("location_fetch_success", 1.0)
+
+                                    return@withContext LocationData(ip.trim(), countryCode.trim())
+                                }
                             }
                         }
                     }
+                } catch (e: Exception) {
+                    ProtonLogger.w("DashboardVM", "Fetch failed from $url (attempt $attempt): ${e.message}")
                 }
-            } catch (e: Exception) {
-                // Sentry HttpClientException handling (avoids reporting transient timeouts as hard errors)
-                val isTimeout = e.message?.contains("504") == true || e.message?.contains("timeout") == true
-                if (isTimeout) {
-                    ProtonLogger.w("DashboardViewModel", "Transient timeout for $url, trying fallback...")
-                } else {
-                    ProtonLogger.w("DashboardViewModel", "Failed to fetch from $url: ${e.message}")
-                }
+                if (attempt < 3) delay(1000)
             }
         }
-        
+
         // Metrics
         Sentry.metrics().count("location_fetch_error", 1.0)
-
         null
     }
 
     private data class LocationData(val ip: String, val countryCode: String)
+
+    override fun onCleared() {
+        super.onCleared()
+        // Shut down the shared OkHttpClient instances to release their thread pools and
+        // connection pools when the ViewModel is destroyed, preventing resource leaks.
+        // evictAll() closes sockets which involves network I/O, so it must run off the main thread.
+        // viewModelScope is already cancelled at this point, so a standalone CoroutineScope is used
+        // to ensure the cleanup coroutine actually executes on the IO dispatcher.
+        CoroutineScope(Dispatchers.IO).launch {
+            noProxyClient.dispatcher.executorService.shutdown()
+            noProxyClient.connectionPool.evictAll()
+            defaultClient.dispatcher.executorService.shutdown()
+            defaultClient.connectionPool.evictAll()
+        }
+    }
 
     fun loadServers() {
         viewModelScope.launch {
@@ -350,13 +443,35 @@ class DashboardViewModel @Inject constructor(
                 return@launch
             }
 
-            vpnRepository.getServers(session.accessToken, session.sessionId, session.userTier)
-                .onFailure { error ->
-                    val cachedServers = vpnRepository.getCachedServers()
-                    if (cachedServers.isEmpty()) {
-                        _errorMessage.value = error.localizedMessage ?: context.getString(R.string.error_unknown)
+            // Proactively ensure WARP is active if configured, before fetching
+            val apiBypassEnabled = settingsManager.apiBypassEnabled.first()
+            val apiBypassStrategy = settingsManager.apiBypassStrategy.first()
+            val isWarpActive = warpManager.isTunnelActive
+            val hasServers = vpnRepository.getCachedServers().isNotEmpty()
+
+            val startedWarp = if (apiBypassEnabled && apiBypassStrategy == SettingsManager.STRATEGY_WARP) {
+                // Only start warp proactively if it's already active (e.g. from login)
+                // OR if we have NO servers at all (first run).
+                // This prevents redundant "connecting to cf" on every app start.
+                if (isWarpActive || !hasServers) {
+                    amneziaVpnManager.ensureWarpBypass(true)
+                    true
+                } else false
+            } else false
+
+            try {
+                vpnRepository.getServers(session.accessToken, session.sessionId, session.userTier)
+                    .onFailure { error ->
+                        val cachedServers = vpnRepository.getCachedServers()
+                        if (cachedServers.isEmpty()) {
+                            _errorMessage.value = error.localizedMessage ?: context.getString(R.string.error_unknown)
+                        }
                     }
+            } finally {
+                if (startedWarp) {
+                    amneziaVpnManager.ensureWarpBypass(false)
                 }
+            }
         }
     }
 
@@ -382,7 +497,7 @@ class DashboardViewModel @Inject constructor(
             val isTargetServerConnected = currentState.connectedServer?.id == server.id
 
             if (isConnectedToAny) {
-                if (isTargetServerConnected) {
+                if (isTargetServerConnected && currentState.isConnected) {
                     disconnect()
                 } else {
                     initiateConnection(server)
@@ -448,7 +563,7 @@ class DashboardViewModel @Inject constructor(
         val physicalServer = targetServer.servers.filter { it.status == 1 }.minByOrNull { it.load }
             ?: targetServer.servers.minByOrNull { it.load } ?: return
 
-        var obfuscationParams: ObfuscationParams? = null
+        var obfuscationParams: AmneziaVpnManager.ObfuscationParams? = null
         if (profile.isObfuscationEnabled && profile.obfuscationProfileId != null) {
             val customProfiles = settingsManager.customProfiles.first()
             val standardProfileName = context.getString(R.string.obfuscation_config_standard)
@@ -456,7 +571,7 @@ class DashboardViewModel @Inject constructor(
                 ?: if (profile.obfuscationProfileId == "standard_1") ObfuscationProfile.getStandardProfile(standardProfileName) else null
 
             selectedConfig?.let {
-                obfuscationParams = ObfuscationParams(
+                obfuscationParams = AmneziaVpnManager.ObfuscationParams(
                     jc = it.jc, jmin = it.jmin, jmax = it.jmax,
                     s1 = it.s1, s2 = it.s2, s3 = it.s3, s4 = it.s4,
                     h1 = it.h1, h2 = it.h2, h3 = it.h3, h4 = it.h4,
@@ -466,10 +581,9 @@ class DashboardViewModel @Inject constructor(
         }
 
         connectedServerState.setConnectedServer(targetServer)
-        val tunnelState = amneziaVpnManager.tunnelState.value
-        val isConnecting = amneziaVpnManager.isConnecting.value
+        val vpnState = amneziaVpnManager.vpnState.value
 
-        if (tunnelState == Tunnel.State.UP || isConnecting) {
+        if (vpnState != AmneziaVpnManager.VpnState.DISCONNECTED) {
             amneziaVpnManager.reconnect(
                 targetServer.id, physicalServer, session,
                 overridePort = profile.port,
@@ -493,18 +607,7 @@ class DashboardViewModel @Inject constructor(
     }
 
     private fun findBestServerForProfile(profile: VpnProfileEntity, allServers: List<LogicalServer>): LogicalServer? {
-        if (profile.targetServerId != null) {
-            return allServers.find { it.id == profile.targetServerId }
-        }
-        if (profile.targetCity != null && profile.targetCountry != null) {
-            val cityServers = allServers.filter { it.exitCountry == profile.targetCountry && it.city == profile.targetCity }
-            if (cityServers.isNotEmpty()) return cityServers.minByOrNull { it.averageLoad }
-        }
-        if (profile.targetCountry != null) {
-            val countryServers = allServers.filter { it.exitCountry == profile.targetCountry }
-            if (countryServers.isNotEmpty()) return countryServers.minByOrNull { it.averageLoad }
-        }
-        return allServers.minByOrNull { it.averageLoad }
+        return vpnRepository.findBestServerForProfile(profile, allServers)
     }
 
     fun setQuickConnectStrategy(strategy: String, targetId: String? = null) {
@@ -526,9 +629,8 @@ class DashboardViewModel @Inject constructor(
 
         if (physicalServer != null) {
             connectedServerState.setConnectedServer(server)
-            val tunnelState = amneziaVpnManager.tunnelState.value
-            val isConnecting = amneziaVpnManager.isConnecting.value
-            if (tunnelState == Tunnel.State.UP || isConnecting) {
+            val vpnState = amneziaVpnManager.vpnState.value
+            if (vpnState != AmneziaVpnManager.VpnState.DISCONNECTED) {
                 amneziaVpnManager.reconnect(server.id, physicalServer, session, logicalServer = server)
             } else {
                 amneziaVpnManager.connect(server.id, physicalServer, session, logicalServer = server)

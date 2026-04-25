@@ -51,6 +51,8 @@
     <string name="title_recent_connections">Recent connections</string>
     <string name="status_connected">Connected</string>
     <string name="status_connecting">Connecting…</string>
+    <string name="status_verifying">Verifying…</string>
+    <string name="status_disconnecting">Disconnecting…</string>
     <string name="status_disconnected">Disconnected</string>
     <string name="status_not_connected">Not connected</string>
     <string name="msg_traffic_not_protected">Your traffic is not protected</string>
@@ -120,6 +122,35 @@
     <string name="api_bypass_strategy_title">ROUTING STRATEGY</string>
     <string name="api_bypass_strategy_netlify">Netlify Proxy</string>
     <string name="api_bypass_strategy_netlify_desc">Routes API requests through a secure Netlify proxy.</string>
+    <string name="api_bypass_strategy_cloudflare">Cloudflare Proxy</string>
+    <string name="api_bypass_strategy_cloudflare_desc">Routes API requests through a high-performance Cloudflare worker.</string>
+    <string name="api_bypass_strategy_mirrors">Proton Mirrors (DoH)</string>
+    <string name="api_bypass_strategy_mirrors_desc">Discovers and uses dynamic Proton API mirrors via DNS-over-HTTPS fallback.</string>
+    <string name="api_bypass_strategy_warp">WARP (Cloudflare)</string>
+    <string name="api_bypass_strategy_warp_desc">Uses a temporary WARP tunnel for API requests. High reliability.</string>
+    <string name="warp_fetching_config">Fetching WARP configuration…</string>
+    <string name="warp_error_fetching">Failed to fetch configuration. Check your connection.</string>
+    <string name="warp_permission_title">VPN Permission Required</string>
+    <string name="warp_permission_desc">WARP needs permission to create a local tunnel for API bypass. No data is sent outside Cloudflare.</string>
+    <string name="btn_allow">Allow</string>
+    <string name="api_bypass_strategy_custom">Custom Proxy (SOCKS5/HTTPS)</string>
+    <string name="api_bypass_strategy_custom_desc">Routes API requests through your own SOCKS5 or HTTPS proxy server.</string>
+    <string name="api_proxy_host">Proxy Host</string>
+    <string name="api_proxy_port">Proxy Port</string>
+    <string name="api_proxy_type">Proxy Type</string>
+    <string name="api_proxy_type_http">HTTPS / HTTP</string>
+    <string name="api_proxy_type_socks">SOCKS5</string>
+    <string name="api_proxy_username">Username (Optional)</string>
+    <string name="api_proxy_password">Password (Optional)</string>
+
+    <!-- Country Spoofing -->
+    <string name="settings_country_spoofing_title">Country Spoofing</string>
+    <string name="settings_country_spoofing_description">Override the country code sent to the API to simulate a different physical location.</string>
+    <string name="settings_country_spoofing_null_label">Null Spoof</string>
+    <string name="settings_country_spoofing_null_desc">Do not send any country code header to the API.</string>
+    <string name="settings_country_spoofing_code_label">Country Code (ISO 3166-1 alpha-2)</string>
+    <string name="settings_country_spoofing_code_hint">e.g. US, DE, RU</string>
+    <string name="settings_country_spoofing_update_toast">Updating server list…</string>
 
     <!-- Custom DNS -->
     <string name="settings_custom_dns">Custom DNS</string>
@@ -235,9 +266,15 @@
     <string name="about_codeberg">Codeberg</string>
     <string name="about_unavailable">Temporarily unavailable</string>
 
-    <string name="url_github">https://github.com/SMH01-MOD-NEXT/ProtonMOD-NEXT</string>
+    <string name="about_sentry">Powered by Sentry</string>
+    <string name="url_sentry">https://sentry.io/</string>
+
+    <string name="url_github">https://github.com/SMH01-MIRRORS/ProtonVPN-Next-MIRROR</string>
     <string name="url_codeberg">https://codeberg.org/SMH01/ProtonVPN-Next</string>
     <string name="url_telegram">https://t.me/ProtonVPN_MOD</string>
+
+    <string name="url_ota_mirror_1" translatable="false">https://kvn.protonnext.qzz.io/update.json</string>
+    <string name="url_ota_mirror_2" translatable="false">https://home.protonnext.qzz.io/update.json</string>
 
     <!-- Licenses Screen -->
     <string name="licenses_title">Licenses</string>
@@ -266,9 +303,6 @@
     <string name="st_mode_include_desc">Only selected apps and IPs will use the VPN</string>
     <string name="st_enabled_subtitle">VPN connection will follow split tunneling rules</string>
     <string name="st_disabled_subtitle">All traffic goes through VPN</string>
-    <string name="st_input_app_label">Enter executable path (e.g. /usr/bin/browser)</string>
-    <string name="st_input_ip_label">Enter IP or CIDR (e.g. 1.1.1.1/32)</string>
-    <string name="st_input_domain_label">Enter domain (e.g. google.com)</string>
     <plurals name="st_apps_selected">
         <item quantity="one">%1$d app selected</item>
         <item quantity="other">%1$d apps selected</item>
@@ -314,6 +348,7 @@
     <string name="notification_channel_name">VPN Status</string>
     <string name="notification_channel_desc">Shows the current connection status of the VPN</string>
     <string name="notification_title_connected">Connected to %1$s</string>
+    <string name="notification_title_verifying">Verifying connection…</string>
     <string name="notification_title_disconnected">Disconnected</string>
     <string name="notification_title_connecting">Connecting…</string>
     <string name="notification_action_disconnect">Disconnect</string>
@@ -330,6 +365,7 @@
     <string name="error_unknown">Unknown error</string>
     <string name="error_auth_failed">An unexpected authentication error occurred</string>
     <string name="error_2fa_failed">Two-factor verification failed</string>
+    <string name="unknown">Unknown</string>
 
     <!-- Profiles Screen -->
     <string name="profiles_title">Profiles</string>
@@ -398,6 +434,8 @@
     <string name="debug_cert_issued">Issued: %1$s</string>
     <string name="debug_cert_expires">Expires: %1$s</string>
     <string name="debug_btn_refresh_cert">Force Refresh Certificate</string>
+    <string name="debug_btn_refresh_session">Force Refresh Session</string>
+    <string name="debug_session_refreshed">Session refreshed successfully!</string>
     <string name="debug_exports_header">Exports &amp; Diagnostics</string>
     <string name="debug_btn_export_logs">Export Logcat to Downloads</string>
     <string name="debug_btn_export_config">Export WG Config (.conf)</string>
@@ -449,6 +487,45 @@
     <string name="captcha_message">To keep your account secure, please complete the verification below.</string>
     <string name="captcha_proxy_active">Anti-blocking proxy is active</string>
     <string name="desc_close">Close</string>
-    <string name="placeholder_google">google.com</string>
-    <string name="placeholder_example_url">https://example.com</string>
+
+    <!-- Token Login & Session Management -->
+    <string name="btn_login_tokens">Login via Tokens</string>
+    <string name="title_login_tokens">Token-based Login</string>
+    <string name="msg_login_tokens_desc">Paste your session JSON below to log in directly. Keep this data secret!</string>
+    <string name="hint_session_json">Session JSON</string>
+    <string name="debug_btn_export_session">Export Session (Clipboard)</string>
+    <string name="debug_btn_import_session">Import Session</string>
+    <string name="debug_btn_fetch_domains">Fetch Available Domains (Clipboard)</string>
+    <string name="debug_export_session_title">Export Sensitive Data</string>
+    <string name="debug_export_session_msg">This will copy your full session (including tokens and private keys) to the clipboard. DO NOT share this with anyone!</string>
+    <string name="debug_import_session_warning">WARNING: Importing a session will overwrite your current one. Use with caution.</string>
+    <string name="debug_btn_copy">Copy to Clipboard</string>
+    <string name="btn_import">Import</string>
+    <string name="btn_logout">Log Out</string>
+    <string name="logout_confirmation">Are you sure you want to log out?</string>
+
+    <!-- OTA Updates -->
+    <string name="ota_title">Software Update</string>
+    <string name="ota_new_version">New version available: %1$s</string>
+    <string name="ota_changelog">What\'s new:</string>
+    <string name="ota_btn_update">Update Now</string>
+    <string name="ota_btn_install">Install</string>
+    <string name="ota_btn_later">Later</string>
+    <string name="ota_force_title">Update Required</string>
+    <string name="ota_force_desc">A critical update is available. Please update the app to continue using Proton VPN-Next.</string>
+    <string name="ota_check_frequency">Check for Updates</string>
+    <string name="ota_channel">Update Channel</string>
+    <string name="ota_channel_stable">Stable</string>
+    <string name="ota_channel_nightly">Nightly</string>
+    <string name="ota_channel_unavailable">Unavailable</string>
+    <string name="ota_freq_hourly">Hourly</string>
+    <string name="ota_freq_daily">Daily</string>
+    <string name="ota_freq_weekly">Weekly</string>
+    <string name="ota_freq_monthly">Monthly</string>
+    <string name="ota_freq_disabled">Disabled</string>
+    <string name="ota_status_checking">Checking for updates…</string>
+    <string name="ota_status_up_to_date">App is up to date</string>
+    <string name="ota_btn_check">Check for Updates</string>
+    <string name="ota_downloading">Downloading update… %1$d%%</string>
+    <string name="ota_download_failed">Download failed. Please try again later.</string>
 </resources>

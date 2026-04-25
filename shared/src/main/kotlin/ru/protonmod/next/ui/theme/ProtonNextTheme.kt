@@ -17,19 +17,26 @@
 
 package ru.protonmod.next.ui.theme
 
+import android.app.Activity
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.structuralEqualityPolicy
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
+// Predefined palette colors for various themes
 object ProtonPalette {
     val Haiti = Color(0xFF1B1340)
     val Valhalla = Color(0xFF271B54)
@@ -312,7 +319,8 @@ class ProtonColors(
         val Amoled = baseDark().copy(
             shade0 = Color.Black,
             backgroundNorm = Color.Black,
-            backgroundSecondary = ProtonPalette.BalticSea.copy(alpha = 0.4f), // More transparent for glass
+            // More transparent for glass effect
+            backgroundSecondary = ProtonPalette.BalticSea.copy(alpha = 0.4f),
             backgroundDeep = Color.Black,
             sidebarColors = sidebarDark().copy(backgroundNorm = Color.Black)
         )
@@ -326,12 +334,12 @@ class ProtonColors(
         ).let { it.copy(
             backgroundSecondary = it.shade10.copy(alpha = 0.4f),
             sidebarColors = sidebarLight(
-            brandDarken40 = it.brandDarken40,
-            brandDarken20 = it.brandDarken20,
-            brandNorm = it.brandNorm,
-            brandLighten20 = it.brandLighten20,
-            brandLighten40 = it.brandLighten40,
-        )) }
+                brandDarken40 = it.brandDarken40,
+                brandDarken20 = it.brandDarken20,
+                brandNorm = it.brandNorm,
+                brandLighten20 = it.brandLighten20,
+                brandLighten40 = it.brandLighten40,
+            )) }
 
         val GoldDark = baseDark(
             brandDarken40 = ProtonPalette.GoldDarken40,
@@ -342,12 +350,12 @@ class ProtonColors(
         ).let { it.copy(
             backgroundSecondary = it.shade20.copy(alpha = 0.4f),
             sidebarColors = sidebarDark(
-            brandDarken40 = it.brandDarken40,
-            brandDarken20 = it.brandDarken20,
-            brandNorm = it.brandNorm,
-            brandLighten20 = it.brandLighten20,
-            brandLighten40 = it.brandLighten40,
-        )) }
+                brandDarken40 = it.brandDarken40,
+                brandDarken20 = it.brandDarken20,
+                brandNorm = it.brandNorm,
+                brandLighten20 = it.brandLighten20,
+                brandLighten40 = it.brandLighten40,
+            )) }
 
         val GoldAmoled = baseDark(
             brandDarken40 = ProtonPalette.GoldDarken40,
@@ -359,7 +367,7 @@ class ProtonColors(
             it.copy(
                 shade0 = Color.Black,
                 backgroundNorm = Color.Black,
-                backgroundSecondary = ProtonPalette.BalticSea.copy(alpha = 0.4f), // More transparent for glass
+                backgroundSecondary = ProtonPalette.BalticSea.copy(alpha = 0.4f),
                 backgroundDeep = Color.Black,
                 sidebarColors = sidebarDark(
                     brandDarken40 = it.brandDarken40,
@@ -376,7 +384,8 @@ class ProtonColors(
             brandDarken20 = Color(0xFF00A3CC),
             brandDarken40 = Color(0xFF007599),
         ).copy(
-            notificationError = ProtonPalette.Pomegranate, // Surfshark sometimes uses red accents
+            // Surfshark sometimes uses red accents
+            notificationError = ProtonPalette.Pomegranate,
             backgroundSecondary = Color(0xFFF0F8FF).copy(alpha = 0.4f)
         )
 
@@ -422,7 +431,8 @@ class ProtonColors(
         )
 
         val Windscribe = baseDark(
-            brandNorm = ProtonPalette.CadetBlue, // Grayish accent
+            // Grayish accent
+            brandNorm = ProtonPalette.CadetBlue,
             brandDarken20 = ProtonPalette.CadetBlue.copy(alpha = 0.8f),
             brandDarken40 = ProtonPalette.CadetBlue.copy(alpha = 0.6f),
         ).copy(
@@ -458,7 +468,8 @@ class ProtonColors(
             shade40 = ProtonPalette.Cloud,
             shade20 = ProtonPalette.Ebb,
             shade15 = ProtonPalette.Pampas,
-            shade10 = Color(0xFFF0F0F0), // Explicit secondary
+            // Explicit secondary
+            shade10 = Color(0xFFF0F0F0),
             shade0 = Color.White,
             shadowNorm = Color.Black.copy(alpha = 0.1f),
             shadowRaised = Color.Black.copy(alpha = 0.1f),
@@ -468,7 +479,8 @@ class ProtonColors(
             iconAccent = brandNorm,
         ).let {
             it.copy(
-                backgroundSecondary = it.shade10.copy(alpha = 0.4f) // More transparent for better glass effect
+                // More transparent for better glass effect
+                backgroundSecondary = it.shade10.copy(alpha = 0.4f)
             )
         }
 
@@ -510,7 +522,8 @@ class ProtonColors(
                 interactionWeakDisabled = it.shade15,
                 interactionDisabled = it.brandDarken40,
                 backgroundNorm = it.shade10,
-                backgroundSecondary = it.shade20.copy(alpha = 0.4f), // More transparent for better glass effect
+                // More transparent for better glass effect
+                backgroundSecondary = it.shade20.copy(alpha = 0.4f),
                 backgroundDeep = it.shade0,
             )
         }
@@ -601,17 +614,31 @@ internal fun ProtonColors.toMaterial3ThemeColors() = androidx.compose.material3.
     scrim = blenderNorm,
     surfaceBright = backgroundNorm,
     surfaceDim = backgroundNorm,
-    surfaceContainer = backgroundNorm,
-    surfaceContainerHigh = backgroundNorm,
-    surfaceContainerHighest = backgroundNorm,
+    // Modern Material 3 mapping for containers and fixed colors
+    surfaceContainer = backgroundSecondary,
+    surfaceContainerHigh = backgroundSecondary,
+    surfaceContainerHighest = backgroundSecondary,
     surfaceContainerLow = backgroundNorm,
-    surfaceContainerLowest = backgroundNorm
+    surfaceContainerLowest = backgroundNorm,
+    primaryFixed = brandNorm,
+    onPrimaryFixed = Color.White,
+    primaryFixedDim = brandDarken20,
+    onPrimaryFixedVariant = Color.White,
+    secondaryFixed = brandNorm,
+    onSecondaryFixed = Color.White,
+    secondaryFixedDim = brandDarken20,
+    onSecondaryFixedVariant = Color.White,
+    tertiaryFixed = brandDarken20,
+    onTertiaryFixed = Color.White,
+    tertiaryFixedDim = brandDarken40,
+    onTertiaryFixedVariant = Color.White
 )
 
 val LocalColors = staticCompositionLocalOf { ProtonColors.Light }
 
 @Composable
 fun ProtonNextTheme(
+    modifier: Modifier = Modifier,
     appTheme: AppTheme = AppTheme.DARK,
     content: @Composable () -> Unit
 ) {
@@ -630,15 +657,28 @@ fun ProtonNextTheme(
         AppTheme.WINDSCRIBE -> ProtonColors.Windscribe
     }
 
-    CompositionLocalProvider(LocalColors provides protonColors) {
-        MaterialTheme(
-            colorScheme = protonColors.toMaterial3ThemeColors(),
-        ) {
-            Surface(
-                color = protonColors.backgroundNorm,
-                contentColor = protonColors.textNorm,
-                content = content
-            )
+    val isDark = protonColors.isDark
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        // Automatically handle status bar icon colors based on theme
+        SideEffect {
+            val window = (view.context as Activity).window
+            val controller = WindowCompat.getInsetsController(window, view)
+            controller.isAppearanceLightStatusBars = !isDark
+        }
+    }
+
+    Box(modifier = modifier) {
+        CompositionLocalProvider(LocalColors provides protonColors) {
+            MaterialTheme(
+                colorScheme = protonColors.toMaterial3ThemeColors(),
+            ) {
+                Surface(
+                    color = protonColors.backgroundNorm,
+                    content = content
+                )
+            }
         }
     }
 }

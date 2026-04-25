@@ -32,6 +32,7 @@ import ru.protonmod.next.ui.screens.settings.*
 sealed class Screen(val route: String) {
     data object Home : Screen("home")
     data object ApiBypass : Screen("api_bypass")
+    data object CountrySpoofing : Screen("country_spoofing")
     data object Settings : Screen("settings")
     data object Profiles : Screen("profiles")
     data object EditProfile : Screen("edit_profile?profileId={profileId}") {
@@ -115,6 +116,9 @@ fun NavGraphBuilder.appNavGraph(
             onNavigateToCustomDns = {
                 navController.navigate(Screen.CustomDns.route)
             },
+            onNavigateToCountrySpoofing = {
+                navController.navigate(Screen.CountrySpoofing.route)
+            },
             onNavigateToPortSelection = { currentPort ->
                 navController.navigate(Screen.PortSelection.createRoute(currentPort, true))
             }
@@ -123,6 +127,12 @@ fun NavGraphBuilder.appNavGraph(
 
     composable(Screen.ApiBypass.route) {
         ApiBypassScreen(
+            onBack = { navController.popBackStack() }
+        )
+    }
+
+    composable(Screen.CountrySpoofing.route) {
+        CountrySpoofingScreen(
             onBack = { navController.popBackStack() }
         )
     }
@@ -204,7 +214,7 @@ fun NavGraphBuilder.appNavGraph(
         PortSelectionScreen(
             currentPort = currentPort,
             onBack = { navController.popBackStack() },
-            onPortSelected = { port ->
+            onPortSelect = { port ->
                 if (isGlobal) {
                     viewModel.setVpnPort(port)
                 } else {
@@ -225,7 +235,7 @@ fun NavGraphBuilder.appNavGraph(
         ProtocolSelectionScreen(
             currentProtocol = currentProtocol,
             onBack = { navController.popBackStack() },
-            onProtocolSelected = { protocol ->
+            onProtocolSelect = { protocol ->
                 navController.previousBackStackEntry?.savedStateHandle?.set("selectedProtocol", protocol)
                 navController.popBackStack()
             }
@@ -241,7 +251,7 @@ fun NavGraphBuilder.appNavGraph(
         AutoOpenUrlScreen(
             currentUrl = currentUrl,
             onBack = { navController.popBackStack() },
-            onUrlSaved = { url ->
+            onUrlSave = { url ->
                 navController.previousBackStackEntry?.savedStateHandle?.set("selectedUrl", url)
                 navController.popBackStack()
             }

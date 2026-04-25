@@ -27,9 +27,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.CleaningServices
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Input
+import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,8 +44,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.protonmod.next.R
+import ru.protonmod.next.ui.components.ExpressiveCircularProgressIndicator
 import ru.protonmod.next.ui.components.NavigationHeader
+import ru.protonmod.next.ui.components.SmoothOutlinedTextField
 import ru.protonmod.next.data.network.LogicalServer
 import ru.protonmod.next.ui.theme.ProtonNextTheme
 import ru.protonmod.next.ui.theme.liquidGlass
@@ -51,12 +57,16 @@ import ru.protonmod.next.ui.theme.liquidGlass
 @Composable
 fun DebugSettingsScreen(
     onBack: () -> Unit,
+    modifier: Modifier = Modifier,
     viewModel: DebugSettingsViewModel = hiltViewModel()
 ) {
     val colors = ProtonNextTheme.colors
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showNukeConfirm by remember { mutableStateOf(false) }
     var showServerSelect by remember { mutableStateOf(false) }
+    var showExportConfirm by remember { mutableStateOf(false) }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var importJson by remember { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -68,7 +78,7 @@ fun DebugSettingsScreen(
     }
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         containerColor = colors.backgroundNorm,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -94,7 +104,7 @@ fun DebugSettingsScreen(
                 contentPadding = PaddingValues(bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                item {
+                item(contentType = "Header") {
                     NavigationHeader(
                         title = stringResource(R.string.debug_title),
                         onBack = onBack
@@ -102,7 +112,7 @@ fun DebugSettingsScreen(
                 }
 
                 // Session & Certificate Info
-                item {
+                item(contentType = "DebugSection") {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         DebugSection(title = stringResource(R.string.debug_session_header)) {
                             uiState.session?.let { session ->
@@ -140,6 +150,18 @@ fun DebugSettingsScreen(
                                     Spacer(Modifier.width(8.dp))
                                     Text(stringResource(R.string.debug_btn_refresh_cert))
                                 }
+
+                                Button(
+                                    onClick = { viewModel.forceRefreshSession() },
+                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.brandNorm.copy(alpha = 0.8f)),
+                                    shape = RoundedCornerShape(12.dp),
+                                    enabled = !uiState.isLoading
+                                ) {
+                                    Icon(Icons.Rounded.Refresh, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(stringResource(R.string.debug_btn_refresh_session))
+                                }
                             } ?: Text(
                                 "No active session",
                                 color = colors.textWeak,
@@ -150,7 +172,7 @@ fun DebugSettingsScreen(
                 }
 
                 // Exports
-                item {
+                item(contentType = "DebugSection") {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         DebugSection(title = stringResource(R.string.debug_exports_header)) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -164,13 +186,28 @@ fun DebugSettingsScreen(
                                     title = stringResource(R.string.debug_btn_export_config),
                                     onClick = { showServerSelect = true }
                                 )
+                                DebugActionRow(
+                                    icon = Icons.Rounded.ContentCopy,
+                                    title = stringResource(R.string.debug_btn_export_session),
+                                    onClick = { showExportConfirm = true }
+                                )
+                                DebugActionRow(
+                                    icon = Icons.Rounded.Input,
+                                    title = stringResource(R.string.debug_btn_import_session),
+                                    onClick = { showImportDialog = true }
+                                )
+                                DebugActionRow(
+                                    icon = Icons.Rounded.Public,
+                                    title = stringResource(R.string.debug_btn_fetch_domains),
+                                    onClick = { viewModel.fetchAvailableDomains() }
+                                )
                             }
                         }
                     }
                 }
 
                 // Device Info
-                item {
+                item(contentType = "DebugSection") {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         DebugSection(title = stringResource(R.string.debug_device_header)) {
                             Text(
@@ -184,7 +221,7 @@ fun DebugSettingsScreen(
                 }
 
                 // Sentry Tests
-                item {
+                item(contentType = "DebugSection") {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         DebugSection(
                             title = stringResource(R.string.debug_sentry_header),
@@ -242,7 +279,7 @@ fun DebugSettingsScreen(
                 }
 
                 // Danger Zone
-                item {
+                item(contentType = "DebugSection") {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         DebugSection(
                             title = stringResource(R.string.debug_danger_header),
@@ -321,9 +358,87 @@ fun DebugSettingsScreen(
         }
     }
 
+    if (showExportConfirm) {
+        AlertDialog(
+            onDismissRequest = { showExportConfirm = false },
+            title = { Text(stringResource(R.string.debug_export_session_title)) },
+            text = { Text(stringResource(R.string.debug_export_session_msg)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.exportSession()
+                        showExportConfirm = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = colors.brandNorm)
+                ) {
+                    Text(stringResource(R.string.debug_btn_copy))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExportConfirm = false }) {
+                    Text(stringResource(R.string.btn_cancel))
+                }
+            },
+            containerColor = colors.backgroundSecondary,
+            titleContentColor = colors.textNorm,
+            textContentColor = colors.textWeak
+        )
+    }
+
+    if (showImportDialog) {
+        AlertDialog(
+            onDismissRequest = { showImportDialog = false },
+            title = { Text(stringResource(R.string.debug_btn_import_session)) },
+            text = {
+                Column {
+                    Text(
+                        text = stringResource(R.string.debug_import_session_warning),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.notificationError,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                        SmoothOutlinedTextField(
+                            value = importJson,
+                            onValueChange = { importJson = it },
+                            label = { Text(stringResource(R.string.hint_session_json)) },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = colors.brandNorm,
+                                unfocusedBorderColor = colors.shade20,
+                                focusedTextColor = colors.textNorm,
+                                unfocusedTextColor = colors.textNorm
+                            )
+                        )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (importJson.isNotBlank()) {
+                            viewModel.importSession(importJson)
+                            showImportDialog = false
+                        }
+                    },
+                    enabled = importJson.isNotBlank()
+                ) {
+                    Text(stringResource(R.string.btn_import))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportDialog = false }) {
+                    Text(stringResource(R.string.btn_cancel))
+                }
+            },
+            containerColor = colors.backgroundSecondary,
+            titleContentColor = colors.textNorm,
+            textContentColor = colors.textWeak
+        )
+    }
+
     if (uiState.isLoading) {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = colors.brandNorm)
+            ExpressiveCircularProgressIndicator(color = colors.brandNorm)
         }
     }
 }

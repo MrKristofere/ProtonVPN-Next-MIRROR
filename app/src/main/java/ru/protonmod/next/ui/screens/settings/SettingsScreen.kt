@@ -17,7 +17,7 @@
 
 package ru.protonmod.next.ui.screens.settings
 
-import android.annotation.SuppressLint
+import ru.protonmod.next.ui.utils.isTablet
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.AltRoute
+import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.protonmod.next.BuildConfig
 import ru.protonmod.next.R
 import ru.protonmod.next.ui.components.MainHeader
@@ -52,6 +54,7 @@ import ru.protonmod.next.ui.utils.isTablet
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    modifier: Modifier = Modifier,
     onBack: () -> Unit = {},
     onNavigateToSplitTunnelingMain: (() -> Unit)? = null,
     onNavigateToProtocol: (() -> Unit)? = null,
@@ -63,15 +66,16 @@ fun SettingsScreen(
     onNavigateToLoadDisplayMode: (() -> Unit)? = null,
     onNavigateToDebug: (() -> Unit)? = null,
     onNavigateToCustomDns: (() -> Unit)? = null,
+    onNavigateToCountrySpoofing: (() -> Unit)? = null,
     onNavigateToPortSelection: ((Int) -> Unit)? = null,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val colors = ProtonNextTheme.colors
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isTablet = isTablet()
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         containerColor = colors.backgroundNorm,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {}
@@ -101,6 +105,7 @@ fun SettingsScreen(
                 isTablet = isTablet,
                 onAutoConnectChange = viewModel::setAutoConnect,
                 onNotificationsChange = viewModel::setNotifications,
+                onLogout = viewModel::logout,
                 onNavigateToSplitTunnelingMain = onNavigateToSplitTunnelingMain,
                 onNavigateToProtocol = onNavigateToProtocol,
                 onNavigateToKillSwitch = onNavigateToKillSwitch,
@@ -111,7 +116,11 @@ fun SettingsScreen(
                 onNavigateToLoadDisplayMode = onNavigateToLoadDisplayMode,
                 onNavigateToDebug = onNavigateToDebug,
                 onNavigateToCustomDns = onNavigateToCustomDns,
+                onNavigateToCountrySpoofing = onNavigateToCountrySpoofing,
                 onNavigateToPortSelection = onNavigateToPortSelection,
+                onOtaFrequencyChange = viewModel::setOtaUpdateFrequency,
+                onOtaChannelChange = viewModel::setOtaUpdateChannel,
+                onCheckForUpdates = viewModel::checkForUpdates,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -121,9 +130,14 @@ fun SettingsScreen(
 @Composable
 fun SettingsContent(
     state: SettingsUiState,
-    isTablet: Boolean = false,
     onAutoConnectChange: (Boolean) -> Unit,
     onNotificationsChange: (Boolean) -> Unit,
+    onLogout: () -> Unit,
+    onOtaFrequencyChange: (String) -> Unit,
+    onOtaChannelChange: (String) -> Unit,
+    onCheckForUpdates: () -> Unit,
+    modifier: Modifier = Modifier,
+    isTablet: Boolean = false,
     onNavigateToSplitTunnelingMain: (() -> Unit)? = null,
     onNavigateToProtocol: (() -> Unit)? = null,
     onNavigateToKillSwitch: (() -> Unit)? = null,
@@ -134,8 +148,8 @@ fun SettingsContent(
     onNavigateToLoadDisplayMode: (() -> Unit)? = null,
     onNavigateToDebug: (() -> Unit)? = null,
     onNavigateToCustomDns: (() -> Unit)? = null,
-    onNavigateToPortSelection: ((Int) -> Unit)? = null,
-    @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
+    onNavigateToCountrySpoofing: (() -> Unit)? = null,
+    onNavigateToPortSelection: ((Int) -> Unit)? = null
 ) {
     LazyColumn(
         modifier = modifier,
@@ -147,12 +161,12 @@ fun SettingsContent(
             bottom = if (isTablet) 140.dp else 120.dp
         )
     ) {
-        item {
+        item(contentType = "Header") {
             MainHeader(title = stringResource(R.string.settings_title))
         }
 
         if (isTablet) {
-            item {
+            item(contentType = "TabletContent") {
                 Row(
                     modifier = Modifier
                         .widthIn(max = 1000.dp)
@@ -187,16 +201,25 @@ fun SettingsContent(
                         PrivacySettingsSection(
                             state = state,
                             onNavigateToCustomDns = onNavigateToCustomDns,
+                            onNavigateToCountrySpoofing = onNavigateToCountrySpoofing,
                             onNavigateToKillSwitch = onNavigateToKillSwitch,
                             onNavigateToErrorReporting = onNavigateToErrorReporting,
                             onNotificationsChange = onNotificationsChange
+                        )
+
+                        UpdateSettingsSection(
+                            state = state,
+                            onFrequencyChange = onOtaFrequencyChange,
+                            onChannelChange = onOtaChannelChange,
+                            onCheckNow = onCheckForUpdates
                         )
 
                         WidgetSettingsSection()
 
                         AboutSettingsSection(
                             onNavigateToAbout = onNavigateToAbout,
-                            onNavigateToDebug = onNavigateToDebug
+                            onNavigateToDebug = onNavigateToDebug,
+                            onLogout = onLogout
                         )
                     }
                 }
@@ -205,52 +228,64 @@ fun SettingsContent(
             // Phone Layout
             val contentModifier = Modifier.fillMaxWidth()
 
-            item {
+            item(contentType = "FeatureCategory") {
                 FeatureCategory(
+                    state = state,
                     modifier = contentModifier,
                     isTablet = false,
-                    state = state,
                     onNavigateToSplitTunnelingMain = onNavigateToSplitTunnelingMain,
                     onNavigateToProtocol = onNavigateToProtocol
                 )
             }
 
-            item {
+            item(contentType = "ConnectionSettings") {
                 ConnectionSettingsSection(
-                    modifier = contentModifier,
                     state = state,
                     onAutoConnectChange = onAutoConnectChange,
+                    modifier = contentModifier,
                     onNavigateToApiBypass = onNavigateToApiBypass,
                     onNavigateToPortSelection = onNavigateToPortSelection
                 )
             }
 
-            item {
+            item(contentType = "CustomizationSettings") {
                 CustomizationSettingsSection(
-                    modifier = contentModifier,
                     state = state,
+                    modifier = contentModifier,
                     onNavigateToThemeSelection = onNavigateToThemeSelection,
                     onNavigateToLoadDisplayMode = onNavigateToLoadDisplayMode
                 )
             }
 
-            item {
+            item(contentType = "PrivacySettings") {
                 PrivacySettingsSection(
-                    modifier = contentModifier,
                     state = state,
+                    onNotificationsChange = onNotificationsChange,
+                    modifier = contentModifier,
                     onNavigateToCustomDns = onNavigateToCustomDns,
+                    onNavigateToCountrySpoofing = onNavigateToCountrySpoofing,
                     onNavigateToKillSwitch = onNavigateToKillSwitch,
-                    onNavigateToErrorReporting = onNavigateToErrorReporting,
-                    onNotificationsChange = onNotificationsChange
+                    onNavigateToErrorReporting = onNavigateToErrorReporting
                 )
             }
 
-            item {
+            item(contentType = "UpdateSettings") {
+                UpdateSettingsSection(
+                    state = state,
+                    onFrequencyChange = onOtaFrequencyChange,
+                    onChannelChange = onOtaChannelChange,
+                    onCheckNow = onCheckForUpdates,
+                    modifier = contentModifier
+                )
+            }
+
+            item(contentType = "WidgetSettings") {
                 WidgetSettingsSection(modifier = contentModifier)
             }
 
-            item {
+            item(contentType = "AboutSettings") {
                 AboutSettingsSection(
+                    onLogout = onLogout,
                     modifier = contentModifier,
                     onNavigateToAbout = onNavigateToAbout,
                     onNavigateToDebug = onNavigateToDebug
@@ -261,13 +296,169 @@ fun SettingsContent(
 }
 
 @Composable
+private fun UpdateSettingsSection(
+    state: SettingsUiState,
+    onFrequencyChange: (String) -> Unit,
+    onChannelChange: (String) -> Unit,
+    onCheckNow: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showFrequencyDialog by remember { mutableStateOf(false) }
+    var showChannelDialog by remember { mutableStateOf(false) }
+
+    SettingsCategory(modifier = modifier, title = stringResource(R.string.ota_title)) {
+        val currentFrequencyName = when (state.otaUpdateFrequency) {
+            "hourly" -> stringResource(R.string.ota_freq_hourly)
+            "daily" -> stringResource(R.string.ota_freq_daily)
+            "weekly" -> stringResource(R.string.ota_freq_weekly)
+            "monthly" -> stringResource(R.string.ota_freq_monthly)
+            "disabled" -> stringResource(R.string.ota_freq_disabled)
+            else -> state.otaUpdateFrequency
+        }
+
+        SettingRowWithIcon(
+            icon = Icons.Rounded.SystemUpdate,
+            title = stringResource(R.string.ota_check_frequency),
+            subtitle = currentFrequencyName,
+            onClick = { showFrequencyDialog = true }
+        )
+
+        val currentChannelName = when (state.otaUpdateChannel) {
+            "stable" -> stringResource(R.string.ota_channel_stable)
+            "nightly" -> stringResource(R.string.ota_channel_nightly)
+            else -> state.otaUpdateChannel
+        }
+
+        SettingRowWithIcon(
+            icon = Icons.AutoMirrored.Rounded.AltRoute,
+            title = stringResource(R.string.ota_channel),
+            subtitle = currentChannelName,
+            onClick = { showChannelDialog = true }
+        )
+
+        val updateStatus = when {
+            state.isCheckingForUpdates -> stringResource(R.string.ota_status_checking)
+            state.isUpdateAvailable -> stringResource(R.string.ota_new_version, "") // Version code is not easily available here, but the text will indicate update
+            else -> stringResource(R.string.ota_status_up_to_date)
+        }
+
+        SettingRowWithIcon(
+            icon = Icons.Rounded.Refresh,
+            title = stringResource(R.string.ota_btn_check),
+            subtitle = updateStatus,
+            onClick = onCheckNow,
+            enabled = !state.isCheckingForUpdates
+        )
+    }
+
+    if (showFrequencyDialog) {
+        val options = listOf("hourly", "daily", "weekly", "monthly", "disabled")
+        val optionNames = listOf(
+            stringResource(R.string.ota_freq_hourly),
+            stringResource(R.string.ota_freq_daily),
+            stringResource(R.string.ota_freq_weekly),
+            stringResource(R.string.ota_freq_monthly),
+            stringResource(R.string.ota_freq_disabled)
+        )
+
+        AlertDialog(
+            onDismissRequest = { showFrequencyDialog = false },
+            title = { Text(stringResource(R.string.ota_check_frequency)) },
+            text = {
+                Column {
+                    options.forEachIndexed { index, option ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onFrequencyChange(option)
+                                    showFrequencyDialog = false
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = state.otaUpdateFrequency == option,
+                                onClick = null,
+                                colors = RadioButtonDefaults.colors(selectedColor = ProtonNextTheme.colors.brandNorm)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(optionNames[index], color = ProtonNextTheme.colors.textNorm)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            containerColor = ProtonNextTheme.colors.backgroundSecondary
+        )
+    }
+
+    if (showChannelDialog) {
+        val options = listOf("stable", "nightly")
+        val optionNames = listOf(
+            stringResource(R.string.ota_channel_stable),
+            stringResource(R.string.ota_channel_nightly)
+        )
+
+        AlertDialog(
+            onDismissRequest = { showChannelDialog = false },
+            title = { Text(stringResource(R.string.ota_channel)) },
+            text = {
+                Column {
+                    options.forEachIndexed { index, option ->
+                        val isAvailable = state.availableChannels[option] ?: true
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = isAvailable) {
+                                    onChannelChange(option)
+                                    showChannelDialog = false
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = state.otaUpdateChannel == option,
+                                onClick = null,
+                                enabled = isAvailable,
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = ProtonNextTheme.colors.brandNorm,
+                                    disabledSelectedColor = ProtonNextTheme.colors.brandNorm.copy(alpha = 0.5f),
+                                    disabledUnselectedColor = ProtonNextTheme.colors.iconWeak.copy(alpha = 0.5f)
+                                )
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = optionNames[index],
+                                    color = if (isAvailable) ProtonNextTheme.colors.textNorm else ProtonNextTheme.colors.textWeak
+                                )
+                                if (!isAvailable) {
+                                    Text(
+                                        text = stringResource(R.string.ota_channel_unavailable),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ProtonNextTheme.colors.notificationError
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            containerColor = ProtonNextTheme.colors.backgroundSecondary
+        )
+    }
+}
+
+@Composable
 private fun WidgetSettingsSection(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val appWidgetManager = remember { android.appwidget.AppWidgetManager.getInstance(context) }
     val isSupported = remember { appWidgetManager.isRequestPinAppWidgetSupported }
 
     if (isSupported) {
-        Category(modifier = modifier, title = stringResource(R.string.settings_widget)) {
+        SettingsCategory(modifier = modifier, title = stringResource(R.string.settings_widget)) {
             SettingRowWithIcon(
                 icon = Icons.Rounded.Widgets,
                 title = stringResource(R.string.settings_widget_add_to_home),
@@ -283,13 +474,13 @@ private fun WidgetSettingsSection(modifier: Modifier = Modifier) {
 
 @Composable
 private fun ConnectionSettingsSection(
-    modifier: Modifier = Modifier,
     state: SettingsUiState,
     onAutoConnectChange: (Boolean) -> Unit,
-    onNavigateToApiBypass: (() -> Unit)?,
-    onNavigateToPortSelection: ((Int) -> Unit)?
+    modifier: Modifier = Modifier,
+    onNavigateToApiBypass: (() -> Unit)? = null,
+    onNavigateToPortSelection: ((Int) -> Unit)? = null
 ) {
-    Category(modifier = modifier, title = stringResource(R.string.settings_connection)) {
+    SettingsCategory(modifier = modifier, title = stringResource(R.string.settings_connection)) {
         SettingToggleRow(
             icon = Icons.Rounded.Autorenew,
             title = stringResource(R.string.settings_auto_connect),
@@ -316,12 +507,12 @@ private fun ConnectionSettingsSection(
 
 @Composable
 private fun CustomizationSettingsSection(
-    modifier: Modifier = Modifier,
     state: SettingsUiState,
-    onNavigateToThemeSelection: (() -> Unit)?,
-    onNavigateToLoadDisplayMode: (() -> Unit)?
+    modifier: Modifier = Modifier,
+    onNavigateToThemeSelection: (() -> Unit)? = null,
+    onNavigateToLoadDisplayMode: (() -> Unit)? = null
 ) {
-    Category(modifier = modifier, title = stringResource(R.string.settings_customization)) {
+    SettingsCategory(modifier = modifier, title = stringResource(R.string.settings_customization)) {
         val currentThemeName = when (state.appTheme) {
             AppTheme.LIGHT -> stringResource(R.string.theme_light)
             AppTheme.DARK -> stringResource(R.string.theme_dark)
@@ -362,14 +553,15 @@ private fun CustomizationSettingsSection(
 
 @Composable
 private fun PrivacySettingsSection(
-    modifier: Modifier = Modifier,
     state: SettingsUiState,
-    onNavigateToCustomDns: (() -> Unit)?,
-    onNavigateToKillSwitch: (() -> Unit)?,
-    onNavigateToErrorReporting: (() -> Unit)?,
-    onNotificationsChange: (Boolean) -> Unit
+    onNotificationsChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    onNavigateToCustomDns: (() -> Unit)? = null,
+    onNavigateToCountrySpoofing: (() -> Unit)? = null,
+    onNavigateToKillSwitch: (() -> Unit)? = null,
+    onNavigateToErrorReporting: (() -> Unit)? = null
 ) {
-    Category(modifier = modifier, title = stringResource(R.string.settings_privacy)) {
+    SettingsCategory(modifier = modifier, title = stringResource(R.string.settings_privacy)) {
         val currentDnsSubtitle = state.customDns.ifBlank {
             stringResource(R.string.settings_custom_dns_default)
         }
@@ -379,6 +571,13 @@ private fun PrivacySettingsSection(
             title = stringResource(R.string.settings_custom_dns),
             subtitle = currentDnsSubtitle,
             onClick = onNavigateToCustomDns
+        )
+
+        SettingRowWithIcon(
+            icon = Icons.Rounded.Public,
+            title = stringResource(R.string.settings_country_spoofing_title),
+            subtitle = if (state.spoofCountryEnabled) stringResource(R.string.settings_on) else stringResource(R.string.settings_off),
+            onClick = onNavigateToCountrySpoofing
         )
 
         SettingRowWithIcon(
@@ -407,11 +606,14 @@ private fun PrivacySettingsSection(
 
 @Composable
 private fun AboutSettingsSection(
+    onLogout: () -> Unit,
     modifier: Modifier = Modifier,
-    onNavigateToAbout: (() -> Unit)?,
+    onNavigateToAbout: (() -> Unit)? = null,
     onNavigateToDebug: (() -> Unit)? = null
 ) {
-    Category(modifier = modifier, title = stringResource(R.string.settings_about)) {
+    var showLogoutDialog by remember { mutableStateOf(false) }
+
+    SettingsCategory(modifier = modifier, title = stringResource(R.string.settings_about)) {
         SettingRowWithIcon(
             icon = Icons.Rounded.Info,
             title = stringResource(R.string.settings_about),
@@ -427,16 +629,51 @@ private fun AboutSettingsSection(
                 onClick = onNavigateToDebug
             )
         }
+
+        SettingRowWithIcon(
+            icon = Icons.AutoMirrored.Rounded.Logout,
+            title = stringResource(R.string.btn_logout),
+            subtitle = stringResource(R.string.desc_toggle_connection),
+            onClick = { showLogoutDialog = true },
+            titleColor = ProtonNextTheme.colors.notificationError
+        )
+    }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text(stringResource(R.string.btn_logout)) },
+            text = { Text(stringResource(R.string.logout_confirmation)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLogoutDialog = false
+                        onLogout()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = ProtonNextTheme.colors.notificationError)
+                ) {
+                    Text(stringResource(R.string.btn_logout))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text(stringResource(R.string.btn_cancel))
+                }
+            },
+            containerColor = ProtonNextTheme.colors.backgroundSecondary,
+            titleContentColor = ProtonNextTheme.colors.textNorm,
+            textContentColor = ProtonNextTheme.colors.textWeak
+        )
     }
 }
 
 @Composable
 private fun FeatureCategory(
+    state: SettingsUiState,
     modifier: Modifier = Modifier,
     isTablet: Boolean = false,
-    state: SettingsUiState,
-    onNavigateToSplitTunnelingMain: (() -> Unit)?,
-    onNavigateToProtocol: (() -> Unit)?
+    onNavigateToSplitTunnelingMain: (() -> Unit)? = null,
+    onNavigateToProtocol: (() -> Unit)? = null
 ) {
     Row(
         modifier = modifier
@@ -473,12 +710,12 @@ private fun FeatureCategory(
 
 @Composable
 fun FeatureTile(
-    modifier: Modifier = Modifier,
     title: String,
     subtitle: String,
     icon: ImageVector,
     isActive: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val colors = ProtonNextTheme.colors
     Box(

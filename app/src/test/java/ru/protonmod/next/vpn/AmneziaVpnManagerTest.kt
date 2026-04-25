@@ -20,6 +20,7 @@ package ru.protonmod.next.vpn
 import android.content.Context
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
 import org.junit.Before
@@ -40,6 +41,8 @@ import ru.protonmod.next.utils.crypto.VpnKeyPair
 import ru.protonmod.next.utils.system.SystemContextWrapper
 import java.net.InetAddress
 import org.mockito.Mockito
+import org.amnezia.awg.backend.Tunnel
+import org.junit.Assert.assertEquals
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AmneziaVpnManagerTest {
@@ -67,6 +70,12 @@ class AmneziaVpnManagerTest {
     
     @Mock
     private lateinit var amneziaConfigGenerator: AmneziaConfigGenerator
+
+    @Mock
+    private lateinit var vpnNetworkMonitor: VpnNetworkMonitor
+
+    @Mock
+    private lateinit var warpManager: ru.protonmod.next.vpn.WarpManager
 
     private val testDispatcher = UnconfinedTestDispatcher()
     private val testScope = TestScope(testDispatcher)
@@ -96,6 +105,7 @@ class AmneziaVpnManagerTest {
         whenever(cryptoWrapper.generateVpnKeyPair()).thenReturn(VpnKeyPair("pub", "priv"))
         whenever(amneziaConfigGenerator.buildConfig(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn("mock_config")
+        whenever(vpnNetworkMonitor.isValidated).thenReturn(MutableStateFlow(false))
 
         manager = AmneziaVpnManager(
             context,
@@ -106,6 +116,8 @@ class AmneziaVpnManagerTest {
             systemContextWrapper,
             cryptoWrapper,
             amneziaConfigGenerator,
+            vpnNetworkMonitor,
+            { warpManager },
             testDispatcherProvider,
             testScope
         )
@@ -133,7 +145,7 @@ class AmneziaVpnManagerTest {
         val newKeys = VpnKeyPair("new_pub_pem", "new_priv")
         whenever(cryptoWrapper.generateVpnKeyPair()).thenReturn(newKeys)
         
-        val refreshResponse = CreateCertificateResponse(code = 1000, certificate = "new_cert")
+        val refreshResponse = CreateCertificateResponse(code = 1000, certificate = "new_cert", expirationTime = 0, refreshTime = 0)
         whenever(vpnRepository.registerWireGuardKey(eq("at"), eq("sid"), eq("new_pub_pem")))
             .thenReturn(Result.success(refreshResponse))
         
@@ -143,7 +155,9 @@ class AmneziaVpnManagerTest {
         verify(sessionDao).updateVpnKeys(
             privateKey = eq("new_priv"),
             publicKeyPem = eq("new_pub_pem"),
-            certificate = eq("new_cert")
+            certificate = eq("new_cert"),
+            expiresAt = eq(0L),
+            refreshAt = eq(0L)
         )
     }
 
@@ -173,7 +187,7 @@ class AmneziaVpnManagerTest {
 
             whenever(sessionDao.getSession()).thenReturn(session)
             whenever(vpnRepository.registerWireGuardKey(any(), any(), any())).thenReturn(
-                Result.success(CreateCertificateResponse(code = 1000, certificate = "new_cert"))
+                Result.success(CreateCertificateResponse(code = 1000, certificate = "new_cert", expirationTime = 0L, refreshTime = 0L))
             )
 
             // We mock it to avoid internal refresh during test if possible
@@ -191,5 +205,27 @@ class AmneziaVpnManagerTest {
         } finally {
             mockedInetAddress.close()
         }
+    }
+
+    @Test
+    fun `VPN state transitions from VERIFYING to CONNECTED when validated`() = runTest(testDispatcher) {
+        val isValidatedFlow = MutableStateFlow(false)
+        whenever(vpnNetworkMonitor.isValidated).thenReturn(isValidatedFlow)
+
+        // Simulate Tunnel UP
+        manager.handleTunnelStateChange(Tunnel.State.UP)
+        
+        // We don't advanceUntilIdle here because it might jump past the verification timeout
+        
+        // Should be in VERIFYING state initially
+        assertEquals("Should be in VERIFYING state", AmneziaVpnManager.VpnState.VERIFYING, manager.vpnState.value)
+        
+        // Now simulate network validation
+        isValidatedFlow.value = true
+        advanceUntilIdle()
+        
+        // Should transition to CONNECTED
+        assertEquals("Should be in CONNECTED state", AmneziaVpnManager.VpnState.CONNECTED, manager.vpnState.value)
+        verify(systemContextWrapper).setVpnVerified()
     }
 }

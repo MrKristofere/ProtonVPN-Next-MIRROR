@@ -26,12 +26,13 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.Route
 import ru.protonmod.next.data.local.SessionDao
+import ru.protonmod.next.data.repository.AuthRepository
 import javax.inject.Inject
 import javax.inject.Provider
 
 class TokenAuthenticator @Inject constructor(
     private val sessionDao: SessionDao,
-    private val authApiProvider: Provider<ProtonAuthApi>
+    private val authRepositoryProvider: Provider<AuthRepository>
 ) : Authenticator {
 
     companion object {
@@ -39,7 +40,23 @@ class TokenAuthenticator @Inject constructor(
     }
 
     override fun authenticate(route: Route?, response: Response): Request? {
-        val requestUrl = response.request.url.toString()
+        val requestUrl = response.request.url
+        val requestHost = requestUrl.host
+
+        // Only authenticate for Proton API requests.
+        // These are hardcoded for safety as this is sensitive logic.
+        val isProtonApi = requestHost == "vpn-api.proton.me" ||
+                requestHost == "shimmering-stroopwafel-51675e.netlify.app" ||
+                requestHost == "api.protonnext.qzz.io"
+
+        // Do not attempt to authenticate if it's already an authentication or refresh request.
+        // This prevents infinite loops if the refresh endpoint itself returns 401.
+        val isAuthRequest = requestUrl.encodedPath.contains("auth/v4")
+
+        if (!isProtonApi || isAuthRequest) {
+            return null
+        }
+
         ProtonLogger.i(TAG, "HTTP 401/402 detected for $requestUrl. Initializing token refresh cycle.")
         ProtonLogger.addSentryBreadcrumb(TAG, "Auth Step: Token Expired ($requestUrl)", SentryLevel.WARNING, "auth.token")
 
@@ -60,6 +77,8 @@ class TokenAuthenticator @Inject constructor(
             }
 
             // Check if the request's auth header matches the current token.
+            // If the token in DB is different from the one in the request,
+            // another thread/request already refreshed it.
             val requestHeader = response.request.header("Authorization")
             if (requestHeader != null && !requestHeader.contains(session.accessToken)) {
                 ProtonLogger.i(TAG, "Token was already refreshed by a parallel request. Retrying with current token.")
@@ -70,43 +89,33 @@ class TokenAuthenticator @Inject constructor(
 
             // Token is genuinely expired, we need to refresh it
             try {
-                ProtonLogger.i(TAG, "Calling refreshSession API (SessionID: ${session.sessionId})")
+                ProtonLogger.i(TAG, "Calling refreshSession (SessionID: ${session.sessionId})")
 
-                val authApi = authApiProvider.get()
-                val refreshRequest = RefreshSessionRequest(
-                    uid = session.sessionId,
-                    refreshToken = session.refreshToken
-                )
+                val authRepository = authRepositoryProvider.get()
 
                 // Execute the refresh token request synchronously
-                val refreshResponse = runBlocking(Dispatchers.IO) {
-                    authApi.refreshSession(refreshRequest)
+                val refreshResult = runBlocking(Dispatchers.IO) {
+                    authRepository.refreshSession(session.sessionId, session.refreshToken)
                 }
 
-                ProtonLogger.d(TAG, "Refresh API response: code=${refreshResponse.code}, hasToken=${refreshResponse.accessToken != null}")
-
-                if (refreshResponse.code == 1000 && refreshResponse.accessToken != null) {
-                    ProtonLogger.i(TAG, "Successfully acquired new access token. Persisting to database...")
+                if (refreshResult.isSuccess) {
+                    val refreshResponse = refreshResult.getOrNull()!!
+                    ProtonLogger.i(TAG, "Successfully acquired new access token.")
                     ProtonLogger.addSentryBreadcrumb(TAG, "Auth Step: Token Refreshed", SentryLevel.INFO, "auth.token")
 
-                    // Update session with new tokens
                     val newAccessToken = refreshResponse.accessToken
-                    val newRefreshToken = refreshResponse.refreshToken ?: session.refreshToken
-
-                    val updatedSession = session.copy(
-                        accessToken = newAccessToken!!,
-                        refreshToken = newRefreshToken
-                    )
-
-                    runBlocking(Dispatchers.IO) { sessionDao.saveSession(updatedSession) }
-                    ProtonLogger.i(TAG, "Session updated in database. Retrying original request.")
 
                     // Retry the failed request with the new access token
                     return response.request.newBuilder()
                         .header("Authorization", "Bearer $newAccessToken")
                         .build()
+                } else if (refreshResult.exceptionOrNull()?.message == "Debounced") {
+                    ProtonLogger.i(TAG, "Refresh debounced, retrying original request with existing token.")
+                    return response.request.newBuilder()
+                        .header("Authorization", "Bearer ${session.accessToken}")
+                        .build()
                 } else {
-                    ProtonLogger.e(TAG, "Proton API rejected refresh request: Code ${refreshResponse.code}. User might be logged out.")
+                    ProtonLogger.e(TAG, "Refresh request failed. User might be logged out.")
                 }
             } catch (e: Exception) {
                 // Refresh failed (e.g., network error or refresh token itself is expired)

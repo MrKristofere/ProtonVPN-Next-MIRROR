@@ -36,15 +36,20 @@ import org.amnezia.awg.backend.Tunnel
 import ru.protonmod.next.data.local.ServerLoadDisplayMode
 import ru.protonmod.next.data.local.SettingsManager
 import ru.protonmod.next.data.model.ObfuscationProfile
+import ru.protonmod.next.data.repository.AuthRepository
+import ru.protonmod.next.ota.OTAUpdateManager
 import ru.protonmod.next.ui.theme.AppTheme
 import ru.protonmod.next.utils.crypto.QuicI1Generator
 import ru.protonmod.next.vpn.AmneziaVpnManager
-import ru.protonmod.next.vpn.VpnConstants
+import ru.protonmod.next.vpn.WarpManager
+import ru.protonmod.next.data.local.SessionDao
+import ru.protonmod.next.data.repository.UpdateRepository
+import ru.protonmod.next.data.repository.VpnRepository
 import javax.inject.Inject
 
 data class SettingsUiState(
     val killSwitchEnabled: Boolean = false,
-    val autoConnectEnabled: Boolean = true,
+    val autoConnectEnabled: Boolean = false,
     val notificationsEnabled: Boolean = true,
 
     // Connection configs
@@ -53,16 +58,37 @@ data class SettingsUiState(
     val excludedApps: Set<String> = emptySet(),
     val excludedIps: Set<String> = emptySet(),
     val excludedDomains: Set<String> = emptySet(),
-    val vpnPort: Int = 1194,
+    val vpnPort: Int = 0,
 
     // API Bypass Feature
     val apiBypassEnabled: Boolean = false,
     val apiBypassStrategy: String = "netlify",
+    val apiProxyHost: String = "",
+    val apiProxyPort: Int = 1080,
+    val apiProxyType: String = SettingsManager.PROXY_TYPE_SOCKS,
+    val apiProxyUsername: String = "",
+    val apiProxyPassword: String = "",
     val isAnyVpnActive: Boolean = false,
+
+    // WARP state
+    val isWarpFetching: Boolean = false,
+    val warpConfigLoaded: Boolean = false,
+
+    // API Mirroring / Spoofing
+    val spoofCountryEnabled: Boolean = false,
+    val spoofCountryNull: Boolean = false,
+    val spoofCountryCode: String = "",
 
     // Customization
     val appTheme: AppTheme = AppTheme.DARK,
     val serverLoadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL,
+
+    // OTA Update Settings
+    val otaUpdateFrequency: String = "daily",
+    val otaUpdateChannel: String = "stable",
+    val availableChannels: Map<String, Boolean> = mapOf("stable" to true, "nightly" to true),
+    val isCheckingForUpdates: Boolean = false,
+    val isUpdateAvailable: Boolean = false,
 
     // AWG low-level params
     val awgJc: Int = 3,
@@ -76,7 +102,7 @@ data class SettingsUiState(
     val awgH2: String = "2",
     val awgH3: String = "3",
     val awgH4: String = "4",
-    val awgI1: String = VpnConstants.DEFAULT_I1,
+    val awgI1: String = SettingsManager.DEFAULT_I1,
     val awgI2: String = "",
     val awgI3: String = "",
     val awgI4: String = "",
@@ -108,14 +134,29 @@ data class SettingsUiState(
 @Suppress("UNCHECKED_CAST")
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    amneziaVpnManager: AmneziaVpnManager,
-    private val settingsManager: SettingsManager
+    private val amneziaVpnManager: AmneziaVpnManager,
+    private val vpnRepository: VpnRepository,
+    private val sessionDao: SessionDao,
+    private val settingsManager: SettingsManager,
+    private val authRepository: AuthRepository,
+    private val updateRepository: UpdateRepository,
+    private val warpManager: WarpManager,
+    private val otaUpdateManager: OTAUpdateManager
 ) : ViewModel() {
 
     // Internal state tracking if any VPN is operating at the OS level
     private val _isAnyVpnActive = MutableStateFlow(false)
+    private val _isCheckingForUpdates = MutableStateFlow(false)
+    private val _isUpdateAvailable = MutableStateFlow(false)
+    private val _availableChannels = MutableStateFlow(mapOf("stable" to true, "nightly" to true))
 
     init {
+        viewModelScope.launch {
+            otaUpdateManager.latestUpdate.collect { update ->
+                _isUpdateAvailable.value = update != null
+            }
+        }
+        checkAvailableChannels()
         // Monitor system networks to automatically detect active VPN connections
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val request = NetworkRequest.Builder()
@@ -187,9 +228,23 @@ class SettingsViewModel @Inject constructor(
         settingsManager.sentryLogsEnabled,
         settingsManager.apiBypassEnabled,
         settingsManager.apiBypassStrategy,
+        settingsManager.apiProxyHost,
+        settingsManager.apiProxyPort,
+        settingsManager.apiProxyType,
+        settingsManager.apiProxyUsername,
+        settingsManager.apiProxyPassword,
         settingsManager.appTheme,
         settingsManager.serverLoadDisplayMode,
-        _isAnyVpnActive
+        settingsManager.spoofCountryEnabled,
+        settingsManager.spoofCountryNull,
+        settingsManager.spoofCountryCode,
+        settingsManager.otaUpdateFrequency,
+        settingsManager.otaUpdateChannel,
+        warpManager.isFetching,
+        _availableChannels,
+        _isAnyVpnActive,
+        _isCheckingForUpdates,
+        _isUpdateAvailable
     ) { args: Array<Any?> ->
         SettingsUiState(
             killSwitchEnabled = args[0] as Boolean,
@@ -234,9 +289,24 @@ class SettingsViewModel @Inject constructor(
             isSentryLogsEnabled = args[39] as Boolean,
             apiBypassEnabled = args[40] as Boolean,
             apiBypassStrategy = args[41] as String,
-            appTheme = args[42] as AppTheme,
-            serverLoadDisplayMode = args[43] as ServerLoadDisplayMode,
-            isAnyVpnActive = args[44] as Boolean
+            apiProxyHost = args[42] as String,
+            apiProxyPort = args[43] as Int,
+            apiProxyType = args[44] as String,
+            apiProxyUsername = args[45] as String,
+            apiProxyPassword = args[46] as String,
+            appTheme = args[47] as AppTheme,
+            serverLoadDisplayMode = args[48] as ServerLoadDisplayMode,
+            spoofCountryEnabled = args[49] as Boolean,
+            spoofCountryNull = args[50] as Boolean,
+            spoofCountryCode = args[51] as String,
+            otaUpdateFrequency = args[52] as String,
+            otaUpdateChannel = args[53] as String,
+            isWarpFetching = args[54] as Boolean,
+            warpConfigLoaded = warpManager.isConfigLoaded(),
+            availableChannels = args[55] as Map<String, Boolean>,
+            isAnyVpnActive = args[56] as Boolean,
+            isCheckingForUpdates = args[57] as Boolean,
+            isUpdateAvailable = args[58] as Boolean
         )
     }.stateIn(
         scope = viewModelScope,
@@ -268,6 +338,38 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setOtaUpdateFrequency(frequency: String) {
+        viewModelScope.launch {
+            settingsManager.setOtaUpdateFrequency(frequency)
+            otaUpdateManager.scheduleUpdateCheck()
+        }
+    }
+
+    fun setOtaUpdateChannel(channel: String) {
+        viewModelScope.launch {
+            settingsManager.setOtaUpdateChannel(channel)
+            // Immediately check for updates when channel changes
+            checkForUpdates()
+        }
+    }
+
+    private fun checkAvailableChannels() {
+        viewModelScope.launch {
+            _availableChannels.value = updateRepository.getAvailableChannels()
+        }
+    }
+
+    fun checkForUpdates() {
+        viewModelScope.launch {
+            _isCheckingForUpdates.value = true
+            try {
+                otaUpdateManager.checkForUpdatesNow()
+            } finally {
+                _isCheckingForUpdates.value = false
+            }
+        }
+    }
+
     fun setSplitTunneling(enabled: Boolean) {
         viewModelScope.launch {
             settingsManager.setSplitTunnelingEnabled(enabled)
@@ -294,13 +396,91 @@ class SettingsViewModel @Inject constructor(
 
     fun setApiBypassEnabled(enabled: Boolean) {
         viewModelScope.launch {
+            if (!enabled) {
+                amneziaVpnManager.ensureWarpBypass(false)
+            }
             settingsManager.setApiBypassEnabled(enabled)
         }
     }
 
     fun setApiBypassStrategy(strategy: String) {
         viewModelScope.launch {
+            if (strategy == SettingsManager.STRATEGY_WARP && !warpManager.isConfigLoaded()) {
+                warpManager.fetchWarpConfig()
+            } else if (strategy != SettingsManager.STRATEGY_WARP) {
+                amneziaVpnManager.ensureWarpBypass(false)
+            }
             settingsManager.setApiBypassStrategy(strategy)
+        }
+    }
+
+    fun fetchWarpConfig() {
+        viewModelScope.launch {
+            warpManager.fetchWarpConfig()
+        }
+    }
+
+    fun setApiProxyHost(host: String) {
+        viewModelScope.launch {
+            settingsManager.setApiProxyHost(host)
+        }
+    }
+
+    fun setApiProxyPort(port: Int) {
+        viewModelScope.launch {
+            settingsManager.setApiProxyPort(port)
+        }
+    }
+
+    fun setApiProxyType(type: String) {
+        viewModelScope.launch {
+            settingsManager.setApiProxyType(type)
+        }
+    }
+
+    fun setApiProxyUsername(username: String) {
+        viewModelScope.launch {
+            settingsManager.setApiProxyUsername(username)
+        }
+    }
+
+    fun setApiProxyPassword(password: String) {
+        viewModelScope.launch {
+            settingsManager.setApiProxyPassword(password)
+        }
+    }
+
+    fun setSpoofCountryEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsManager.setSpoofCountryEnabled(enabled)
+            // Trigger refresh if we have a session
+            sessionDao.getSession()?.let {
+                vpnRepository.refreshServersBackground(it.accessToken, it.sessionId, it.userTier, forceRefresh = true)
+            }
+        }
+    }
+
+    fun setSpoofCountryNull(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsManager.setSpoofCountryNull(enabled)
+            // Trigger refresh
+            sessionDao.getSession()?.let {
+                vpnRepository.refreshServersBackground(it.accessToken, it.sessionId, it.userTier, forceRefresh = true)
+            }
+        }
+    }
+
+    fun setSpoofCountryCode(code: String) {
+        viewModelScope.launch {
+            settingsManager.setSpoofCountryCode(code)
+        }
+    }
+
+    fun refreshServersAfterSpoofChange() {
+        viewModelScope.launch {
+            sessionDao.getSession()?.let {
+                vpnRepository.refreshServersBackground(it.accessToken, it.sessionId, it.userTier, forceRefresh = true)
+            }
         }
     }
 
@@ -434,7 +614,7 @@ class SettingsViewModel @Inject constructor(
             "<b 0xc0000000010892b06b4ebbca0bc7000044d057c592e23d34c9c3deca7a7cd33a1db8a4f853b48ab16f04e3c7fd20807f9b80954c849cac06879170c668ce2055d423bda127002d560066c2687ff3b688125269defb288ece048019c9812c55fbb016cf95fd73fd428b1f2efdd7e10c174fd1e6757a347214b443105777429c8cddd2e1fc77856fc41cabfc4781eca3027ecd073c7e4dd4e688e47f3d5d4831a37d0059f89bdcf055f11184725db456dcda8d0d3ee0e2f5dd4ce6aa039099e95b8c966210cb35dd4f7437e6e68d64c0d5d33aef8523af522e03de47ea6bb43b8bf1a96fc16ff4fd76d8a4c338f88360f69aed686fd82be98f17abb94ac63a0d9210840a4528ef25f91e7a0d91b6223e9b06b75465c94dd7e28f4194d25bab33ec618813c614a654b9dd420c2729e0202fbaf26e11268b6e50f2287452c3c81dacef3d98db8b7f4144bf70d70f6d72614167509afc874843843cbb73b302997cdafadd41850b0cb99a0b272b06e2c0001e6fda4fee44036b62ce27aea485a39a33c48e0ce97a7977c76d140f7df98b1a1cc46631a905041c76682dd2a8e07ab784f92d44c172d13405c3d87232aa539187c38d82096c17f5ccf76299465be7d25e81cf4bab3092846f158bec336d661cdd232b41b91fb50610e9113bc355dd92e404b7d91b288069397627c723202860658d995e94d4fefc005dda2df80d757aa5bc7a233b4b5807ccf28ebefcf6f70f8c513c55d5e9ff658e51583a0e460724db85b1e61891638817793542d5520a1d2536e08ddda1c11ba28173d7371d0bf6dde4a3aa4b826af64d307d97d471f5665f328af478abc70b8cefc24a0a90a6ed5caae5c4ce25167598600333943731aea8324e985ada2ab7ab1ea428ff8d3ecf8b272690e5b0ea1c5b4aa827b812cc5dd0b970b18ac88061a44255f5f638651ba5286d1decb8596b26f87730cd5de955f54a331f15e0c3edfea2b354e8418ac5c113f9dab98cd3822d7bc72cf29511abcdd56712f270f15419d1bab3b7e4a9320f41849e42b7ce3717c38f3b207867714a808f4f964fd4e51440a607b6efcef650cc7719227376b165e929c382ca943527c66e274ae9da0840b8f91f2d581a92e0c013155b4395f4c459e5e5089f9c3638098763d9485223d96c20e964e5bbec40c6fd920d746539dbca1ffdf1fbdeefa2256e7c8622566bbcfa0b60a573a13b6452e6b7ffe312c43475563fa5227fd50d450c022a6b46fb0f43a432dd84390ee337f6107bde0f4aecf0d58b3be6a5fb2b0e65bea782202f05ff145fb2561cbb29a536cd40bbb9058b673501798484af393423d84756af0a9813ef355c09f3112b80cb785b567aa36d7055a08e475c369c1c750c7c937655486075145863d29424a2442d3ea935e04c21d486d9c476f969dbc862d8e72e50b1c9880703a892f1d78a56ac336ac43e0a73de92bbbbc6d27b15f8ede377a43d39ba6f3c78b68da50a1f12bd8066bb572673210c6971f59af59d7c17245968b7f0d2fe8e9f141aaf99e6de7e0e9208d7a6dc83b9d9846bb0d01684ba9f1c9cdf07698549566466c20fc7cf2c679fc7aedeac59f534cd68e2e9ce7181fd9137f38431e708627101f3bf76a849ba5add5cf33508c8858e0ac587050eaecdf7e479a88eba4cc08d22d0c37cf12ce115eb4ee7a99302692d5cff8446486db739fa5db193a798776f879aabdffe5a3df911f7eb0a7e9b01d1fb7fad1392c9e4be307c329f7120edb4186c457f58>"
         )
         val randomHex = i1List.random()
-        
+
         val currentState = uiState.value
         setAwgParams(
             jc = currentState.awgJc, jmin = currentState.awgJmin, jmax = currentState.awgJmax,
@@ -462,5 +642,11 @@ class SettingsViewModel @Inject constructor(
     fun resetToStandard() {
         val standard = ObfuscationProfile.getStandardProfile()
         selectObfuscationProfile(standard)
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            authRepository.logout()
+        }
     }
 }
