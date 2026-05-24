@@ -62,12 +62,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import ru.protonmod.next.data.local.SessionDao
 import ru.protonmod.next.data.local.SettingsManager
+import ru.protonmod.next.data.local.SetupStep
 import ru.protonmod.next.ota.OTAUpdateScreen
 import ru.protonmod.next.ui.components.LiquidGlassBottomBar
 import ru.protonmod.next.ui.nav.MainTarget
 import ru.protonmod.next.ui.nav.Screen
 import ru.protonmod.next.ui.nav.appNavGraph
-import ru.protonmod.next.ui.screens.LoginScreen
 import ru.protonmod.next.ui.screens.WelcomeScreen
 import ru.protonmod.next.ui.screens.settings.PolicyAcceptanceScreen
 import ru.protonmod.next.ui.theme.AppTheme
@@ -118,11 +118,13 @@ class MainViewModel @Inject constructor(
                 settingsManager.setPolicyAcceptedVersion(SettingsManager.CURRENT_POLICY_VERSION)
             }
 
-            if (hasSession) {
-                ru.protonmod.next.utils.ProtonLogger.d("MainViewModel", "User logged in, going home.")
+            val step = settingsManager.setupStep.first()
+
+            if (hasSession && step == SetupStep.COMPLETE) {
+                ru.protonmod.next.utils.ProtonLogger.d("MainViewModel", "User logged in and setup complete, going home.")
                 _startDestination.value = Screen.Home.route
             } else {
-                ru.protonmod.next.utils.ProtonLogger.d("MainViewModel", "No session, going to welcome.")
+                ru.protonmod.next.utils.ProtonLogger.d("MainViewModel", "No session or setup incomplete, going to welcome.")
                 _startDestination.value = "welcome"
             }
         }
@@ -328,31 +330,18 @@ fun ProtonNextAppNavHost(
 
             composable("welcome") {
                 WelcomeScreen(
-                    onNavigateToLogin = { navController.navigate("login") },
-                    onNavigateToRegister = { /* TODO: Registration flow */ },
                     onNavigateToHome = {
                         // Clear the entire backstack and navigate to home (dashboard)
                         navController.navigate(Screen.Home.route) {
                             popUpTo(0)
                         }
                     },
-                    onNavigateToApiBypassSettings = {
-                        navController.navigate(Screen.ApiBypass.route)
-                    },
+                    onNavigateToRegister = { /* TODO: Registration flow */ },
                     onNavigateToPrivacyPolicy = {
                         navController.navigate(Screen.PrivacyPolicy.route)
-                    }
-                )
-            }
-
-            composable("login") {
-                LoginScreen(
-                    onBackClick = { navController.popBackStack() },
-                    onLoginSuccess = {
-                        // Clear the entire backstack and navigate to home (dashboard)
-                        navController.navigate(Screen.Home.route) {
-                            popUpTo(0)
-                        }
+                    },
+                    onNavigateToApiBypass = {
+                        navController.navigate(Screen.ApiBypass.route)
                     }
                 )
             }

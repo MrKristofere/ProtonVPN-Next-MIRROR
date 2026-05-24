@@ -37,6 +37,7 @@ sealed class Screen(val route: String) {
     data object Home : Screen("home")
     data object ApiBypass : Screen("api_bypass")
     data object CountrySpoofing : Screen("country_spoofing")
+    data object ByeDpiTest : Screen("byedpi_test")
     data object Settings : Screen("settings")
     data object Profiles : Screen("profiles")
     data object EditProfile : Screen("edit_profile?profileId={profileId}") {
@@ -90,18 +91,6 @@ fun NavGraphBuilder.appNavGraph(
         DashboardScreen()
     }
 
-    composable(Screen.PolicyAcceptance.route) {
-        val loginViewModel: LoginViewModel = hiltViewModel()
-        WelcomeScreen(
-            onNavigateToLogin = { navController.navigate(Screen.Home.route) },
-            onNavigateToRegister = { navController.navigate(Screen.Home.route) },
-            onNavigateToHome = { navController.navigate(Screen.Home.route) },
-            onNavigateToApiBypassSettings = { navController.navigate(Screen.ApiBypass.route) },
-            onNavigateToPrivacyPolicy = { navController.navigate(Screen.PrivacyPolicy.route) },
-            viewModel = loginViewModel
-        )
-    }
-
     composable(Screen.Settings.route) {
         SettingsScreen(
             onBack = { navController.popBackStack() },
@@ -149,6 +138,13 @@ fun NavGraphBuilder.appNavGraph(
 
     composable(Screen.ApiBypass.route) {
         ApiBypassScreen(
+            onBack = { navController.popBackStack() },
+            onNavigateToByeDpiTest = { navController.navigate(Screen.ByeDpiTest.route) }
+        )
+    }
+
+    composable(Screen.ByeDpiTest.route) {
+        ByeDpiTestScreen(
             onBack = { navController.popBackStack() }
         )
     }

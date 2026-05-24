@@ -17,21 +17,164 @@
 
 package ru.protonmod.next.ui.components
 
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LinearWavyProgressIndicator
-import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import ru.protonmod.next.data.local.SetupStep
 import ru.protonmod.next.ui.theme.ProtonNextTheme
+
+/**
+ * A full-screen loading overlay used during setup/login transitions.
+ */
+@Composable
+fun SetupLoadingScreen(
+    message: String,
+    modifier: Modifier = Modifier,
+    step: SetupStep = SetupStep.LOADING,
+    progress: Float? = null,
+    currentStrategy: String? = null,
+    onSkip: (() -> Unit)? = null
+) {
+    val colors = ProtonNextTheme.colors
+    val infiniteTransition = rememberInfiniteTransition(label = "loading_pulse")
+    
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_scale"
+    )
+
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow_alpha"
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(colors.backgroundNorm)
+    ) {
+        ExpressiveBackground(step = step)
+        
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(240.dp)
+                    .graphicsLayer {
+                        scaleX = pulseScale
+                        scaleY = pulseScale
+                    }
+            ) {
+                // Background glow
+                Box(
+                    modifier = Modifier
+                        .size(180.dp)
+                        .background(
+                            brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                                colors = listOf(
+                                    colors.brandNorm.copy(alpha = glowAlpha),
+                                    Color.Transparent
+                                )
+                            ),
+                            shape = CircleShape
+                        )
+                )
+
+                MorphedGears(
+                    modifier = Modifier.size(200.dp),
+                    color = colors.brandNorm
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(48.dp))
+            
+            Text(
+                text = message,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = colors.textNorm,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = if (progress != null) stringResource(ru.protonmod.next.R.string.byedpi_auto_test_desc)
+                       else stringResource(ru.protonmod.next.R.string.setup_please_wait_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.textWeak,
+                textAlign = TextAlign.Center
+            )
+
+            if (progress != null) {
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
+                    color = colors.brandNorm,
+                    trackColor = colors.separatorNorm
+                )
+                
+                if (currentStrategy != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = currentStrategy,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textWeak,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 2
+                    )
+                }
+                
+                if (onSkip != null) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    TextButton(
+                        onClick = onSkip,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(ru.protonmod.next.R.string.btn_skip), color = colors.brandNorm)
+                    }
+                }
+            }
+        }
+    }
+}
 
 /**
  * A "Google Pixel Style" shape-shifting circular loading indicator.
