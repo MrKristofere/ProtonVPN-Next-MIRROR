@@ -57,7 +57,7 @@ jobs:
             "build-tools;36.0.0"
 
       - name: Build Debug APK
-        run: ./gradlew assembleRelease --stacktrace
+        run: ./gradlew assembleDebug --stacktrace
         
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
