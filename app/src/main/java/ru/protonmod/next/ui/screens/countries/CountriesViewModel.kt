@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
@@ -43,22 +44,27 @@ import javax.inject.Inject
 data class CountryDisplayItem(val code: String, val averageLoad: Int)
 data class CityDisplayItem(val name: String, val localizedName: String, val averageLoad: Int)
 
+sealed class BottomSheetContent {
+    data class Cities(
+        val countryCode: String,
+        val cities: List<CityDisplayItem>
+    ) : BottomSheetContent()
+
+    data class Servers(
+        val countryCode: String,
+        val cityName: String,
+        val localizedCityName: String,
+        val servers: List<LogicalServer>
+    ) : BottomSheetContent()
+}
+
 sealed class CountriesUiState {
     data object Loading : CountriesUiState()
-    data class CountriesList(
+    data class Success(
         val countries: List<CountryDisplayItem>,
-        val loadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
-    ) : CountriesUiState()
-    data class CitiesList(
-        val country: String,
-        val cities: List<CityDisplayItem>,
-        val loadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
-    ) : CountriesUiState()
-    data class ServersList(
-        val country: String,
-        val city: String,
-        val servers: List<LogicalServer>,
-        val loadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL
+        val bottomSheetContent: BottomSheetContent? = null,
+        val loadDisplayMode: ServerLoadDisplayMode = ServerLoadDisplayMode.ALL,
+        val isBottomSheetOpen: Boolean = false
     ) : CountriesUiState()
     data class Error(val message: String) : CountriesUiState()
 }
@@ -100,16 +106,15 @@ class CountriesViewModel @Inject constructor(
             return@combine CountriesUiState.Error(error)
         }
 
-        when (nav) {
-            is NavigationState.Countries -> {
-                val countries = servers.groupBy { it.exitCountry }
-                    .map { (code, countryServers) ->
-                        val avg = if (countryServers.isEmpty()) 0 else countryServers.map { it.averageLoad }.average().toInt()
-                        CountryDisplayItem(code, avg)
-                    }
-                    .sortedBy { it.code }
-                CountriesUiState.CountriesList(countries, loadMode)
+        val countries = servers.groupBy { it.exitCountry }
+            .map { (code, countryServers) ->
+                val avg = if (countryServers.isEmpty()) 0 else countryServers.map { it.averageLoad }.average().toInt()
+                CountryDisplayItem(code, avg)
             }
+            .sortedBy { it.code }
+
+        val bottomSheetContent = when (nav) {
+            is NavigationState.Countries -> null
             is NavigationState.Cities -> {
                 val cities = servers.filter { it.exitCountry == nav.countryCode }
                     .groupBy { it.city }
@@ -119,16 +124,20 @@ class CountriesViewModel @Inject constructor(
                         CityDisplayItem(name, localizedName, avg)
                     }
                     .sortedBy { it.localizedName }
-                CountriesUiState.CitiesList(nav.countryCode, cities, loadMode)
+                BottomSheetContent.Cities(nav.countryCode, cities)
             }
             is NavigationState.Servers -> {
                 val cityServers = servers.filter { it.exitCountry == nav.countryCode && it.city == nav.cityName }
                     .sortedBy { it.name }
                 val localizedCityName = cityServers.firstOrNull()?.localizedCity ?: nav.cityName
-                CountriesUiState.ServersList(nav.countryCode, localizedCityName, cityServers, loadMode)
+                BottomSheetContent.Servers(nav.countryCode, nav.cityName, localizedCityName, cityServers)
             }
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CountriesUiState.Loading)
+
+        CountriesUiState.Success(countries, bottomSheetContent, loadMode, nav != NavigationState.Countries)
+    }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CountriesUiState.Loading)
 
     val connectedServer: StateFlow<LogicalServer?> = connectedServerState.connectedServer
 
