@@ -51,8 +51,9 @@ fun ExpressiveBackground(
     alpha: Float = 0.8f,
     step: SetupStep = SetupStep.WELCOME
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "expressive_bg")
     val colors = ProtonNextTheme.colors
+
+    val infiniteTransition = rememberInfiniteTransition(label = "expressive_bg")
 
     // --- Dynamic Background Positions based on Step ---
     val blob1TargetPosition = remember(step) {

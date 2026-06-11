@@ -71,6 +71,7 @@
     <string name="dashboard_title">Proton VPN-Next</string>
     <string name="btn_retry">Повторить</string>
     <string name="error_system_appops">Системная ошибка: пожалуйста, переустановите приложение.</string>
+    <string name="error_vpn_permission_dialog_not_found">VPN permission dialog not available on this device.</string>
     <string name="title_recent_connections">Недавние подключения</string>
     <string name="status_connected">Подключено</string>
     <string name="status_connecting">Подключение…</string>
@@ -528,23 +529,37 @@
     <string name="battery_optimization_title">Оптимизация батареи активна</string>
     <string name="battery_optimization_desc">Android может отключать VPN для экономии энергии. Пожалуйста, отключите оптимизацию для этого приложения.</string>
     <string name="btn_fix">Исправить</string>
-    <!-- Trusted Wi-Fi -->
-    <string name="settings_trusted_wifi">Доверенные сети</string>
-    <string name="settings_trusted_wifi_desc">Управление Wi-Fi и мобильными сетями, в которых VPN не требуется</string>
-    <string name="settings_auto_connect_untrusted">Автоконнект в чужих сетях</string>
-    <string name="settings_auto_connect_untrusted_desc">Автоматически подключать VPN при входе в неизвестные сети</string>
-    <string name="trusted_wifi_title">Доверенные Wi-Fi и мобильные сети</string>
-    <string name="trusted_wifi_desc">VPN будет автоматически отключаться при подключении к этим сетям.</string>
-    <string name="trusted_wifi_add">Добавить текущую сеть: %1$s</string>
-    <string name="trusted_wifi_empty">Доверенные сети еще не добавлены.</string>
-    <string name="trusted_wifi_permission_title">Требуется доступ к сети</string>
-    <string name="trusted_wifi_permission_desc">Android требует разрешение на доступ к местоположению для идентификации Wi-Fi сетей. Мобильные сети определяются по имени оператора. Это используется только для автоматизации.</string>
     <!-- Anti-Tamper / Scary Warning -->
     <string name="tamper_warning_title">ОБНАРУЖЕНА НЕОФИЦИАЛЬНАЯ СБОРКА!</string>
     <string name="tamper_warning_desc">Эта версия Proton VPN-Next была модифицирована неизвестной третьей стороной. Ваша безопасность, конфиденциальность и данные находятся под ВЫСОКИМ РИСКОМ.</string>
     <string name="tamper_btn_accept_risks">Я осознаю риск и принимаю последствия</string>
     <string name="tamper_btn_download_official">Скачать оригинал</string>
     <string name="tamper_btn_back">Назад</string>
+    <!-- Backup & Restore -->
+    <string name="backup_title">Резервное копирование</string>
+    <string name="backup_export">Экспорт настроек</string>
+    <string name="backup_import">Импорт настроек</string>
+    <string name="backup_export_desc">Сохранить ваши конфигурации в файл</string>
+    <string name="backup_import_desc">Восстановить конфигурации из файла</string>
+    <string name="backup_categories">Выберите категории для включения</string>
+    <string name="backup_cat_general">Общие настройки</string>
+    <string name="backup_cat_obfuscation">Конфиги обфускации</string>
+    <string name="backup_cat_api_bypass">Настройки обхода API</string>
+    <string name="backup_cat_profiles">Профили VPN</string>
+    <string name="backup_cat_recent">Недавние подключения</string>
+    <string name="backup_cat_quick_connect">Быстрое подключение</string>
+    <string name="backup_cat_split_tunneling">Раздельное туннелирование</string>
+    <string name="backup_cat_vpn_port">Порт VPN</string>
+    <string name="backup_cat_dns">Настройки DNS</string>
+    <string name="backup_cat_spoof_country">Подмена страны</string>
+    <string name="backup_cat_ota">Настройки обновлений</string>
+    <string name="backup_cat_sentry">Аналитика и отчеты о сбоях</string>
+    <string name="backup_export_success">Настройки успешно экспортированы</string>
+    <string name="backup_export_error">Ошибка при экспорте настроек</string>
+    <string name="backup_import_success">Настройки успешно импортированы</string>
+    <string name="backup_import_error">Ошибка при импорте настроек</string>
+    <string name="backup_import_confirm">Это перезапишет ваши текущие настройки в выбранных категориях. Продолжить?</string>
+    <string name="backup_no_categories">Пожалуйста, выберите хотя бы одну категорию</string>
     <!-- Integrity failure overlay strings -->
     <string name="tamper_integrity_failure_title">КРИТИЧЕСКАЯ ОШИБКА ЦЕЛОСТНОСТИ</string>
     <string name="tamper_integrity_failure_desc">Это приложение было модифицировано и более не является безопасным. Обнаружено несовпадение ресурсов.</string>

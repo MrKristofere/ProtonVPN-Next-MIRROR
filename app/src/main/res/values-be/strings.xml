@@ -71,6 +71,7 @@
     <string name="dashboard_title">Proton VPN-Next</string>
     <string name="btn_retry">Паўтарыць</string>
     <string name="error_system_appops">Сістэмная памылка: пераўсталюйце праграму.</string>
+    <string name="error_vpn_permission_dialog_not_found">VPN permission dialog not available on this device.</string>
     <string name="title_recent_connections">Нядаўнія падключэнні</string>
     <string name="status_connected">Падключана</string>
     <string name="status_connecting">Падключэнне…</string>
@@ -528,23 +529,37 @@
     <string name="battery_optimization_title">Аптымізацыя батарэі актыўная</string>
     <string name="battery_optimization_desc">Android можа адключаць VPN для эканоміі энергіі. Адключыце аптымізацыю для гэтай праграмы.</string>
     <string name="btn_fix">Выправіць</string>
-    <!-- Trusted Wi-Fi -->
-    <string name="settings_trusted_wifi">Давераныя сеткі</string>
-    <string name="settings_trusted_wifi_desc">Кіраванне сеткамі, у якіх VPN не патрабуецца</string>
-    <string name="settings_auto_connect_untrusted">Аўтападключэнне ў недавераных сетках</string>
-    <string name="settings_auto_connect_untrusted_desc">Аўтаматычна падключаць VPN пры далучэнні да невядомыя сетак Wi-Fi</string>
-    <string name="trusted_wifi_title">Давераныя сеткі</string>
-    <string name="trusted_wifi_desc">VPN будзе аўтаматычна адключацца пры падключэнні да гэтых сетак Wi-Fi.</string>
-    <string name="trusted_wifi_add">Дадаць бягучую сетку: %1$s</string>
-    <string name="trusted_wifi_empty">Давераныя сеткі яшчэ не дададзены.</string>
-    <string name="trusted_wifi_permission_title">Патрабуецца доступ да сеткі</string>
-    <string name="trusted_wifi_permission_desc">Android патрабуе дазвол на доступ да месцазнаходжання, каб вызначыць сеткі Wi-Fi (SSID). Гэты дазвол будзе выкарыстаны толькі для вызначэння давераных сетак.</string>
     <!-- Anti-Tamper / Scary Warning -->
     <string name="tamper_warning_title">ВЫЯЎЛЕНА НЕАФІЦЫЙНАЯ ЗБОРКА!</string>
     <string name="tamper_warning_desc">Гэтая версія Proton VPN-Next была мадыфікавана невядомым рэсурсам. Ваша бяспека, прыватнасць і даныя знаходзяцца пад ВЫСОКАЙ ПАГРОЗАЙ.</string>
     <string name="tamper_btn_accept_risks">Я ўсведамляю рызыку і прымаю наступствы</string>
     <string name="tamper_btn_download_official">Спампаваць арыгінал</string>
     <string name="tamper_btn_back">Назад</string>
+    <!-- Backup & Restore -->
+    <string name="backup_title">Рэзервовае капіяванне і аднаўленне</string>
+    <string name="backup_export">Экспартаванне налад</string>
+    <string name="backup_import">Імпартаванне налад</string>
+    <string name="backup_export_desc">Захаваць вашы канфігурацыі ў файл</string>
+    <string name="backup_import_desc">Аднавіць канфігурацыі з файла</string>
+    <string name="backup_categories">Выберыце катэгорыі для ўключэння</string>
+    <string name="backup_cat_general">Агульныя налады</string>
+    <string name="backup_cat_obfuscation">Канфігурацыі абфускацыі</string>
+    <string name="backup_cat_api_bypass">Налады абыходу API</string>
+    <string name="backup_cat_profiles">Профілі VPN</string>
+    <string name="backup_cat_recent">Нядаўнія падключэнні</string>
+    <string name="backup_cat_quick_connect">Хуткае падключэнне</string>
+    <string name="backup_cat_split_tunneling">Split Tunneling</string>
+    <string name="backup_cat_vpn_port">Порт VPN</string>
+    <string name="backup_cat_dns">Налады DNS</string>
+    <string name="backup_cat_spoof_country">Падмена краіны</string>
+    <string name="backup_cat_ota">Налады абнаўлення</string>
+    <string name="backup_cat_sentry">Аналітыка і справаздачы аб збоях</string>
+    <string name="backup_export_success">Налады паспяхова экспартаваны</string>
+    <string name="backup_export_error">Не ўдалося экспартаваць налады</string>
+    <string name="backup_import_success">Налады паспяхова імпартаваны</string>
+    <string name="backup_import_error">Не ўдалося імпартаваць налады</string>
+    <string name="backup_import_confirm">Гэта дзеянне прывядзе да перазапісу вашых бягучых налад у выбраных катэгорыях. Працягнуць?</string>
+    <string name="backup_no_categories">Выберыце хаця б адну катэгорыю</string>
     <!-- Integrity failure overlay strings -->
     <string name="tamper_integrity_failure_title">КРЫТЫЧНАЯ ПАМЫЛКА ЦЭЛАСНАСЦІ</string>
     <string name="tamper_integrity_failure_desc">Гэта дадатак было мадыфікавана і больш не з\'яўляецца бяспечным. Выяўлена неадпаведнасць рэсурсаў.</string>

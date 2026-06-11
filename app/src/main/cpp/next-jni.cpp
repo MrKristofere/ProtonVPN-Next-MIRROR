@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <sys/ptrace.h>
 #include <android/log.h>
 #include <android/native_window_jni.h>
 #include <android/asset_manager_jni.h>
@@ -206,6 +207,10 @@ static jstring getSentryDsn(JNIEnv* env, jobject /* thiz */) {
 }
 
 static jobject loginNative(JNIEnv* env, jobject /* thiz */, jstring username, jstring password, jstring captchaToken) {
+    if (!AntiTamper::g_initialized) {
+        AntiTamper::reportSecurityEvent(env, XOR_STR("Login attempt without AntiTamper initialization!"));
+        abort();
+    }
     const char* userChars = env->GetStringUTFChars(username, nullptr);
     const char* passChars = env->GetStringUTFChars(password, nullptr);
     const char* captchaChars = captchaToken ? env->GetStringUTFChars(captchaToken, nullptr) : "";
@@ -263,6 +268,10 @@ static jobject loginNative(JNIEnv* env, jobject /* thiz */, jstring username, js
 extern "C" jint JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
     JNIEnv* env;
     if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) return JNI_ERR;
+
+    // Claim our own ptrace slot so no external process (GameGuardian, GameKiller, etc.)
+    // can attach and read/write our process memory via ptrace(PTRACE_ATTACH).
+    ptrace(PTRACE_TRACEME, 0, nullptr, nullptr);
 
     // Register NextConfigGenerator methods
     {

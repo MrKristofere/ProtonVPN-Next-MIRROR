@@ -18,11 +18,7 @@
 package ru.protonmod.next.ui.screens.dashboard
 
 import android.app.Activity
-import android.content.Intent
-import android.net.Uri
 import android.net.VpnService
-import android.os.PowerManager
-import android.provider.Settings
 import android.text.BidiFormatter
 import ru.protonmod.next.utils.system.SystemUtils
 import ru.protonmod.next.utils.ProtonLogger
@@ -41,13 +37,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Place
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Star
@@ -56,7 +49,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -64,7 +56,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -77,12 +68,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import dagger.hilt.android.EntryPointAccessors
-import ru.protonmod.next.di.AppEntryPoint
-import ru.protonmod.next.vpn.NextVpnManager
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -101,7 +86,6 @@ import ru.protonmod.next.ui.theme.liquidGlass
 import ru.protonmod.next.ui.utils.CountryUtils
 import ru.protonmod.next.ui.utils.isTablet
 import ru.protonmod.next.vpn.AmneziaVpnManager
-import java.util.Locale
 
 // --- Extensions for UI Effects matching Original Proton ---
 
@@ -248,42 +232,32 @@ private fun ObscurableText(
             var currentChars = displayText.toCharArray()
 
             // Check if the underlying string itself has changed (e.g., completely new IP loaded)
-            // This is critical because if lengths match but dot positions differ, the old
-            // asterisks will remain stuck since the animation filter preserves the new dots.
             val baseChanged = previousTargetText != targetText || currentChars.size != targetChars.size
 
             if (baseChanged) {
-                // Reset fixed width to allow the layout to remeasure for the new string
                 fixedWidth = null
                 previousTargetText = targetText
 
                 val baseChars = targetChars.clone()
                 if (isObscured) {
-                    // Instantly obscure the new text, applying the new dot/dash placement
                     for (i in baseChars.indices) {
                         if (!preserveCharacters.contains(baseChars[i])) baseChars[i] = targetCharacter
                     }
-                    displayText = String(baseChars)
-                } else {
-                    // If we are unobscuring to a NEW target, start from its obscured version
-                    // and let the animation below reveal the new characters gracefully.
-                    for (i in baseChars.indices) {
-                        if (!preserveCharacters.contains(baseChars[i])) baseChars[i] = targetCharacter
-                    }
-                    currentChars = baseChars
-                    displayText = String(currentChars)
                 }
-            } else {
-                // Animate the differences character by character
-                for (i in indicesToAnimate) {
-                    if (isObscured && currentChars[i] == targetCharacter) continue
-                    if (!isObscured && currentChars[i] == targetChars[i]) continue
+                // Update displayText immediately for base change to align characters
+                displayText = String(baseChars)
+                currentChars = baseChars
+            }
 
-                    delay(duration.toLong())
-                    val newChar = if (isObscured) targetCharacter else targetChars[i]
-                    currentChars[i] = newChar
-                    displayText = String(currentChars)
-                }
+            // Always run the animation loop to ensure state matches targetText/isObscured
+            for (i in indicesToAnimate) {
+                if (isObscured && currentChars[i] == targetCharacter) continue
+                if (!isObscured && currentChars[i] == targetChars[i]) continue
+
+                delay(duration.toLong())
+                val newChar = if (isObscured) targetCharacter else targetChars[i]
+                currentChars[i] = newChar
+                displayText = String(currentChars)
             }
         }
 
@@ -404,6 +378,7 @@ fun DashboardScreen(
     var showPauseDialog by remember { mutableStateOf(false) }
 
     val errorAppOpsMsg = stringResource(R.string.error_system_appops)
+    val errorVpnDialogNotFound = stringResource(R.string.error_vpn_permission_dialog_not_found)
 
     val checkVpnAndConnect: (LogicalServer) -> Unit = { server ->
         try {
@@ -417,6 +392,9 @@ fun DashboardScreen(
         } catch (_: SecurityException) {
             android.widget.Toast.makeText(context, errorAppOpsMsg, android.widget.Toast.LENGTH_LONG).show()
             viewModel.toggleConnection(server)
+        } catch (_: android.content.ActivityNotFoundException) {
+            pendingServer = null
+            android.widget.Toast.makeText(context, errorVpnDialogNotFound, android.widget.Toast.LENGTH_LONG).show()
         }
     }
 
@@ -432,6 +410,9 @@ fun DashboardScreen(
         } catch (_: SecurityException) {
             android.widget.Toast.makeText(context, errorAppOpsMsg, android.widget.Toast.LENGTH_LONG).show()
             viewModel.quickConnect()
+        } catch (_: android.content.ActivityNotFoundException) {
+            isQuickConnectPending = false
+            android.widget.Toast.makeText(context, errorVpnDialogNotFound, android.widget.Toast.LENGTH_LONG).show()
         }
     }
 
@@ -465,6 +446,7 @@ fun DashboardScreen(
                 HomeMap(
                     allServers = (successState?.servers ?: emptyList()).toImmutableList(),
                     connectedServer = successState?.connectedServer,
+                    isConnected = isConnected,
                     isConnecting = isConnecting,
                     modifier = Modifier.fillMaxSize(),
                     userCountryCode = successState?.originalLocationText?.countryCode,

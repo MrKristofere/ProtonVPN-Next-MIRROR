@@ -129,10 +129,6 @@ data class SettingsUiState(
     val selectedProfileId: String = "standard_1",
     val customDns: String = "",
 
-    // Trusted Wi-Fi
-    val trustedWifiNetworks: Set<String> = emptySet(),
-    val autoConnectOnUntrusted: Boolean = false,
-
     // Privacy & Analytics
     val isAnalyticsEnabled: Boolean = true,
     val isCrashReportsEnabled: Boolean = true,
@@ -258,8 +254,6 @@ class SettingsViewModel @Inject constructor(
         settingsManager.otaUpdateChannel,
         settingsManager.byeDpiFlags,
         settingsManager.byeDpiSni,
-        settingsManager.trustedWifiNetworks,
-        settingsManager.autoConnectOnUntrusted,
         warpManager.isFetching,
         byeDpiStrategyTester.isTesting,
         byeDpiStrategyTester.progress,
@@ -327,18 +321,16 @@ class SettingsViewModel @Inject constructor(
             otaUpdateChannel = args[53] as String,
             byeDpiFlags = args[54] as String,
             byeDpiSni = args[55] as String,
-            trustedWifiNetworks = args[56] as Set<String>,
-            autoConnectOnUntrusted = args[57] as Boolean,
-            isWarpFetching = args[58] as Boolean,
+            isWarpFetching = args[56] as Boolean,
             warpConfigLoaded = warpManager.isConfigLoaded(),
-            isByeDpiTesting = args[59] as Boolean,
-            byeDpiTestProgress = args[60] as Float,
-            byeDpiCurrentStrategy = args[61] as String,
-            byeDpiResults = args[62] as List<ByeDpiStrategyTester.TestResult>,
-            availableChannels = args[63] as Map<String, Boolean>,
-            isAnyVpnActive = args[64] as Boolean,
-            isCheckingForUpdates = args[65] as Boolean,
-            isUpdateAvailable = args[66] as Boolean
+            isByeDpiTesting = args[57] as Boolean,
+            byeDpiTestProgress = args[58] as Float,
+            byeDpiCurrentStrategy = args[59] as String,
+            byeDpiResults = args[60] as List<ByeDpiStrategyTester.TestResult>,
+            availableChannels = args[61] as Map<String, Boolean>,
+            isAnyVpnActive = args[62] as Boolean,
+            isCheckingForUpdates = args[63] as Boolean,
+            isUpdateAvailable = args[64] as Boolean
         )
     }.stateIn(
         scope = viewModelScope,
@@ -417,26 +409,6 @@ class SettingsViewModel @Inject constructor(
     fun setVpnPort(port: Int) {
         viewModelScope.launch {
             settingsManager.setVpnPort(port)
-        }
-    }
-
-    fun setAutoConnectOnUntrusted(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsManager.setAutoConnectOnUntrusted(enabled)
-        }
-    }
-
-    fun addTrustedWifi(ssid: String) {
-        viewModelScope.launch {
-            val current = uiState.value.trustedWifiNetworks
-            settingsManager.setTrustedWifiNetworks(current + ssid)
-        }
-    }
-
-    fun removeTrustedWifi(ssid: String) {
-        viewModelScope.launch {
-            val current = uiState.value.trustedWifiNetworks
-            settingsManager.setTrustedWifiNetworks(current - ssid)
         }
     }
 
@@ -582,49 +554,56 @@ class SettingsViewModel @Inject constructor(
     fun setAnalyticsEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsManager.setAnalyticsEnabled(enabled)
+            ru.protonmod.next.vpn.SentryConfigurator.applySettings(settingsManager)
         }
     }
 
     fun setCrashReportsEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsManager.setCrashReportsEnabled(enabled)
+            ru.protonmod.next.vpn.SentryConfigurator.applySettings(settingsManager)
         }
     }
 
     fun setSentryPerformanceEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsManager.setSentryPerformanceEnabled(enabled)
+            ru.protonmod.next.vpn.SentryConfigurator.applySettings(settingsManager)
         }
     }
 
     fun setSentryNonFatalEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsManager.setSentryNonFatalEnabled(enabled)
+            ru.protonmod.next.vpn.SentryConfigurator.applySettings(settingsManager)
         }
     }
 
     fun setSentrySessionReplayEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsManager.setSentrySessionReplayEnabled(enabled)
+            ru.protonmod.next.vpn.SentryConfigurator.applySettings(settingsManager)
         }
     }
 
     fun setSentryAnrEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsManager.setSentryAnrEnabled(enabled)
+            ru.protonmod.next.vpn.SentryConfigurator.applySettings(settingsManager)
         }
     }
 
     fun setSentryMetricsEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsManager.setSentryMetricsEnabled(enabled)
+            ru.protonmod.next.vpn.SentryConfigurator.applySettings(settingsManager)
         }
     }
 
     fun setSentryLogsEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsManager.setSentryLogsEnabled(enabled)
-            ru.protonmod.next.utils.ProtonLogger.isSentryLogsEnabled = enabled
+            ru.protonmod.next.vpn.SentryConfigurator.applySettings(settingsManager)
         }
     }
 

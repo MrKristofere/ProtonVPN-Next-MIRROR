@@ -79,6 +79,7 @@
     <string name="dashboard_title">Proton VPN-Next</string>
     <string name="btn_retry">Retry</string>
     <string name="error_system_appops">System error: please reinstall the app.</string>
+    <string name="error_vpn_permission_dialog_not_found">VPN permission dialog not available on this device.</string>
     <string name="title_recent_connections">Recent connections</string>
     <string name="status_connected">Connected</string>
     <string name="status_connecting">Connecting…</string>
@@ -583,24 +584,38 @@
     <string name="battery_optimization_desc">Android may disconnect the VPN to save power. Please disable optimization for this app.</string>
     <string name="btn_fix">Fix</string>
 
-    <!-- Trusted Wi-Fi -->
-    <string name="settings_trusted_wifi">Trusted Networks</string>
-    <string name="settings_trusted_wifi_desc">Manage Wi-Fi and mobile networks where VPN is not required</string>
-    <string name="settings_auto_connect_untrusted">Auto-connect on Untrusted</string>
-    <string name="settings_auto_connect_untrusted_desc">Automatically connect VPN when joining unknown networks</string>
-    <string name="trusted_wifi_title">Trusted Wi-Fi &amp; Mobile</string>
-    <string name="trusted_wifi_desc">The VPN will automatically disconnect when you connect to these Wi-Fi or mobile networks.</string>
-    <string name="trusted_wifi_add">Add current network: %1$s</string>
-    <string name="trusted_wifi_empty">No trusted networks added yet.</string>
-    <string name="trusted_wifi_permission_title">Network Access Required</string>
-    <string name="trusted_wifi_permission_desc">Android requires location permission to identify Wi-Fi networks. Mobile networks are identified by carrier name. This is used only for automation.</string>
-
     <!-- Anti-Tamper / Scary Warning -->
     <string name="tamper_warning_title">UNOFFICIAL BUILD DETECTED!</string>
     <string name="tamper_warning_desc">This version of Proton VPN-Next has been modified by an unknown third party. Your security, privacy, and data are at HIGH RISK.</string>
     <string name="tamper_btn_accept_risks">I Understand the Risk and Accept Consequences</string>
     <string name="tamper_btn_download_official">Get Official App</string>
     <string name="tamper_btn_back">Back</string>
+
+    <!-- Backup & Restore -->
+    <string name="backup_title">Backup &amp; Restore</string>
+    <string name="backup_export">Export Settings</string>
+    <string name="backup_import">Import Settings</string>
+    <string name="backup_export_desc">Save your configurations to a file</string>
+    <string name="backup_import_desc">Restore configurations from a file</string>
+    <string name="backup_categories">Select categories to include</string>
+    <string name="backup_cat_general">General Settings</string>
+    <string name="backup_cat_obfuscation">Obfuscation Configs</string>
+    <string name="backup_cat_api_bypass">API Bypass Settings</string>
+    <string name="backup_cat_profiles">VPN Profiles</string>
+    <string name="backup_cat_recent">Recent Connections</string>
+    <string name="backup_cat_quick_connect">Quick Connect</string>
+    <string name="backup_cat_split_tunneling">Split Tunneling</string>
+    <string name="backup_cat_vpn_port">VPN Port</string>
+    <string name="backup_cat_dns">DNS Settings</string>
+    <string name="backup_cat_spoof_country">Country Spoofing</string>
+    <string name="backup_cat_ota">Update Settings</string>
+    <string name="backup_cat_sentry">Analytics &amp; Crash Reports</string>
+    <string name="backup_export_success">Settings exported successfully</string>
+    <string name="backup_export_error">Failed to export settings</string>
+    <string name="backup_import_success">Settings imported successfully</string>
+    <string name="backup_import_error">Failed to import settings</string>
+    <string name="backup_import_confirm">This will overwrite your current settings in the selected categories. Continue?</string>
+    <string name="backup_no_categories">Please select at least one category</string>
 
     <!-- Integrity failure overlay strings -->
     <string name="tamper_integrity_failure_title">CRITICAL INTEGRITY FAILURE</string>

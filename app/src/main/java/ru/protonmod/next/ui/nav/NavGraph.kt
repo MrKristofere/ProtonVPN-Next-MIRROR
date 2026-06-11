@@ -55,12 +55,12 @@ sealed class Screen(val route: String) {
     data object Protocol : Screen("protocol")
     data object ObfuscationSettings : Screen("obfuscation_settings")
     data object KillSwitch : Screen("kill_switch")
-    data object TrustedWifi : Screen("trusted_wifi")
     data object ErrorReporting : Screen("error_reporting")
 
     data object ThemeSelection : Screen("theme_selection")
     data object LoadDisplayModeSelection : Screen("load_display_mode_selection")
     data object DebugSettings : Screen("debug_settings")
+    data object BackupSettings : Screen("backup_settings")
 
     data object CustomDns : Screen("custom_dns")
     data object PortSelection : Screen("port_selection?currentPort={currentPort}&isGlobal={isGlobal}") {
@@ -121,6 +121,9 @@ fun NavGraphBuilder.appNavGraph(
             onNavigateToDebug = {
                 navController.navigate(Screen.DebugSettings.route)
             },
+            onNavigateToBackup = {
+                navController.navigate(Screen.BackupSettings.route)
+            },
             onNavigateToCustomDns = {
                 navController.navigate(Screen.CustomDns.route)
             },
@@ -129,9 +132,6 @@ fun NavGraphBuilder.appNavGraph(
             },
             onNavigateToPortSelection = { currentPort ->
                 navController.navigate(Screen.PortSelection.createRoute(currentPort, true))
-            },
-            onNavigateToTrustedWifi = {
-                navController.navigate(Screen.TrustedWifi.route)
             }
         )
     }
@@ -174,12 +174,6 @@ fun NavGraphBuilder.appNavGraph(
         )
     }
 
-    composable(Screen.TrustedWifi.route) {
-        TrustedWifiScreen(
-            onBack = { navController.popBackStack() }
-        )
-    }
-
     composable(Screen.ErrorReporting.route) {
         ErrorReportingScreen(
             onBack = { navController.popBackStack() }
@@ -201,6 +195,12 @@ fun NavGraphBuilder.appNavGraph(
     composable(Screen.DebugSettings.route) {
         DebugSettingsScreen(
             onBack = { navController.popBackStack() }
+        )
+    }
+
+    composable(Screen.BackupSettings.route) {
+        BackupScreen(
+            onNavigateBack = { navController.popBackStack() }
         )
     }
 

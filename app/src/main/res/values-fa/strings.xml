@@ -71,6 +71,7 @@
     <string name="dashboard_title">Proton VPN-Next</string>
     <string name="btn_retry">تلاش مجدد</string>
     <string name="error_system_appops">خطای سیستم: لطفاً برنامه را دوباره نصب کنید.</string>
+    <string name="error_vpn_permission_dialog_not_found">VPN permission dialog not available on this device.</string>
     <string name="title_recent_connections">اتصال‌های اخیر</string>
     <string name="status_connected">متصل شد</string>
     <string name="status_connecting">در حال اتصال…</string>
@@ -522,23 +523,37 @@
     <string name="battery_optimization_title">بهینه‌سازی باتری فعال است</string>
     <string name="battery_optimization_desc">اندروید ممکن است برای صرفه‌جویی در مصرف انرژی، VPN را قطع کند. لطفاً بهینه‌سازی را برای این برنامه غیرفعال کنید.</string>
     <string name="btn_fix">رفع مشکل</string>
-    <!-- Trusted Wi-Fi -->
-    <string name="settings_trusted_wifi">شبکه‌های Wi-Fi قابل اعتماد</string>
-    <string name="settings_trusted_wifi_desc">مدیریت شبکه‌هایی که در آن‌ها VPN لازم نیست</string>
-    <string name="settings_auto_connect_untrusted">اتصال خودکار در شبکه‌های نامطمئن</string>
-    <string name="settings_auto_connect_untrusted_desc">اتصال خودکار VPN هنگام پیوستن به Wi-Fi ناشناخته</string>
-    <string name="trusted_wifi_title">شبکه‌های مورد اعتماد</string>
-    <string name="trusted_wifi_desc">هنگام اتصال به این شبکه‌های Wi-Fi، VPN به طور خودکار قطع می‌شود.</string>
-    <string name="trusted_wifi_add">افزودن Wi-Fi فعلی: %1$s</string>
-    <string name="trusted_wifi_empty">هنوز هیچ شبکه مورد اعتمادی اضافه نشده است.</string>
-    <string name="trusted_wifi_permission_title">دسترسی به موقعیت مکانی لازم است</string>
-    <string name="trusted_wifi_permission_desc">اندروید برای خواندن نام Wi-Fi (SSID) به مجوز موقعیت مکانی نیاز دارد. این فقط برای شناسایی شبکه‌های مورد اعتماد استفاده می‌شود.</string>
     <!-- Anti-Tamper / Scary Warning -->
     <string name="tamper_warning_title">نسخه غیررسمی شناسایی شد!</string>
     <string name="tamper_warning_desc">این نسخه از Proton VPN-Next توسط یک شخص ثالث ناشناس اصلاح شده است. امنیت، حریم خصوصی و داده‌های شما در معرض خطر بسیار بالایی قرار دارند.</string>
     <string name="tamper_btn_accept_risks">خطر را می‌پذیرم</string>
     <string name="tamper_btn_download_official">دریافت نسخه اصلی</string>
     <string name="tamper_btn_back">بازگشت</string>
+    <!-- Backup & Restore -->
+    <string name="backup_title">پشتیبان‌گیری</string>
+    <string name="backup_export">خروجی تنظیمات</string>
+    <string name="backup_import">وارد کردن تنظیمات</string>
+    <string name="backup_export_desc">ذخیره پیکربندی‌های شما در یک فایل</string>
+    <string name="backup_import_desc">بازیابی پیکربندی‌ها از یک فایل</string>
+    <string name="backup_categories">دسته‌بندی‌ها را برای گنجاندن انتخاب کنید</string>
+    <string name="backup_cat_general">تنظیمات عمومی</string>
+    <string name="backup_cat_obfuscation">پیکربندی‌های مبهم‌سازی</string>
+    <string name="backup_cat_api_bypass">تنظیمات دور زدن API</string>
+    <string name="backup_cat_profiles">پروفایل‌های VPN</string>
+    <string name="backup_cat_recent">اتصال‌های اخیر</string>
+    <string name="backup_cat_quick_connect">اتصال سریع</string>
+    <string name="backup_cat_split_tunneling">تونل‌زنی تقسیم‌شده</string>
+    <string name="backup_cat_vpn_port">پورت VPN</string>
+    <string name="backup_cat_dns">تنظیمات DNS</string>
+    <string name="backup_cat_spoof_country">جعل کشور</string>
+    <string name="backup_cat_ota">تنظیمات به‌روزرسانی</string>
+    <string name="backup_cat_sentry">تجزیه و تحلیل و گزارش‌های خرابی</string>
+    <string name="backup_export_success">تنظیمات با موفقیت صادر شد</string>
+    <string name="backup_export_error">صادر کردن تنظیمات ناموفق بود</string>
+    <string name="backup_import_success">تنظیمات با موفقیت وارد شد</string>
+    <string name="backup_import_error">وارد کردن تنظیمات ناموفق بود</string>
+    <string name="backup_import_confirm">این کار تنظیمات فعلی شما را در دسته‌بندی‌های انتخاب شده بازنویسی می‌کند. ادامه می‌دهید؟</string>
+    <string name="backup_no_categories">لطفاً حداقل یک دسته‌بندی را انتخاب کنید</string>
     <!-- Integrity failure overlay strings -->
     <string name="tamper_integrity_failure_title">خطای بحرانی در یکپارچگی</string>
     <string name="tamper_integrity_failure_desc">این برنامه دستکاری شده است و دیگر برای استفاده ایمن نیست. منابع ناهماهنگ شناسایی شدند.</string>

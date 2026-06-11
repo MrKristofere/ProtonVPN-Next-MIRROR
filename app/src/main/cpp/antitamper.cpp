@@ -3,6 +3,8 @@
 #include "security_metadata.h"
 #include "obfuscation.h"
 #include "sentry_manager.h"
+#include "sha256.h"
+#include "syscalls.h"
 #include <android/log.h>
 #include <android/native_window_jni.h>
 #include <EGL/egl.h>
@@ -19,6 +21,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/ptrace.h>
+#include <dirent.h>
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 
@@ -114,6 +117,7 @@ std::atomic<bool> AntiTamper::g_download_clicked(false);
 std::atomic<bool> AntiTamper::g_accept_clicked(false);
 std::atomic<bool> AntiTamper::g_force_detection(false);
 std::atomic<bool> AntiTamper::g_force_error(false);
+std::atomic<bool> AntiTamper::g_initialized(false);
 std::atomic<OverlayView> AntiTamper::g_current_view(OverlayView::WARNING);
 std::string AntiTamper::g_current_locale = "en";
 std::string AntiTamper::g_url_to_open = "";
@@ -224,15 +228,15 @@ bool AntiTamper::isDebuggerConnected(JNIEnv* env) {
 }
 
 bool AntiTamper::checkTracerPid() {
-    std::ifstream status(XOR_STR("/proc/self/status"));
-    if (!status.is_open()) return true; // Fail safe
-    std::string line;
-    while (std::getline(status, line)) {
-        if (line.find(XOR_STR("TracerPid:")) == 0) {
-            int pid = std::stoi(line.substr(10));
-            if (pid != 0) return false;
-            break;
-        }
+    std::string status = read_file_sys(XOR_STR("/proc/self/status").c_str());
+    if (status.empty()) return true; // Fail safe
+
+    size_t pos = status.find(XOR_STR("TracerPid:"));
+    if (pos != std::string::npos) {
+        size_t end = status.find('\n', pos);
+        std::string line = status.substr(pos, end - pos);
+        int pid = std::stoi(line.substr(10));
+        if (pid != 0) return false;
     }
     return true;
 }
@@ -271,11 +275,6 @@ bool AntiTamper::checkEnvironment(JNIEnv* env) {
     std::string pkgName = getExpectedPackageName();
     std::vector<std::string> detectedLibs;
 
-    bool isSecurityTest = false;
-#if defined(DEBUG_BUILD) || defined(ANTITAMPER_TEST_BUILD)
-    isSecurityTest = true;
-#endif
-
     bool allGood = true;
 
     // Advanced checks
@@ -292,22 +291,33 @@ bool AntiTamper::checkEnvironment(JNIEnv* env) {
 
     int libCount = (int)detectedLibs.size();
 
-    std::ifstream maps(XOR_STR("/proc/self/maps"));
-    if (!maps.is_open()) return allGood && (libCount > 0);
+    // Use syscall for maps reading
+    std::string maps_content = read_file_sys(XOR_STR("/proc/self/maps").c_str());
+    if (maps_content.empty()) return allGood && (libCount > 0);
 
+    std::stringstream maps(maps_content);
     std::string line;
     bool apkMapped = false;
     auto officialLibs = next::getOfficialLibs();
 
     while (std::getline(maps, line)) {
-        // 1. Frida/Xposed/Bypass Tools Detection
-        if (line.find(XOR_STR("frida")) != std::string::npos ||
+        // 1. Frida/Xposed/Bypass Tools Detection (name-based)
+        bool isFridaByName = (line.find(XOR_STR("frida")) != std::string::npos ||
             line.find(XOR_STR("xposed")) != std::string::npos ||
             line.find(XOR_STR("libgadget")) != std::string::npos ||
-            line.find(XOR_STR("substrate")) != std::string::npos) {
+            line.find(XOR_STR("substrate")) != std::string::npos);
+
+        // Detect anonymous executable memfd mappings that may be renamed Frida gadgets.
+        // A memfd line looks like: <range> r-xp 00000000 00:01 <inode> /memfd:<name> (deleted)
+        bool isSuspiciousMemfd = (!isFridaByName &&
+            line.find(XOR_STR("memfd:")) != std::string::npos &&
+            (line.find(XOR_STR("r-xp")) != std::string::npos || line.find(XOR_STR("rwxp")) != std::string::npos));
+
+        if (isFridaByName || isSuspiciousMemfd) {
             LOGE("AntiTamper: Suspicious library detected in memory: %s", line.c_str());
             reportSecurityEvent(env, XOR_STR("Suspicious library detected: ") + line);
-            allGood = false;
+            // Flush the Sentry event and terminate the process — do not allow execution to continue.
+            SentryManager::flushAndTerminate(env);
         }
 
         // 2. Check for App APK Mapping
@@ -329,6 +339,16 @@ bool AntiTamper::checkEnvironment(JNIEnv* env) {
                 continue;
             }
 
+            // If the .so is from /data/app/ but belongs to a DIFFERENT package, this is a
+            // foreign library injection (e.g. GameGuardian, GameKiller). Terminate immediately.
+            if (line.find(XOR_STR("/data/app/")) != std::string::npos &&
+                line.find(pkgName) == std::string::npos) {
+                LOGE("AntiTamper: Foreign library injection detected: %s", line.c_str());
+                reportSecurityEvent(env, XOR_STR("Unofficial library mapping: ") + line);
+                SentryManager::flushAndTerminate(env);
+                break; // unreachable
+            }
+
             bool foundInWhitelist = false;
             for (const auto& official : officialLibs) {
                 if (line.find(official) != std::string::npos) {
@@ -337,7 +357,7 @@ bool AntiTamper::checkEnvironment(JNIEnv* env) {
                 }
             }
 
-            // If it's an .so in our app context but NOT in our whitelist
+            // If it's an .so in our own app context but NOT in our whitelist (tampered own lib)
             if (!foundInWhitelist) {
                 LOGE("AntiTamper: Unofficial library mapping detected: %s", line.c_str());
                 reportSecurityEvent(env, XOR_STR("Unofficial library mapping: ") + line);
@@ -366,6 +386,46 @@ bool AntiTamper::checkEnvironment(JNIEnv* env) {
 
 bool AntiTamper::checkHooks(JNIEnv* env, jobject context) {
     bool allGood = true;
+
+    // 0. Detect known game-hacking tools (GameGuardian, GameKiller, etc.)
+    // These tools inject native libraries into other processes to read/write memory.
+    {
+        const char* hackerPkgs[] = {
+            "com.ztheone.gamedaemon",      // GameGuardian daemon
+            "catch_.me_.if_.you_.can_",    // GameGuardian service alias
+            "com.cih.gamecih",             // GameCIH
+            "com.cih.gamecih2",
+            "com.gk.speed.booster.tool",   // GameKiller (rebranded GameGuardian clone)
+            "com.gk.speedbooster",
+            "org.sbtools.gamehack",        // SB Game Hacker
+            "com.zune.gamekiller",
+            nullptr
+        };
+        jclass pmClass = env->FindClass(XOR_STR("android/content/pm/PackageManager").c_str());
+        jclass contextClass = env->GetObjectClass(context);
+        jmethodID getPmMethod = env->GetMethodID(contextClass, XOR_STR("getPackageManager").c_str(), XOR_STR("()Landroid/content/pm/PackageManager;").c_str());
+        jobject pm = env->CallObjectMethod(context, getPmMethod);
+        jmethodID getPackageInfoMethod = env->GetMethodID(pmClass, XOR_STR("getPackageInfo").c_str(), XOR_STR("(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;").c_str());
+
+        for (int i = 0; hackerPkgs[i] != nullptr; i++) {
+            jstring jPkg = env->NewStringUTF(hackerPkgs[i]);
+            jobject pkgInfo = nullptr;
+            // Suppress the NameNotFoundException — it just means package isn't installed
+            pkgInfo = env->CallObjectMethod(pm, getPackageInfoMethod, jPkg, 0);
+            if (env->ExceptionCheck()) {
+                env->ExceptionClear();
+                pkgInfo = nullptr;
+            }
+            env->DeleteLocalRef(jPkg);
+            if (pkgInfo != nullptr) {
+                LOGE("AntiTamper: Game-hacking tool detected: %s", hackerPkgs[i]);
+                reportSecurityEvent(env, std::string(XOR_STR("Game hacking tool installed: ")) + hackerPkgs[i]);
+                SentryManager::flushAndTerminate(env);
+                break; // unreachable
+            }
+        }
+    }
+
     // 1. Check for Mocked PackageManager
     jclass contextClass = env->GetObjectClass(context);
     jmethodID getPackageManagerMethod = env->GetMethodID(contextClass, XOR_STR("getPackageManager").c_str(), XOR_STR("()Landroid/content/pm/PackageManager;").c_str());
@@ -393,7 +453,8 @@ bool AntiTamper::checkHooks(JNIEnv* env, jobject context) {
 }
 
 std::string AntiTamper::getApkPathFromMaps() {
-    std::ifstream maps(XOR_STR("/proc/self/maps"));
+    std::string maps_content = read_file_sys(XOR_STR("/proc/self/maps").c_str());
+    std::stringstream maps(maps_content);
     std::string line;
     std::string pkgName = getExpectedPackageName();
     while (std::getline(maps, line)) {
@@ -608,10 +669,21 @@ std::string AntiTamper::getStringFromResources(JNIEnv* env, jobject context, con
     return val;
 }
 
+bool AntiTamper::checkSelfIntegrity(JNIEnv* env) {
+    if (!g_initialized) {
+        reportSecurityEvent(env, XOR_STR("AntiTamper NOT INITIALIZED (JNI_OnLoad bypass)"));
+        return false;
+    }
+    return true;
+}
+
 bool AntiTamper::check(JNIEnv* env, jobject context) {
     LOGD("Check started");
 
     bool allGood = true;
+
+    // Self-integrity check
+    if (!checkSelfIntegrity(env)) allGood = false;
 
     // Advanced Checks
     if (checkDebuggable(env, context)) {
@@ -742,24 +814,16 @@ bool AntiTamper::check(JNIEnv* env, jobject context) {
     jmethodID toByteArrayMethod = env->GetMethodID(signatureClass, XOR_STR("toByteArray").c_str(), XOR_STR("()[B").c_str());
     jbyteArray certBytes = (jbyteArray)env->CallObjectMethod(firstSigner, toByteArrayMethod);
 
-    // Calculate SHA-256 of the certificate
-    jclass messageDigestClass = env->FindClass(XOR_STR("java/security/MessageDigest").c_str());
-    jmethodID getInstanceMethod = env->GetStaticMethodID(messageDigestClass, XOR_STR("getInstance").c_str(), XOR_STR("(Ljava/lang/String;)Ljava/security/MessageDigest;").c_str());
-    jstring sha256String = env->NewStringUTF(XOR_STR("SHA-256").c_str());
-    jobject digest = env->CallStaticObjectMethod(messageDigestClass, getInstanceMethod, sha256String);
-    jmethodID digestMethod = env->GetMethodID(messageDigestClass, XOR_STR("digest").c_str(), XOR_STR("([B)[B").c_str());
-    jbyteArray hashBytes = (jbyteArray)env->CallObjectMethod(digest, digestMethod, certBytes);
+    // Calculate SHA-256 of the certificate natively
+    jsize certLen = env->GetArrayLength(certBytes);
+    jbyte* certPtr = env->GetByteArrayElements(certBytes, nullptr);
 
-    jsize hashLen = env->GetArrayLength(hashBytes);
-    jbyte* hashPtr = env->GetByteArrayElements(hashBytes, nullptr);
+    next::SHA256 sha256;
+    sha256.update(reinterpret_cast<uint8_t*>(certPtr), static_cast<size_t>(certLen));
+    std::vector<uint8_t> hash = sha256.digest();
+    std::string currentSignature = next::SHA256::toString(hash);
 
-    std::stringstream ss;
-    for (int i = 0; i < hashLen; ++i) {
-        ss << std::uppercase << std::setfill('0') << std::setw(2) << std::hex << (int)(hashPtr[i] & 0xFF);
-        if (i < hashLen - 1) ss << ":";
-    }
-    std::string currentSignature = ss.str();
-    env->ReleaseByteArrayElements(hashBytes, hashPtr, JNI_ABORT);
+    env->ReleaseByteArrayElements(certBytes, certPtr, JNI_ABORT);
 
     LOGD("Signature: %s", currentSignature.c_str());
     LOGD("Expected: %s", getExpectedSignature().c_str());
@@ -1135,6 +1199,7 @@ void AntiTamper::dismissNativeOverlay(JNIEnv* env) {
 void AntiTamper::registerLifecycleCallbacks(JNIEnv* env, jobject application) {
     if (g_lifecycle_callback_proxy != nullptr) return;
 
+    g_initialized = true;
     LOGD("Registering native lifecycle callbacks...");
 
     jclass proxyClass = env->FindClass(XOR_STR("java/lang/reflect/Proxy").c_str());
@@ -1307,15 +1372,68 @@ void AntiTamper::renderLoop() {
                 LOGD("AntiTamper: Late-attached debugger detected (TracerPid fallback)!");
             }
 
-            std::ifstream maps(XOR_STR("/proc/self/maps"));
+            std::string maps_content = read_file_sys(XOR_STR("/proc/self/maps").c_str());
+            std::stringstream maps(maps_content);
             std::string line;
+            std::string pkgName = next::AntiTamper::getExpectedPackageName();
             while (std::getline(maps, line)) {
-                if (line.find(XOR_STR("frida")) != std::string::npos ||
+                bool isFridaByName = (line.find(XOR_STR("frida")) != std::string::npos ||
                     line.find(XOR_STR("xposed")) != std::string::npos ||
-                    line.find(XOR_STR("libgadget")) != std::string::npos) {
-                    LOGE("AntiTamper: Late-attached hook detected in memory!");
-                    g_force_error = true;
-                    break;
+                    line.find(XOR_STR("libgadget")) != std::string::npos);
+                bool isSuspiciousMemfd = (!isFridaByName &&
+                    line.find(XOR_STR("memfd:")) != std::string::npos &&
+                    (line.find(XOR_STR("r-xp")) != std::string::npos || line.find(XOR_STR("rwxp")) != std::string::npos));
+                // Detect foreign .so injection from another app's /data/app/ directory
+                bool isForeignInjection = (line.find(XOR_STR(".so")) != std::string::npos &&
+                    line.find(XOR_STR("/data/app/")) != std::string::npos &&
+                    line.find(pkgName) == std::string::npos);
+                if (isFridaByName || isSuspiciousMemfd || isForeignInjection) {
+                    LOGE("AntiTamper: Late-attached hook detected in memory: %s", line.c_str());
+                    JNIEnv* scanEnv = nullptr;
+                    g_vm->GetEnv((void**)&scanEnv, JNI_VERSION_1_6);
+                    SentryManager::reportSecurityEvent(scanEnv, XOR_STR("Late-attached hook detected: ") + line);
+                    SentryManager::flushAndTerminate(scanEnv);
+                    break; // unreachable, but keeps the compiler happy
+                }
+            }
+
+            // Scan running processes for known game-hacking tools via /proc/*/cmdline
+            {
+                const char* hackerProcs[] = {
+                    "gameguardian", "gamedaemon", "gamekiller",
+                    "speed.booster.tool", "gamecih", "gamehack",
+                    nullptr
+                };
+                DIR* procDir = opendir(XOR_STR("/proc").c_str());
+                if (procDir) {
+                    struct dirent* entry;
+                    while ((entry = readdir(procDir)) != nullptr) {
+                        // Only process numeric directories (PIDs)
+                        bool allDigits = true;
+                        for (char* c = entry->d_name; *c; c++) {
+                            if (*c < '0' || *c > '9') { allDigits = false; break; }
+                        }
+                        if (!allDigits || entry->d_name[0] == '\0') continue;
+
+                        std::string cmdlinePath = std::string(XOR_STR("/proc/")) + entry->d_name + XOR_STR("/cmdline");
+                        std::ifstream cmdlineFile(cmdlinePath);
+                        if (!cmdlineFile.is_open()) continue;
+                        std::string cmdline;
+                        std::getline(cmdlineFile, cmdline);
+                        if (cmdline.empty()) continue;
+
+                        for (int i = 0; hackerProcs[i] != nullptr; i++) {
+                            if (cmdline.find(hackerProcs[i]) != std::string::npos) {
+                                LOGE("AntiTamper: Game-hacking process detected: %s", cmdline.c_str());
+                                JNIEnv* scanEnv = nullptr;
+                                g_vm->GetEnv((void**)&scanEnv, JNI_VERSION_1_6);
+                                SentryManager::reportSecurityEvent(scanEnv, std::string(XOR_STR("Game hacking process running: ")) + cmdline.substr(0, 64));
+                                SentryManager::flushAndTerminate(scanEnv);
+                                break; // unreachable
+                            }
+                        }
+                    }
+                    closedir(procDir);
                 }
             }
             last_security_scan = now;

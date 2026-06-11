@@ -296,6 +296,9 @@ class MapView constructor(
     private var targetRenderData: RenderData? = null
     private var renderedMap: RenderedMap? = null
 
+    // Track metadata for pending render requests to ensure they are applied atomically with the bitmap.
+    private val pendingRenderData = java.util.concurrent.ConcurrentHashMap<Long, RenderData>()
+
     data class RenderData(
         val region: MapRegion,
         val pins: List<PinInfo>,
@@ -338,19 +341,17 @@ class MapView constructor(
             config,
             FUZZY_BORDER_COUNTRIES
         ) { map, id ->
-            targetRenderData?.let { renderData ->
-                if (id == renderData.id) {
-                    if (renderedMap == null) {
-                        animate()
-                            .alpha(1f)
-                            .duration = fadeInDurationMs
-                    }
-                    renderedMap = map
-                    renderTimeInfo = Pair(elapsedClockMs(), renderData.stage)
-                    currentRenderData = targetRenderData
-
-                    invalidate()
+            val renderData = pendingRenderData.remove(id) ?: targetRenderData
+            if (renderData != null && id == renderData.id) {
+                if (renderedMap == null) {
+                    animate()
+                        .alpha(1f)
+                        .duration = fadeInDurationMs
                 }
+                renderedMap = map
+                renderTimeInfo = Pair(elapsedClockMs(), renderData.stage)
+                currentRenderData = renderData // ATOMIC UPDATE with map
+                invalidate()
             }
         }
     }
@@ -473,8 +474,13 @@ class MapView constructor(
                 h = (w * normalH).roundToInt()
             }
             val newId = mapRenderer.updateSize(w, h)
-            if (newId != null)
-                targetRenderData = targetRenderData?.copy(id = newId)
+            if (newId != null) {
+                val renderData = targetRenderData?.copy(id = newId)
+                if (renderData != null) {
+                    pendingRenderData[newId] = renderData
+                    targetRenderData = renderData
+                }
+            }
         }
     }
 
@@ -496,7 +502,9 @@ class MapView constructor(
             newMapRegion = newRegion,
             newHighlights = newHighlights,
         )
-        targetRenderData = RenderData(newRegion, newPins, highlightStage, id)
+        val renderData = RenderData(newRegion, newPins, highlightStage, id)
+        pendingRenderData[id] = renderData
+        targetRenderData = renderData
     }
 
     companion object {
@@ -530,6 +538,7 @@ class MapView constructor(
 fun HomeMap(
     allServers: ImmutableList<LogicalServer>,
     connectedServer: LogicalServer?,
+    isConnected: Boolean,
     isConnecting: Boolean,
     modifier: Modifier = Modifier,
     userCountryCode: String? = null,
@@ -556,8 +565,7 @@ fun HomeMap(
         CountryHighlight.CONNECTED to colors.notificationSuccess.toArgb(),
     )
 
-    val mapState = remember(connectedServer, isConnecting, userCountryCode) {
-        val isConnected = connectedServer != null && !isConnecting
+    val mapState = remember(connectedServer, isConnected, isConnecting, userCountryCode) {
         val highlight = when {
             isConnected -> CountryHighlight.CONNECTED
             isConnecting -> CountryHighlight.CONNECTING
@@ -570,6 +578,10 @@ fun HomeMap(
         }
         targetCode?.let { it to highlight }
     }
+
+    // Track the last state that was actually applied to the native view
+    var lastAppliedState by remember { mutableStateOf<Pair<String, CountryHighlight>?>(null) }
+    var isInitialized by remember { mutableStateOf(false) }
 
     AndroidView(
         modifier = modifier.fillMaxSize(),
@@ -585,7 +597,11 @@ fun HomeMap(
             }
         },
         update = { mapView ->
-            updateMapView(mapView, scope, mapState)
+            if (mapState != lastAppliedState || !isInitialized) {
+                lastAppliedState = mapState
+                isInitialized = true
+                updateMapView(mapView, scope, mapState)
+            }
         }
     )
 }
@@ -595,7 +611,7 @@ private fun updateMapView(
     scope: CoroutineScope,
     mapHighlight: Pair<String, CountryHighlight>?
 ) {
-    var region = TvMapRenderer.DEFAULT_PORTRAIT_REGION
+    var region = TvMapRenderer.FULL_REGION
     var highlights = emptyList<CountryHighlightInfo>()
     var pins = emptyList<PinInfo>()
 

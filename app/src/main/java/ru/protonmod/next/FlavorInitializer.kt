@@ -19,6 +19,8 @@ package ru.protonmod.next
 
 import android.content.Context
 import io.sentry.android.core.SentryAndroid
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import ru.protonmod.next.data.local.SettingsManager
 import ru.protonmod.next.utils.PiiScrubber
 import ru.protonmod.next.vpn.SentryBridge
@@ -30,11 +32,23 @@ import ru.protonmod.next.vpn.SentryBridge
  */
 object FlavorInitializer {
     @JvmStatic
-    fun initialize(context: Context) {
+    fun initializeOnMainThread(context: Context) {
         // Honeypot: A fake environment check that modders might try to skip.
+        // Kept on the main thread intentionally.
         verifySecurityEnvironment(context)
+    }
 
-        // Read settings synchronously for app startup to avoid ANR
+    /**
+     * Performs the Sentry SDK initialization.
+     * This method is called by the native AntiTamper code via JNI.
+     * It MUST remain a static method with the signature (Landroid/content/Context;)V.
+     *
+     * In ProtonNextApp, it is called from Dispatchers.IO to avoid blocking the main thread
+     * and triggering a Background ANR during startup.
+     */
+    @JvmStatic
+    fun initialize(context: Context) {
+        // Read settings synchronously — SharedPreferences reads are thread-safe
         val settingsManager = SettingsManager(context)
         val isAnalyticsEnabled = settingsManager.isAnalyticsEnabledSync()
         val isPerformanceEnabled = settingsManager.isPerformanceEnabledSync()
@@ -53,10 +67,17 @@ object FlavorInitializer {
             options.isEnableScopeSync = false
             options.isSendDefaultPii = false
 
-            // Global PII filtering for all Sentry events
+            // Global PII filtering and master kill-switch for all Sentry events
             options.setBeforeSend { event, _ ->
                 val currentCrashEnabled = settingsManager.isCrashReportsEnabledSync()
-                if (!currentCrashEnabled) return@setBeforeSend null
+                val currentNonFatalEnabled = settingsManager.isNonFatalEnabledSync()
+                val currentAnalyticsEnabled = settingsManager.isAnalyticsEnabledSync()
+                
+                // If it's a crash and crashes are disabled, drop it
+                if (event.isCrashed && !currentCrashEnabled) return@setBeforeSend null
+                
+                // If it's NOT a crash and non-fatals/analytics are disabled, drop it
+                if (!event.isCrashed && (!currentNonFatalEnabled || !currentAnalyticsEnabled)) return@setBeforeSend null
 
                 // Scrub event message
                 event.message?.let { it.message = PiiScrubber.scrub(it.message) }
