@@ -58,7 +58,12 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.room)
-    alias(libs.plugins.sentry)
+    alias(libs.plugins.sentry) apply false
+}
+
+// Only apply Sentry for non-privacy builds to ensure zero dependencies in privacy flavor
+if (!project.gradle.startParameter.taskNames.any { it.contains("privacy", ignoreCase = true) }) {
+    apply(plugin = "io.sentry.android.gradle")
 }
 
 android {
@@ -74,6 +79,7 @@ android {
         targetSdk = 37
         versionCode = getDynamicVersionCode(rootDir)
         versionName = getDynamicVersionName(rootDir)
+        buildConfigField("boolean", "SENTRY_ENABLED", "true")
 
         // Support 64-bit architectures only
         // 32-bit devices (armeabi-v7a, armeabi) are not supported as the VPN engine
@@ -123,7 +129,7 @@ android {
         }
     }
 
-    flavorDimensions.add("channel")
+    flavorDimensions.addAll(listOf("channel", "type"))
     productFlavors {
         create("stable") {
             dimension = "channel"
@@ -135,6 +141,39 @@ android {
             applicationIdSuffix = ".nightly"
             versionNameSuffix = "-nightly"
             buildConfigField("String", "UPDATE_CHANNEL", "\"nightly\"")
+        }
+        
+        create("official") {
+            dimension = "type"
+            isDefault = true
+            buildConfigField("boolean", "IS_PRIVACY_BUILD", "false")
+        }
+
+        create("privacy") {
+            dimension = "type"
+            applicationIdSuffix = ".privacy"
+            buildConfigField("boolean", "IS_PRIVACY_BUILD", "true")
+            buildConfigField("boolean", "SENTRY_ENABLED", "false")
+            externalNativeBuild {
+                cmake {
+                    cppFlags("-DPRIVACY_FLAVOR=1")
+                }
+            }
+        }
+    }
+
+    sourceSets {
+        getByName("main") {
+            java.srcDirs("src/main/java", "src/main/kotlin")
+        }
+        getByName("stable") {
+            java.srcDirs("src/stable/java")
+        }
+        getByName("nightly") {
+            java.srcDirs("src/nightly/java")
+        }
+        getByName("privacy") {
+            java.srcDirs("src/privacy/java")
         }
     }
 
@@ -313,10 +352,12 @@ tasks.register("generateSecurityMetadata") {
     val officialLibs = listOf(
         "libam-go.so", "libam-quick.so", "libam.so", 
         "libandroidx.graphics.path.so", "libdatastore_shared_counter.so",
-        "libgojni.so", "libhev-socks5-tunnel.so", "libsentry-android.so",
-        "libsentry.so", "libbyedpi.so", "libnext.so"
+        "libgojni.so", "libhev-socks5-tunnel.so", "libbyedpi.so", "libnext.so"
     )
+    val sentryLibs = listOf("libsentry-android.so", "libsentry.so")
+    
     inputs.property("officialLibs", officialLibs)
+    inputs.property("sentryLibs", sentryLibs)
 
     outputs.file(outputFile)
 
@@ -334,7 +375,12 @@ tasks.register("generateSecurityMetadata") {
             // Obfuscated APK sizes
             #define MAX_RELEASE_APK_SIZE_VAL (${releaseMaxSize}LL ^ 0x1337BEEF)
             #define MAX_DEBUG_APK_SIZE_VAL   (${debugMaxSize}LL ^ 0xDEADBEEF)
+            
+            #ifdef PRIVACY_FLAVOR
             #define EXPECTED_LIB_COUNT ${officialLibs.size}
+            #else
+            #define EXPECTED_LIB_COUNT ${officialLibs.size + sentryLibs.size}
+            #endif
             
             // Obfuscated version code
             #define EXPECTED_VERSION_CODE_VAL (${expectedVersionCode} ^ 0xCAFEBABE)
@@ -343,7 +389,10 @@ tasks.register("generateSecurityMetadata") {
                 // We will use a function to get official libs to allow runtime decryption
                 static inline std::vector<std::string> getOfficialLibs() {
                     return {
-                        ${officialLibs.joinToString(",\n                        ") { "XOR_STR(\"$it\")" }}
+                        ${officialLibs.joinToString(",\n                        ") { "XOR_STR(\"$it\")" }},
+#ifndef PRIVACY_FLAVOR
+                        ${sentryLibs.joinToString(",\n                        ") { "XOR_STR(\"$it\")" }}
+#endif
                     };
                 }
                 
@@ -376,17 +425,19 @@ room {
     generateKotlin = true
 }
 
-sentry {
-    includeProguardMapping.set(true)
-    autoUploadProguardMapping.set(true)
-    uploadNativeSymbols.set(true)
-    includeNativeSources.set(true)
-    includeSourceContext.set(true)
-    autoUploadSourceContext.set(true)
-    tracingInstrumentation {
-        enabled.set(true)
-        logcat {
+plugins.withId("io.sentry.android.gradle") {
+    configure<io.sentry.android.gradle.extensions.SentryPluginExtension> {
+        includeProguardMapping.set(true)
+        autoUploadProguardMapping.set(true)
+        uploadNativeSymbols.set(true)
+        includeNativeSources.set(true)
+        includeSourceContext.set(true)
+        autoUploadSourceContext.set(true)
+        tracingInstrumentation {
             enabled.set(true)
+            logcat {
+                enabled.set(true)
+            }
         }
     }
 }
@@ -453,11 +504,17 @@ dependencies {
     implementation(libs.amneziawg.android)
     implementation(libs.go.vpn.lib)
 
-    // Sentry
-    implementation(libs.sentry.android)
-    implementation(libs.sentry.compose)
-    implementation(libs.sentry.okhttp)
-    implementation(libs.sentry.replay)
+    // Sentry - only for official builds (not for privacy)
+    val sentryDeps = listOf(
+        libs.sentry.android,
+        libs.sentry.compose,
+        libs.sentry.okhttp,
+        libs.sentry.replay
+    )
+    add("officialImplementation", platform(libs.sentry.bom))
+    sentryDeps.forEach { dep ->
+        add("officialImplementation", dep)
+    }
 
     // Testing
     testImplementation(libs.junit)

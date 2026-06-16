@@ -232,12 +232,14 @@ fun SettingsContent(
                             onNotificationsChange = onNotificationsChange
                         )
 
-                        UpdateSettingsSection(
-                            state = state,
-                            onFrequencyChange = onOtaFrequencyChange,
-                            onChannelChange = onOtaChannelChange,
-                            onCheckNow = onCheckForUpdates
-                        )
+                        if (!state.isPrivacyBuild) {
+                            UpdateSettingsSection(
+                                state = state,
+                                onFrequencyChange = onOtaFrequencyChange,
+                                onChannelChange = onOtaChannelChange,
+                                onCheckNow = onCheckForUpdates
+                            )
+                        }
 
                         WidgetSettingsSection()
 
@@ -295,14 +297,16 @@ fun SettingsContent(
                 )
             }
 
-            item(contentType = "UpdateSettings") {
-                UpdateSettingsSection(
-                    state = state,
-                    onFrequencyChange = onOtaFrequencyChange,
-                    onChannelChange = onOtaChannelChange,
-                    onCheckNow = onCheckForUpdates,
-                    modifier = contentModifier
-                )
+            if (!state.isPrivacyBuild) {
+                item(contentType = "UpdateSettings") {
+                    UpdateSettingsSection(
+                        state = state,
+                        onFrequencyChange = onOtaFrequencyChange,
+                        onChannelChange = onOtaChannelChange,
+                        onCheckNow = onCheckForUpdates,
+                        modifier = contentModifier
+                    )
+                }
             }
 
             item(contentType = "WidgetSettings") {
@@ -614,12 +618,14 @@ private fun PrivacySettingsSection(
             onClick = onNavigateToKillSwitch
         )
 
-        SettingRowWithIcon(
-            icon = Icons.Rounded.BugReport,
-            title = stringResource(R.string.settings_error_reporting),
-            subtitle = stringResource(R.string.settings_error_reporting_desc),
-            onClick = onNavigateToErrorReporting
-        )
+        if (BuildConfig.SENTRY_ENABLED) {
+            SettingRowWithIcon(
+                icon = Icons.Rounded.BugReport,
+                title = stringResource(R.string.settings_error_reporting),
+                subtitle = stringResource(R.string.settings_error_reporting_desc),
+                onClick = onNavigateToErrorReporting
+            )
+        }
 
         SettingToggleRow(
             icon = Icons.Rounded.Notifications,
